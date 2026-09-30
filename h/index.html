@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0e122f" />
+  <meta name="description" content="Play online slots, live casino games, sportsbook matches and tournaments at Nexluck." />
+  <title>Nexluck Casino | Home</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="landing.css" />
+  <link rel="stylesheet" href="home.css" />
+</head>
+<body class="landing-body home-page" data-mode="casino">
+  <div class="landing-shell home-shell">
+    <header class="landing-header home-header">
+      <a class="landing-brand" href="/" aria-label="Nexluck home"><span class="bird-logo"><i></i><b></b></span><span class="logo-copy">nex<span>luck</span></span><span class="brand-name">CASINO</span></a>
+      <div class="home-header-actions">
+        <label class="balance-select"><span>Balance</span><select aria-label="Select currency"><option>100 EUR</option><option>100 USD</option><option>85 GBP</option></select></label>
+        <button class="header-notice bonus-notice" data-notice="Your bonus wallet is up to date." aria-label="Bonus notifications" title="Bonus notifications"><span aria-hidden="true">%</span><i></i></button>
+        <button class="header-notice message-notice" data-notice="No new messages." aria-label="Messages" title="Messages"><span aria-hidden="true">✉</span><i></i></button>
+        <button class="profile-avatar" data-notice="Profile menu is ready." aria-label="Profile: luna.play, Gold loyalty level"><span>L</span><b class="loyalty-badge" aria-label="Gold loyalty level">✦</b></button>
+      </div>
+    </header>
+
+    <main class="home-main">
+      <section class="home-promotions" aria-labelledby="home-promotions-title"><div class="section-heading"><div><span class="eyebrow">OFFERS FOR YOUR NEXT SESSION</span><h1 id="home-promotions-title">Promotions</h1></div><div class="carousel-arrows"><button data-scroll-track="home-promo-track" data-direction="-1" aria-label="Previous promotions">←</button><button data-scroll-track="home-promo-track" data-direction="1" aria-label="Next promotions">→</button></div></div><div class="home-slider-window"><div class="home-promo-track" id="home-promo-track"></div></div></section>
+
+      <section class="home-section casino-only" id="home-categories"><div class="section-heading"><div><span class="eyebrow">QUICK ACCESS</span><h2>Popular categories</h2></div></div><div class="category-slider-window"><div class="category-slider" id="home-category-track"></div></div></section>
+
+      <section class="home-section casino-only" id="home-games"><div class="section-heading"><div><span class="eyebrow">FIND YOUR NEXT FAVORITE</span><h2>Popular games</h2></div><button class="text-link" data-focus-search>Browse games <span>→</span></button></div><label class="home-search"><span aria-hidden="true">⌕</span><input id="home-game-search" type="search" placeholder="Search games" aria-label="Search games" /></label><div id="home-game-groups"></div></section>
+
+      <section class="home-section sportsbook-section" id="sportsbook-matches"><div class="section-heading"><div><span class="eyebrow">LIVE ODDS · BIG MATCHES</span><h2>Sportsbook matches</h2></div><div class="carousel-arrows"><button data-scroll-track="match-track" data-direction="-1" aria-label="Previous matches">←</button><button data-scroll-track="match-track" data-direction="1" aria-label="Next matches">→</button></div></div><div class="home-slider-window"><div class="match-track" id="match-track"></div></div></section>
+
+      <section class="home-section casino-only" id="game-providers"><div class="section-heading"><div><span class="eyebrow">THE STUDIOS BEHIND THE GAMES</span><h2>Game providers</h2></div></div><div class="provider-grid" id="provider-grid"></div></section>
+
+      <section class="home-section"><div class="section-heading"><div><span class="eyebrow">MORE REASONS TO PLAY</span><h2>Promotions</h2></div><div class="carousel-arrows"><button data-scroll-track="offer-track" data-direction="-1" aria-label="Previous offers">←</button><button data-scroll-track="offer-track" data-direction="1" aria-label="Next offers">→</button></div></div><div class="home-slider-window"><div class="home-promo-track" id="offer-track"></div></div></section>
+
+      <section class="home-section"><div class="section-heading"><div><span class="eyebrow">PLAY FOR THE LEADERBOARD</span><h2>Tournaments</h2></div><div class="carousel-arrows"><button data-scroll-track="home-tournament-track" data-direction="-1" aria-label="Previous tournaments">←</button><button data-scroll-track="home-tournament-track" data-direction="1" aria-label="Next tournaments">→</button></div></div><div class="home-slider-window"><div class="home-promo-track" id="home-tournament-track"></div></div></section>
+
+      <section class="home-section"><div class="section-heading"><div><span class="eyebrow">RECENT PLAYER ACTIVITY</span><h2>Winning now</h2></div><span class="home-live"><i></i> LIVE</span></div><div class="home-table-wrap"><table class="home-table"><thead><tr><th>Game</th><th>Player</th><th>Win</th></tr></thead><tbody id="home-wins"></tbody></table></div></section>
+
+      <section class="home-section"><div class="section-heading"><div><span class="eyebrow">TOP FINISHERS</span><h2>Recent tournament winners</h2></div></div><div class="home-table-wrap"><table class="home-table tournament-winners"><thead><tr><th>Tournament</th><th>Player</th><th>Win / Place</th></tr></thead><tbody id="tournament-winners"></tbody></table></div></section>
+
+      <section class="home-section casino-only reward-grid"><article class="reward-card spin-rally"><span class="eyebrow">DAILY RACE</span><h2>Spin Rally</h2><p>Climb the leaderboard with every spin and race for rewards.</p><button data-notice="Spin Rally is ready to explore.">Join the rally <span>→</span></button></article><article class="reward-card loot-box"><span class="eyebrow">A SURPRISE INSIDE</span><h2>Loot box</h2><p>Open your next reward and see what luck has in store.</p><button data-notice="Your next surprise is waiting.">Open rewards <span>→</span></button></article></section>
+    </main>
+
+    <footer class="home-footer"><p class="home-seo">Discover online slots, live casino tables, popular game providers, sportsbook matches and tournaments at Nexluck. Browse new releases, current promotions and rewards in one place.</p><p class="home-responsible">18+ only. Casino games and sports betting are for entertainment. Play responsibly and within your limits.</p><div><a href="#home-terms">Terms and Conditions</a><span>|</span><a href="#home-license">License</a></div><small id="home-terms">Please review the terms and applicable license details for your region.</small><span id="home-license"></span></footer>
+  </div>
+
+  <nav class="landing-bottom-nav" aria-label="Main navigation"><button data-action="deposit"><span class="nav-symbol" aria-hidden="true">◈</span><small>Deposit</small></button><button data-action="search"><span class="nav-symbol" aria-hidden="true">⌕</span><small>Search</small></button><button class="mode-toggle" data-action="mode" aria-label="Switch to sportsbook mode"><span class="nav-symbol" id="home-mode-icon" aria-hidden="true">⚽</span><small id="home-mode-label">Sport</small></button><button data-action="menu"><span class="nav-symbol" aria-hidden="true">☰</span><small>Menu</small></button></nav>
+  <div class="home-menu" id="home-menu" hidden><div class="home-menu-scrim" data-close-menu></div><section><div class="home-menu-heading">Menu<button data-close-menu aria-label="Close menu">×</button></div><a href="#home-categories" data-close-menu>Popular categories</a><a href="#sportsbook-matches" data-close-menu>Sportsbook matches</a><a href="#game-providers" data-close-menu>Game providers</a><a href="#home-terms" data-close-menu>Terms and Conditions</a><a href="#home-license" data-close-menu>License</a></section></div>
+  <div class="home-toast" id="home-toast" role="status" aria-live="polite"></div>
+  <script src="home.js" defer></script>
+</body>
+</html>

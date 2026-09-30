@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0e122f" />
+  <meta name="description" content="Explore casino games, live wins, promotions and tournaments at nexluck." />
+  <title>Nexluck Casino | Play brighter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="landing.css" />
+</head>
+<body class="landing-body">
+  <div class="landing-shell">
+    <header class="landing-header">
+      <a class="landing-brand" href="/" aria-label="Nexluck home"><span class="bird-logo"><i></i><b></b></span><span class="logo-copy">nex<span>luck</span></span><span class="brand-name">CASINO</span></a>
+      <div class="landing-header-actions"><button class="landing-signin" data-auth="signin">Sign in</button><button class="landing-signup" data-auth="signup">Sign up</button></div>
+    </header>
+
+    <main>
+      <section class="landing-hero" aria-labelledby="hero-title">
+        <div class="hero-backdrop" role="img" aria-label="Colorful casino game artwork"></div>
+        <div class="hero-content"><span class="eyebrow">YOUR NEXT LUCKY MOMENT</span><h1 id="hero-title">Play brighter.<br /><span>Win your way.</span></h1><p id="hero-copy">Find your next favorite game, explore live tables and join the action.</p><button class="hero-cta" data-auth="signup">Join Nexluck <span>→</span></button><div class="quick-signup"><span>Quick sign up with</span><div class="social-buttons"><button data-auth="signup" aria-label="Sign up with Twitch"><b class="twitch-mark">T</b><span>Twitch</span></button><button data-auth="signup" aria-label="Sign up with Steam"><b class="steam-mark">S</b><span>Steam</span></button><button data-auth="signup" aria-label="Sign up with Google"><b class="google-mark">G</b><span>Google</span></button><button data-auth="signup" aria-label="Sign up with Facebook"><b class="facebook-mark">f</b><span>Facebook</span></button></div></div></div>
+        <div class="hero-side-art" aria-hidden="true"><span>7</span><b>✦</b><i>♛</i></div>
+      </section>
+
+      <section class="landing-section wins-section" aria-labelledby="wins-title"><div class="section-heading"><div><span class="eyebrow">THE ACTION IS LIVE</span><h2 id="wins-title">Live wins</h2></div><span class="live-indicator"><i></i> LIVE</span></div><div class="wins-window"><div class="wins-track" id="wins-track" aria-label="Recent player wins"></div></div></section>
+
+      <section class="landing-section games-section" aria-labelledby="games-title"><div class="section-heading"><div><span class="eyebrow">FIND YOUR NEXT FAVORITE</span><h2 id="games-title">Popular games</h2></div><button class="text-link" data-scroll="#game-categories">Browse all <span>→</span></button></div><label class="landing-game-search"><span aria-hidden="true">⌕</span><input id="game-search" type="search" placeholder="Search games" aria-label="Search games" /></label><div id="game-categories"></div></section>
+
+      <section class="landing-section carousel-section" aria-labelledby="promotions-title"><div class="section-heading"><div><span class="eyebrow">MORE REASONS TO PLAY</span><h2 id="promotions-title">Promotions</h2></div><div class="carousel-arrows"><button data-scroll-track="promo-track" data-direction="-1" aria-label="Previous promotions">←</button><button data-scroll-track="promo-track" data-direction="1" aria-label="Next promotions">→</button></div></div><div class="horizontal-window"><div class="promo-track" id="promo-track"></div></div></section>
+
+      <section class="landing-section carousel-section" aria-labelledby="tournaments-title"><div class="section-heading"><div><span class="eyebrow">PLAY FOR THE LEADERBOARD</span><h2 id="tournaments-title">Tournaments</h2></div><div class="carousel-arrows"><button data-scroll-track="tournament-track" data-direction="-1" aria-label="Previous tournaments">←</button><button data-scroll-track="tournament-track" data-direction="1" aria-label="Next tournaments">→</button></div></div><div class="horizontal-window"><div class="tournament-track" id="tournament-track"></div></div></section>
+
+      <section class="landing-section winners-section" aria-labelledby="winners-title"><div class="section-heading"><div><span class="eyebrow">GOOD LUCK IS SHARED</span><h2 id="winners-title">Winning now</h2></div><span class="live-indicator"><i></i> LIVE</span></div><div class="winners-table-wrap"><table class="winners-table"><thead><tr><th scope="col">Game</th><th scope="col">Player</th><th scope="col">Win</th></tr></thead><tbody id="winners-list"></tbody></table></div></section>
+    </main>
+
+    <footer class="landing-footer"><div class="footer-brand"><a class="landing-brand" href="/" aria-label="Nexluck home"><span class="bird-logo"><i></i><b></b></span><span class="logo-copy">nex<span>luck</span></span></a><span class="responsible-note">18+ only. Play responsibly.</span></div><div class="footer-links"><a href="#terms">Terms and Conditions</a><a href="#license">License</a></div><p id="terms">Casino games are for entertainment. Please review the terms and play within your limits.</p><p class="license-copy" id="license">License and operator details are available in the applicable terms for your region.</p><small>© 2026 Nexluck. All rights reserved.</small></footer>
+  </div>
+
+  <nav class="landing-bottom-nav" aria-label="Main navigation"><button data-action="deposit"><span class="nav-symbol" aria-hidden="true">◈</span><small>Deposit</small></button><button data-action="search"><span class="nav-symbol" aria-hidden="true">⌕</span><small>Search</small></button><button class="mode-toggle" data-action="mode" aria-label="Switch to sportsbook mode"><span class="nav-symbol" id="mode-icon" aria-hidden="true">⚽</span><small id="mode-label">Sport</small></button><button data-action="menu"><span class="nav-symbol" aria-hidden="true">☰</span><small>Menu</small></button></nav>
+
+  <div class="landing-modal" id="auth-modal" hidden><div class="modal-scrim" data-close-modal></div><section class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title"><button class="modal-close" data-close-modal aria-label="Close">×</button><span class="eyebrow">WELCOME TO NEXLUCK</span><h2 id="auth-title">Sign up</h2><p id="auth-copy">Create an account to explore games and offers.</p><form id="auth-form"><label>Email address<input type="email" name="email" placeholder="you@example.com" required autocomplete="email" /></label><label>Password<input type="password" name="password" placeholder="At least 6 characters" minlength="6" required autocomplete="new-password" /></label><button class="hero-cta" type="submit">Continue <span>→</span></button></form><p class="auth-switch">Already have an account? <button data-auth="signin">Sign in</button></p><small>18+ only. By continuing, you agree to the Terms and Conditions.</small></section></div>
+  <div class="menu-drawer" id="menu-drawer" hidden><div class="modal-scrim" data-close-menu></div><section class="drawer-panel" role="dialog" aria-modal="true" aria-label="Menu"><div class="drawer-heading"><strong>Menu</strong><button data-close-menu aria-label="Close menu">×</button></div><a href="#games-title" data-close-menu>Popular games</a><a href="#promotions-title" data-close-menu>Promotions</a><a href="#tournaments-title" data-close-menu>Tournaments</a><a href="#terms" data-close-menu>Terms and Conditions</a><a href="#license" data-close-menu>License</a></section></div>
+  <div class="landing-toast" id="landing-toast" role="status" aria-live="polite"></div>
+  <script src="landing.js" defer></script>
+</body>
+</html>
