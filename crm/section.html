@@ -1,0 +1,13 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NextLuck CRM</title><link rel="stylesheet" href="/crm/crm.css"></head>
+<body><header id="hdr"></header><div class="subbar" id="sub"></div>
+<main id="m"></main><footer id="ftr"></footer>
+<script src="/crm/data.js"></script>
+<script>
+const s=SECTIONS.find(x=>x.k===new URLSearchParams(location.search).get('s'))||SECTIONS[0];
+chrome(`<span class="crumb"><a href="/crm/">Home</a> / ${s.n}</span>`);document.title='NextLuck CRM — '+s.n;
+document.getElementById('m').innerHTML=`<h1>${s.i} ${s.n}</h1><p class="lead">Section details (prototype placeholder).</p>
+<div class="tiles">${[[s.big[1],s.big[0],'']].concat(s.kv.map(x=>[x[0],x[1],x[2]])).map(x=>`<div class="tile" style="--c:${s.c}"><div class="kv"><div>${x[0]}<b class="big ${x[2]}">${x[1]}</b></div></div></div>`).join('')}</div>
+<div class="panel"><h2>Recent activity</h2><table><tr><th>Time</th><th>Item</th><th>Status</th></tr>
+${['09:41','09:12','08:55','08:20','07:48'].map((t,i)=>`<tr><td>${t}</td><td>${s.n} record #${1040+i}</td><td>${['Completed','Pending','Completed','Review','Completed'][i]}</td></tr>`).join('')}</table></div>
+<p style="margin-top:16px"><a class="go" href="/crm/">← Back to home</a></p>`;
+</script></body></html>

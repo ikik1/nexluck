@@ -1,0 +1,7 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NextLuck CRM</title><link rel="stylesheet" href="/crm/crm.css"></head>
+<body><header id="hdr"></header><div class="subbar" id="sub"></div>
+<main><h1>Operator Console</h1><p class="lead">Key performance summary across your casino operation. Select a tile to open details.</p><div class="tiles" id="tiles"></div></main>
+<footer id="ftr"></footer>
+<script src="/crm/data.js"></script>
+<script>chrome();
+document.getElementById('tiles').innerHTML=SECTIONS.map(s=>`<a class="tile" style="--c:${s.c}" href="${s.href||'/crm/section.html?s='+s.k}"><div class="top"><div class="ico">${s.i}</div>${s.n}</div><div class="big">${s.big[0]}<small>${s.big[1]}</small></div><div class="kv">${s.kv.map(x=>`<div>${x[0]}<b class="${x[2]}">${x[1]}</b></div>`).join('')}</div><span class="go">View details →</span></a>`).join('');</script></body></html>

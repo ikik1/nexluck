@@ -1,0 +1,93 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NextLuck CRM — Bonuses</title><link rel="stylesheet" href="/crm/crm.css">
+<style>
+main{max-width:1600px}
+.tools{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:16px 0 12px}
+.search{flex:1;min-width:240px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;font-size:14px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--line);margin-bottom:12px}
+.tab{background:none;border:0;padding:10px 14px;font-size:14px;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px}
+.tab.on{color:var(--brand);border-color:var(--brand);font-weight:600}
+.tab span{background:#e8e8e8;border-radius:99px;padding:1px 7px;font-size:11px;margin-left:4px}
+.wrap{background:#fff;border:1px solid var(--line);border-radius:4px;overflow-x:auto}
+table.bt{min-width:1100px;border-collapse:collapse;width:100%;font-size:13px}
+.bt th{background:#f3f3f3;color:#444;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:8px 12px;border-bottom:1px solid var(--line);border-right:1px solid #e5e5e5;white-space:nowrap;position:sticky;top:0}
+.bt td{padding:8px 12px;border-bottom:1px solid var(--line);border-right:1px solid #f0f0f0;vertical-align:middle}
+.bt th:last-child,.bt td:last-child{border-right:0}
+.bt tbody tr:hover{filter:brightness(.96)}
+.bt tr.active{background:#eaf6ee;box-shadow:inset 4px 0 0 var(--green)}
+.bt tr.inactive{background:#f1f1f1;color:#6b6b6b;box-shadow:inset 4px 0 0 #9a9a9a}
+.bt tr.auto{background:#eef2ff;box-shadow:inset 4px 0 0 #5a4fcf}
+.bt th:first-child,.bt td.bn{min-width:250px;width:250px}
+.bt td.bn{padding:0}
+.bn-top{padding:8px 12px;white-space:nowrap}
+.bn-bot{padding:3px 12px;min-height:22px;border-top:1px dashed #cfcfcf;display:flex;align-items:center;gap:6px;background:#00000008}
+.bn-bot .info{width:12px;height:12px;font-size:9px;margin:0}
+.bn-bot .info:hover::after{left:16px;top:-6px;font-size:11px}
+.bn-bot .promo{font-size:8px;padding:0 5px;margin:0;line-height:14px}
+.bt .name{color:var(--brand);font-weight:600}
+.info{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--brand);color:#fff;font-size:11px;font-style:italic;cursor:help;margin-left:6px;position:relative}
+.info:hover::after{content:attr(data-id);position:absolute;left:22px;top:-4px;background:#222;color:#fff;font-style:normal;padding:3px 8px;border-radius:4px;white-space:nowrap;z-index:5}
+.promo{white-space:nowrap;display:inline-block;margin-top:2px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;margin-left:8px;background:#fff3d6;color:#8a5a00;border:1px solid #f5b942;text-transform:uppercase}
+.st{font-weight:600;white-space:nowrap}.st.on{color:var(--green)}.st.off{color:#777}
+.pb{width:170px}.pb .bar{height:8px;background:#ddd;border-radius:4px;overflow:hidden}.pb .bar i{display:block;height:100%;background:var(--brand)}
+.pb small{font-size:11px;color:var(--muted)}
+.num{white-space:nowrap}.empty{padding:30px;text-align:center;color:var(--muted)}
+.give a{color:var(--brand);text-decoration:underline}
+.more{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px}
+.more button{background:#fff;border:1px solid var(--line);color:var(--brand);padding:8px 24px;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer}
+.more button:hover{background:#f3f3f3}.more small{color:var(--muted);font-size:12px}
+</style></head>
+<body><header id="hdr"></header><div class="subbar" id="sub"></div>
+<main><h1>🎁 Bonuses / Promotion</h1><p class="lead">Manage bonuses and track their performance.</p>
+<div class="tools"><input id="q" class="search" type="search" placeholder="Search bonuses by name or ID…"></div>
+<div class="tabs" id="tabs"></div>
+<div class="wrap"><table class="bt"><thead><tr><th>Bonus</th><th>Status</th><th>Created at</th><th>Date start</th><th>Date end</th><th>Given on</th><th>Bonus value / wagered</th><th>Total wins</th><th>Total wagered</th><th>Received by</th></tr></thead><tbody id="rows"></tbody></table><div class="more" id="more"></div></div>
+</main><footer id="ftr"></footer>
+<script src="/crm/data.js"></script>
+<script>
+chrome('<span class="crumb"><a href="/crm/">Home</a> / Bonuses / Promotion</span>');
+// [id,name,status,banner,created,start,end,event,bonusValue,wagered,wins,received]
+const B=[
+['BN-1001','Welcome Pack 100%','active',1,'2026-08-14','2026-09-01','2026-12-31','First deposit',120000,96400,81200,2140],
+['BN-1002','Reload Friday 50%','active',1,'2026-08-20','2026-09-05','2026-11-30','Deposit on Friday',45000,30100,27800,1320],
+['BN-1003','Free Spins Gates of Olympus','active',1,'2026-09-02','2026-09-10','2026-10-31','Registration',18000,15900,12400,3010],
+['BN-1004','VIP Cashback Weekly','active',0,'2026-07-11','2026-07-15','2027-01-15','Weekly loss',62000,41500,35200,412],
+['BN-1005','Birthday Gift','auto',0,'2026-05-03','2026-05-05','2027-05-05','Player birthday',9500,6100,5300,286],
+['BN-1006','Loyalty Level-Up Reward','auto',0,'2026-06-18','2026-06-20','2027-06-20','Loyalty level reached',23400,17800,14900,731],
+['BN-1007','Win-back 30 Free Spins','auto',1,'2026-08-01','2026-08-03','2026-12-31','Inactive 30 days',7200,3900,3400,598],
+['BN-1008','Summer Splash 200%','inactive',1,'2026-05-28','2026-06-01','2026-08-31','First deposit',88000,87200,79100,1904],
+['BN-1009','Easter Egg Hunt','inactive',1,'2026-03-10','2026-03-28','2026-04-10','Any deposit',31000,30800,26400,877],
+['BN-1010','No-Deposit €10','inactive',0,'2026-02-02','2026-02-05','2026-03-05','Registration',12000,11200,9100,1200],
+['BN-1011','Referral Bonus','active',0,'2026-04-09','2026-04-10','2027-04-10','Friend\'s first deposit',15500,9800,8200,344],
+['BN-1012','Tournament Entry Boost','inactive',0,'2026-06-22','2026-07-01','2026-07-31','Tournament join',5200,5100,4300,205]
+];
+const EV=['First deposit','Registration','Any deposit','Weekly loss','Player birthday','Loyalty level reached','Inactive 30 days','Tournament join','Deposit on Friday','Friend\'s first deposit'];
+const NM=['Welcome Pack','Reload','Free Spins','Cashback','Level-Up Reward','Win-back','Boost','Mega Match','Lucky Spin','Weekend Special'];
+let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+while(B.length<100){const n=B.length+1001,r=rnd(),kind=r<.4?'active':r<.7?'inactive':'auto';
+ const val=Math.round((5000+rnd()*120000)/100)*100,w=Math.round(val*(.3+rnd()*.7)),d=new Date(2026,0,1+Math.floor(rnd()*240));
+ const iso=x=>x.toISOString().slice(0,10),e=new Date(d.getTime()+(20+rnd()*300)*864e5),c=new Date(d.getTime()-rnd()*10*864e5);
+ B.push(['BN-'+n,NM[Math.floor(rnd()*10)]+' '+(10+Math.floor(rnd()*19)*5)+'%',kind,rnd()<.5?1:0,iso(c),iso(d),iso(e),EV[Math.floor(rnd()*10)],val,w,Math.round(w*(.6+rnd()*.35)),Math.round(100+rnd()*3000)])}
+const isOn=b=>b[2]!=='inactive';
+const fmt=d=>new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+const eur=n=>'\u20ac'+n.toLocaleString('en-US');
+const TABS=[['all','All',()=>true],['active','Active',isOn],['inactive','Inactive',b=>!isOn(b)],['auto','Auto-generated',b=>b[2]==='auto'],['banner','With promotion banners',b=>b[3]],['nobanner','No promotion banners',b=>!b[3]]];
+const STEP=20;let tab='all',q='',shown=STEP;
+function render(){
+ document.getElementById('tabs').innerHTML=TABS.map(t=>`<button class="tab ${t[0]===tab?'on':''}" data-t="${t[0]}">${t[1]}<span>${B.filter(t[2]).length}</span></button>`).join('');
+ const f=TABS.find(t=>t[0]===tab)[2],ql=q.toLowerCase();
+ const list=B.filter(f).filter(b=>!ql||b[1].toLowerCase().includes(ql)||b[0].toLowerCase().includes(ql));
+ const vis=list.slice(0,shown);
+ document.getElementById('rows').innerHTML=vis.length?vis.map(b=>{const p=Math.min(100,Math.round(b[9]/b[8]*100)),on=isOn(b);
+ return `<tr class="${b[2]}"><td class="bn"><div class="bn-top"><span class="name">${b[1]}</span></div><div class="bn-bot"><span class="info" data-id="ID: ${b[0]}" title="ID: ${b[0]}">i</span>${b[3]?'<span class="promo">Has promo</span>':''}</div></td>
+ <td><span class="st ${on?'on':'off'}">${on?'Active':'Not Active'}</span></td>
+ <td class="num">${fmt(b[4])}</td><td class="num">${fmt(b[5])}</td><td class="num">${fmt(b[6])}</td>
+ <td class="give"><a href="#" title="Open event">${b[7]}</a></td>
+ <td class="pb"><div class="bar"><i style="width:${p}%"></i></div><small>${eur(b[8])} / ${eur(b[9])} (${p}%)</small></td>
+ <td class="num">${eur(b[10])}</td><td class="num">${eur(b[9])}</td><td class="num">${b[11].toLocaleString('en-US')}</td></tr>`}).join(''):'<tr><td colspan="10" class="empty">No bonuses found</td></tr>';
+ document.getElementById('more').innerHTML=list.length?`<small>Showing ${vis.length} of ${list.length}</small>`+(vis.length<list.length?'<button id="sm">Show more</button>':''):'';
+ const sm=document.getElementById('sm');if(sm)sm.onclick=()=>{shown+=STEP;render()};
+}
+document.getElementById('tabs').onclick=e=>{const t=e.target.closest('.tab');if(t){tab=t.dataset.t;shown=STEP;render()}};
+document.getElementById('q').oninput=e=>{q=e.target.value.trim();shown=STEP;render()};
+render();
+</script></body></html>
