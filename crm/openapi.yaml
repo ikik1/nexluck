@@ -1,0 +1,107 @@
+openapi: 3.0.3
+info:
+  title: NextLuck CRM API
+  version: 1.0.0
+  description: REST API behind the CRM "Bonuses / Promotion" list (`/crm/b/`).
+servers:
+  - url: /crm/api/v1
+tags:
+  - name: Bonuses
+paths:
+  /bonuses:
+    get:
+      tags: [Bonuses]
+      summary: List bonuses
+      description: Returns one page of bonuses plus the per-tab counters. Use `offset` to implement "Show more".
+      operationId: listBonuses
+      parameters:
+        - name: tab
+          in: query
+          schema: { type: string, enum: [all, active, inactive, auto, banner, nobanner], default: all }
+          description: Filter tab (`banner` / `nobanner` = with / without promotion banners).
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Case-insensitive search by bonus name or ID.
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: A page of bonuses
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BonusPage' }
+        '400':
+          description: Unknown tab
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /bonuses/{id}/delete:
+    post:
+      tags: [Bonuses]
+      summary: Mark a bonus as deleted
+      operationId: markBonusDeleted
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          example: BN-1001
+      responses:
+        '200':
+          description: The updated bonus
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bonus' }
+        '404':
+          description: Bonus not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+components:
+  schemas:
+    Bonus:
+      type: object
+      required: [id, name, status, hasPromo, createdAt, dateStart, dateEnd, event, bonusValue, wagered, wins, received, groups, deleted]
+      properties:
+        id: { type: string, example: BN-1001 }
+        name: { type: string, example: Welcome Pack 100% }
+        status: { type: string, enum: [active, inactive, auto] }
+        hasPromo: { type: boolean }
+        createdAt: { type: string, format: date }
+        dateStart: { type: string, format: date }
+        dateEnd: { type: string, format: date }
+        event: { type: string, description: Event that gives the bonus, example: First deposit }
+        bonusValue: { type: integer, description: Bonus value in EUR, example: 120000 }
+        wagered: { type: integer, description: Total wagered in EUR, example: 96400 }
+        wins: { type: integer, description: Total wins in EUR, example: 81200 }
+        received: { type: integer, description: Number of players who received the bonus, example: 2140 }
+        groups:
+          type: array
+          description: Player groups the bonus is available to
+          items: { type: string }
+          example: [first_dep, registered]
+        deleted: { type: boolean }
+    BonusPage:
+      type: object
+      required: [items, total, offset, limit, counts]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Bonus' }
+        total: { type: integer, description: Number of bonuses matching tab and search }
+        offset: { type: integer }
+        limit: { type: integer }
+        counts:
+          type: object
+          description: Number of bonuses per tab (ignores search)
+          additionalProperties: { type: integer }
+          example: { all: 100, active: 70, inactive: 30, auto: 20, banner: 50, nobanner: 50 }
+    Error:
+      type: object
+      properties:
+        error: { type: string }
