@@ -32,6 +32,13 @@ table.bt{min-width:1100px;border-collapse:collapse;width:100%;font-size:13px}
 .pb small{font-size:11px;color:var(--muted)}
 .num{white-space:nowrap}.empty{padding:30px;text-align:center;color:var(--muted)}
 .give a{color:var(--brand);text-decoration:underline}
+.grp{white-space:nowrap}
+.edit{background:none;border:0;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px}.edit:hover{background:#0000001a}
+.bt tr.deleted{background:#fbeaea;color:#999;box-shadow:inset 4px 0 0 #c23934}.bt tr.deleted .name{text-decoration:line-through;color:#999}
+.bt td.ed{text-align:center}
+#ctx{position:fixed;display:none;z-index:50;min-width:170px;background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 16px #0003;padding:4px 0;font-size:13px}
+#ctx div{padding:7px 16px;cursor:pointer}#ctx div:hover{background:#f0f0f0}
+#ctx div.dis{color:#aaa;cursor:not-allowed}#ctx div.dis:hover{background:none}
 .more{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px}
 .more button{background:#fff;border:1px solid var(--line);color:var(--brand);padding:8px 24px;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer}
 .more button:hover{background:#f3f3f3}.more small{color:var(--muted);font-size:12px}
@@ -40,7 +47,7 @@ table.bt{min-width:1100px;border-collapse:collapse;width:100%;font-size:13px}
 <main><h1>🎁 Bonuses / Promotion</h1><p class="lead">Manage bonuses and track their performance.</p>
 <div class="tools"><input id="q" class="search" type="search" placeholder="Search bonuses by name or ID…"></div>
 <div class="tabs" id="tabs"></div>
-<div class="wrap"><table class="bt"><thead><tr><th>Bonus</th><th>Status</th><th>Created at</th><th>Date start</th><th>Date end</th><th>Given on</th><th>Bonus value / wagered</th><th>Total wins</th><th>Total wagered</th><th>Received by</th></tr></thead><tbody id="rows"></tbody></table><div class="more" id="more"></div></div>
+<div class="wrap"><table class="bt"><thead><tr><th>Bonus</th><th>Status</th><th>Created at</th><th>Date start</th><th>Date end</th><th>Given on</th><th>Bonus value / wagered</th><th>Total wins</th><th>Total wagered</th><th>Player groups</th><th>Received by</th><th>Edit</th></tr></thead><tbody id="rows"></tbody></table><div class="more" id="more"></div></div>
 </main><footer id="ftr"></footer>
 <script src="/crm/data.js"></script>
 <script>
@@ -67,6 +74,9 @@ while(B.length<100){const n=B.length+1001,r=rnd(),kind=r<.4?'active':r<.7?'inact
  const val=Math.round((5000+rnd()*120000)/100)*100,w=Math.round(val*(.3+rnd()*.7)),d=new Date(2026,0,1+Math.floor(rnd()*240));
  const iso=x=>x.toISOString().slice(0,10),e=new Date(d.getTime()+(20+rnd()*300)*864e5),c=new Date(d.getTime()-rnd()*10*864e5);
  B.push(['BN-'+n,NM[Math.floor(rnd()*10)]+' '+(10+Math.floor(rnd()*19)*5)+'%',kind,rnd()<.5?1:0,iso(c),iso(d),iso(e),EV[Math.floor(rnd()*10)],val,w,Math.round(w*(.6+rnd()*.35)),Math.round(100+rnd()*3000)])}
+const deleted=new Set();
+const GR=['first_dep','registered','vip','no_deposit','newcomers','high_roller','inactive_30d','kyc_verified'];
+function groupsOf(id){const n=parseInt(id.slice(3),10),c=1+n%3,out=[];for(let i=0;i<c;i++){const g=GR[(n*(i+3)+i*5)%GR.length];if(!out.includes(g))out.push(g)}return out.join(', ')}
 const isOn=b=>b[2]!=='inactive';
 const fmt=d=>new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
 const eur=n=>'\u20ac'+n.toLocaleString('en-US');
@@ -78,16 +88,28 @@ function render(){
  const list=B.filter(f).filter(b=>!ql||b[1].toLowerCase().includes(ql)||b[0].toLowerCase().includes(ql));
  const vis=list.slice(0,shown);
  document.getElementById('rows').innerHTML=vis.length?vis.map(b=>{const p=Math.min(100,Math.round(b[9]/b[8]*100)),on=isOn(b);
- return `<tr class="${b[2]}"><td class="bn"><div class="bn-top"><span class="name">${b[1]}</span></div><div class="bn-bot"><span class="info" data-id="ID: ${b[0]}" title="ID: ${b[0]}">i</span>${b[3]?'<span class="promo">Has promo</span>':''}</div></td>
+ return `<tr class="${b[2]}${deleted.has(b[0])?' deleted':''}" data-id="${b[0]}"><td class="bn"><div class="bn-top"><span class="name">${b[1]}</span></div><div class="bn-bot"><span class="info" data-id="ID: ${b[0]}" title="ID: ${b[0]}">i</span>${b[3]?'<span class="promo">Has promo</span>':''}</div></td>
  <td><span class="st ${on?'on':'off'}">${on?'Active':'Not Active'}</span></td>
  <td class="num">${fmt(b[4])}</td><td class="num">${fmt(b[5])}</td><td class="num">${fmt(b[6])}</td>
  <td class="give"><a href="#" title="Open event">${b[7]}</a></td>
  <td class="pb"><div class="bar"><i style="width:${p}%"></i></div><small>${eur(b[8])} / ${eur(b[9])} (${p}%)</small></td>
- <td class="num">${eur(b[10])}</td><td class="num">${eur(b[9])}</td><td class="num">${b[11].toLocaleString('en-US')}</td></tr>`}).join(''):'<tr><td colspan="10" class="empty">No bonuses found</td></tr>';
+ <td class="num">${eur(b[10])}</td><td class="num">${eur(b[9])}</td><td class="grp">${groupsOf(b[0])}</td><td class="num">${b[11].toLocaleString('en-US')}</td><td class="ed"><button class="edit" title="Modify" aria-label="Modify ${b[1]}">✏️</button></td></tr>`}).join(''):'<tr><td colspan="12" class="empty">No bonuses found</td></tr>';
  document.getElementById('more').innerHTML=list.length?`<small>Showing ${vis.length} of ${list.length}</small>`+(vis.length<list.length?'<button id="sm">Show more</button>':''):'';
  const sm=document.getElementById('sm');if(sm)sm.onclick=()=>{shown+=STEP;render()};
 }
 document.getElementById('tabs').onclick=e=>{const t=e.target.closest('.tab');if(t){tab=t.dataset.t;shown=STEP;render()}};
+const ctx=document.createElement('div');ctx.id='ctx';
+ctx.innerHTML='<div data-a="del">Mark as deleted</div><div data-a="copy">Copy</div><div class="dis" aria-disabled="true">Paste</div>';
+document.body.appendChild(ctx);let ctxId=null;
+const hide=()=>{ctx.style.display='none'};
+document.getElementById('rows').oncontextmenu=e=>{const tr=e.target.closest('tr[data-id]');if(!tr)return;e.preventDefault();ctxId=tr.dataset.id;
+ ctx.style.display='block';ctx.style.left=Math.min(e.clientX,innerWidth-ctx.offsetWidth-4)+'px';ctx.style.top=Math.min(e.clientY,innerHeight-ctx.offsetHeight-4)+'px'};
+ctx.onclick=e=>{const a=e.target.dataset.a;if(!a)return;
+ if(a==='del'){deleted.add(ctxId);render()}
+ else if(a==='copy'){const b=B.find(x=>x[0]===ctxId);navigator.clipboard&&navigator.clipboard.writeText(JSON.stringify(b)).catch(()=>{})}
+ hide()};
+document.addEventListener('click',hide);document.addEventListener('scroll',hide,true);addEventListener('resize',hide);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')hide()});
 document.getElementById('q').oninput=e=>{q=e.target.value.trim();shown=STEP;render()};
 render();
 </script></body></html>
