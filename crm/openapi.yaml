@@ -2,18 +2,69 @@ openapi: 3.0.3
 info:
   title: NextLuck CRM API
   version: 1.0.0
-  description: REST API behind the CRM "Bonuses / Promotion" list (`/crm/b/`).
+  description: |
+    REST API behind the CRM "Bonuses / Promotion" list (`/crm/b/`).
+
+    ## Server-to-server authentication
+    OAuth 2.0 **client credentials** grant (RFC 6749 §4.4). The calling server exchanges its `client_id` / `client_secret`
+    at `POST /oauth/token` for a short-lived (15 min) signed JWT access token and sends it as `Authorization: Bearer <token>`.
+
+    * Keep the client secret on the server only (env var / secret manager); never ship it to browsers or mobile apps.
+    * Request the least-privilege scopes you need (`bonuses:read`, `bonuses:write`).
+    * Cache the token until shortly before `expires_in`, then request a new one. There are no refresh tokens.
+    * Always use HTTPS; token responses are `Cache-Control: no-store`.
+    * Failures follow RFC 6749 / RFC 6750: `401` + `WWW-Authenticate` for missing/invalid credentials, `403` for insufficient scope.
 servers:
   - url: /crm/api/v1
 tags:
+  - name: Authentication
   - name: Bonuses
 paths:
+  /oauth/token:
+    post:
+      tags: [Authentication]
+      summary: Obtain an access token (client credentials)
+      description: Authenticate with HTTP Basic (`client_id:client_secret`, preferred) or with `client_id` / `client_secret` form fields.
+      operationId: getToken
+      security:
+        - basicAuth: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [grant_type]
+              properties:
+                grant_type: { type: string, enum: [client_credentials] }
+                scope: { type: string, description: Space-separated scopes (defaults to all scopes of the client), example: "bonuses:read" }
+                client_id: { type: string, description: Only when not using HTTP Basic }
+                client_secret: { type: string, format: password, description: Only when not using HTTP Basic }
+      responses:
+        '200':
+          description: Access token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400':
+          description: invalid_request, unsupported_grant_type or invalid_scope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '401':
+          description: invalid_client
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
   /bonuses:
     get:
       tags: [Bonuses]
       summary: List bonuses
       description: Returns one page of bonuses plus the per-tab counters. Use `offset` to implement "Show more".
       operationId: listBonuses
+      security:
+        - oauth2: ["bonuses:read"]
       parameters:
         - name: tab
           in: query
@@ -35,6 +86,18 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BonusPage' }
+        '401':
+          description: Missing, invalid or expired access token
+          headers:
+            WWW-Authenticate: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '403':
+          description: Token lacks the required scope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
         '400':
           description: Unknown tab
           content:
@@ -45,6 +108,8 @@ paths:
       tags: [Bonuses]
       summary: Mark a bonus as deleted
       operationId: markBonusDeleted
+      security:
+        - oauth2: ["bonuses:write"]
       parameters:
         - name: id
           in: path
@@ -57,12 +122,38 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Bonus' }
+        '401':
+          description: Missing, invalid or expired access token
+          headers:
+            WWW-Authenticate: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '403':
+          description: Token lacks the required scope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
         '404':
           description: Bonus not found
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: Client credentials flow; Swagger UI exchanges the credentials for a bearer token.
+      flows:
+        clientCredentials:
+          tokenUrl: /crm/api/v1/oauth/token
+          scopes:
+            bonuses:read: List bonuses
+            bonuses:write: Modify bonuses (mark as deleted)
+    basicAuth:
+      type: http
+      scheme: basic
+      description: client_id and client_secret, used only at the token endpoint.
   schemas:
     Bonus:
       type: object
@@ -101,6 +192,19 @@ components:
           description: Number of bonuses per tab (ignores search)
           additionalProperties: { type: integer }
           example: { all: 100, active: 70, inactive: 30, auto: 20, banner: 50, nobanner: 50 }
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in, scope]
+      properties:
+        access_token: { type: string, description: "Signed JWT (HS256) with claims iss, sub, aud, iat, nbf, exp, jti, scope" }
+        token_type: { type: string, example: Bearer }
+        expires_in: { type: integer, example: 900 }
+        scope: { type: string, example: "bonuses:read bonuses:write" }
+    OAuthError:
+      type: object
+      properties:
+        error: { type: string, example: invalid_token }
+        error_description: { type: string }
     Error:
       type: object
       properties:

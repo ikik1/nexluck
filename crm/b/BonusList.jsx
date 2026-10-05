@@ -1,5 +1,5 @@
 const { useState, useEffect, useRef, useCallback } = React;
-const API = '/crm/api/v1';
+const API = '/crm/ui-api/v1';
 const STEP = 20;
 const TABS = [['all', 'All'], ['active', 'Active'], ['inactive', 'Inactive'], ['auto', 'Auto-generated'], ['banner', 'With promotion banners'], ['nobanner', 'No promotion banners']];
 const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
