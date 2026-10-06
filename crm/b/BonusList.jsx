@@ -136,7 +136,7 @@ function BonusList() {
             e.preventDefault();
             setMenu({ x: e.clientX, y: e.clientY, bonus: items.find(b => b.id === tr.dataset.id) });
           }}>
-            {items.map(b => <BonusRow key={b.id} b={b} onEdit={() => {}} />)}
+            {items.map(b => <BonusRow key={b.id} b={b} onEdit={(row) => { location.href = '/crm/b/e/?id=' + encodeURIComponent(row.id); }} />)}
             {!items.length && !loading && !error && <tr><td colSpan="12" className="empty">No bonuses found</td></tr>}
             {error && <tr><td colSpan="12" className="empty">Failed to load: {error} <button onClick={() => load(items.length)}>Retry</button></td></tr>}
           </tbody>

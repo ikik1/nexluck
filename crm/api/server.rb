@@ -4,6 +4,7 @@
 require 'webrick'
 require 'json'
 require 'date'
+require 'time'
 require 'openssl'
 require 'base64'
 require 'securerandom'
@@ -27,7 +28,15 @@ FIXED = [
 ]
 EV = ['First deposit','Registration','Any deposit','Weekly loss','Player birthday','Loyalty level reached','Inactive 30 days','Tournament join','Deposit on Friday',"Friend's first deposit"]
 NM = ['Welcome Pack','Reload','Free Spins','Cashback','Level-Up Reward','Win-back','Boost','Mega Match','Lucky Spin','Weekend Special']
-GR = %w[first_dep registered vip no_deposit newcomers high_roller inactive_30d kyc_verified]
+CATEGORIES = %w[SLOTS TABLE_GAMES LIVE_CASINO CRASH]
+INCLUDE_SEGMENTS = %w[registered no_deposit kyc_verified]
+EXCLUDE_SEGMENTS = %w[restricted_countries restricted_currencies]
+TRIGGER_EVENTS = %w[on_registration on_deposit]
+APPLIES_TO = %w[BONUS_ONLY BONUS_PLUS_DEPOSIT WINNINGS_ONLY]
+CAP_TYPES = %w[MULTIPLIER FIXED]
+WALLET_ORDER = %w[MAIN_WALLET_FIRST BONUS_MONEY_FIRST]
+CREATORS = %w[v.kovalevskiy a.petrova m.rossi]
+DETAIL_KEYS = %w[description category createdBy availability triggers reward wagering walletRules]
 
 BONUS_TYPES = ['dep match', 'no-deposit', 'free spins', 'cashback', 'multiplier']
 TYPE_RULES = [[/no-deposit/i, 'no-deposit'], [/free spins|win-back|lucky spin|birthday/i, 'free spins'],
@@ -39,12 +48,27 @@ end
 
 def groups_of(id)
   n = id[3..-1].to_i
-  out = []
-  (1 + n % 3).times do |i|
-    g = GR[(n * (i + 3) + i * 5) % GR.length]
-    out << g unless out.include?(g)
-  end
-  out
+  INCLUDE_SEGMENTS.rotate(n % 3).first(1 + n % 3).sort_by { |g| INCLUDE_SEGMENTS.index(g) }
+end
+
+def detail_for(b, type, groups)
+  n = b[0][3..-1].to_i
+  trig = b[7] =~ /registration/i ? 'on_registration' : 'on_deposit'
+  {
+    'description' => "#{b[1]}: #{b[7].downcase} bonus.",
+    'category' => type == 'free spins' ? 'SLOTS' : CATEGORIES[n % 4],
+    'createdBy' => CREATORS[n % 3],
+    'availability' => { 'startTime' => "#{b[5]}T00:00", 'endTime' => "#{b[6]}T23:59", 'includeSegments' => groups,
+                        'excludeSegments' => [[], %w[restricted_countries], EXCLUDE_SEGMENTS, %w[restricted_currencies]][n % 4] },
+    'triggers' => { 'event' => trig, 'minDeposit' => [10, 20, 25, 50][n % 4], 'maxDeposit' => [500, 1000, 2000, 5000][n % 4],
+                    'depositNumber' => trig == 'on_registration' ? 0 : (b[7] =~ /first/i ? 1 : 1 + n % 3) },
+    'reward' => { 'dmp' => (b[1][/(\d+)%/, 1] || [50, 100, 150][n % 3]).to_i, 'maxBonusAmount' => [100, 200, 300, 500][n % 4] },
+    'wagering' => { 'multiplier' => [20, 25, 30, 35, 40][n % 5], 'timeToCompleteDays' => [7, 14, 30][n % 3], 'maxBetPerRound' => [2, 5, 10][n % 3],
+                    'appliesTo' => type == 'free spins' ? 'WINNINGS_ONLY' : APPLIES_TO[n % 2],
+                    'maxWithdrawCap' => n.even? ? { 'type' => 'MULTIPLIER', 'value' => 5 + n % 6 } : { 'type' => 'FIXED', 'value' => [500, 1000, 2000][n % 3] } },
+    'walletRules' => { 'deduction' => WALLET_ORDER[n % 2], 'winnings' => WALLET_ORDER[(n / 2) % 2],
+                       'allowCancelBeforeWagering' => n % 3 != 0, 'allowWithdrawBeforeWagering' => n % 5 == 0 }
+  }
 end
 
 def build
@@ -68,15 +92,21 @@ def build
     rows << ["BN-#{n}", name, kind, promo, c.to_s, d.to_s, e.to_s, ev, val, w, wins, recv]
   end
   rows.map do |b|
+    type = type_of(b[1])
+    groups = groups_of(b[0])
     { 'id' => b[0], 'name' => b[1], 'status' => b[2], 'hasPromo' => b[3] == 1,
       'createdAt' => b[4], 'dateStart' => b[5], 'dateEnd' => b[6], 'event' => b[7],
       'bonusValue' => b[8], 'wagered' => b[9], 'wins' => b[10], 'received' => b[11],
-      'bonusType' => type_of(b[1]), 'groups' => groups_of(b[0]), 'deleted' => false }
+      'bonusType' => type, 'groups' => groups, 'deleted' => false }.merge(detail_for(b, type, groups))
   end
 end
 
 BONUSES = build
 LOCK = Mutex.new
+CHANGELOG = BONUSES.map { |b| [b['id'], [{ 'at' => "#{b['createdAt']}T09:00:00Z", 'by' => b['createdBy'], 'summary' => 'Bonus created', 'changes' => [] }]] }.to_h
+# Units of each currency per 1 EUR; editable through /exchange-rates.
+RATES = { 'USD' => 1.08, 'GBP' => 0.85, 'CAD' => 1.47, 'AUD' => 1.65, 'CHF' => 0.95, 'SEK' => 11.5, 'NOK' => 11.7, 'PLN' => 4.28 }
+RATES_META = { 'updatedAt' => Time.now.utc.iso8601, 'updatedBy' => 'system' }
 
 # Filter groups: values inside one group are OR-ed, different groups are AND-ed.
 FILTERS = {
@@ -176,6 +206,7 @@ def authorize(req, res, scope)
     json(res, 403, { error: 'insufficient_scope', error_description: "Scope '#{scope}' required" })
     return false
   end
+  req.attributes['client'] = claims['sub']
   true
 end
 
@@ -207,11 +238,158 @@ srv.mount_proc('/crm/api/v1/oauth/token') do |req, res|
   json(res, 200, { access_token: issue_token(id, asked), token_type: 'Bearer', expires_in: TOKEN_TTL, scope: asked.join(' ') })
 end
 
+# ---- editing: validation, diff, changelog ----
+def deep_dup(v) Marshal.load(Marshal.dump(v)) end
+
+def deep_merge(a, b)
+  return b unless a.is_a?(Hash) && b.is_a?(Hash)
+  a.merge(b) { |_, x, y| deep_merge(x, y) }
+end
+
+def flat(h, pre = '')
+  h.each_with_object({}) { |(k, v), o| v.is_a?(Hash) ? o.merge!(flat(v, "#{pre}#{k}.")) : o["#{pre}#{k}"] = v }
+end
+
+def list_view(b) b.reject { |k, _| DETAIL_KEYS.include?(k) } end
+
+# The part of a bonus the editor may change. `auto` bonuses are reported as active.
+def editable(b)
+  deep_dup(b.slice('name', 'description', 'bonusType', 'category', 'availability', 'triggers', 'reward', 'wagering', 'walletRules'))
+    .merge('status' => b['status'] == 'inactive' ? 'inactive' : 'active')
+end
+
+DT_FORMAT = /\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}\z/
+def parse_dt(s)
+  return nil unless s.is_a?(String) && s =~ DT_FORMAT
+  DateTime.strptime(s, '%Y-%m-%dT%H:%M')
+rescue ArgumentError
+  nil
+end
+
+# Returns [cleaned_hash, errors]; errors maps a dotted field path to a message.
+def validate_bonus(m)
+  err = {}
+  h = ->(v) { v.is_a?(Hash) ? v : {} }
+  num = lambda do |path, v, min, max, int|
+    ok = v.is_a?(Numeric) && v >= min && v <= max && (!int || v == v.to_i)
+    err[path] = "Must be #{int ? 'a whole number' : 'a number'} between #{min} and #{max}" unless ok
+    ok ? (int ? v.to_i : v) : nil
+  end
+  enum = lambda do |path, v, opts|
+    err[path] = "Must be one of: #{opts.join(', ')}" unless opts.include?(v)
+    v
+  end
+  subset = lambda do |path, v, opts|
+    ok = v.is_a?(Array) && (v - opts).empty?
+    err[path] = "Allowed values: #{opts.join(', ')}" unless ok
+    ok ? v.uniq : []
+  end
+  bool = lambda do |path, v|
+    err[path] = 'Must be true or false' unless [true, false].include?(v)
+    v
+  end
+
+  name = m['name'].to_s.strip
+  err['name'] = 'Required, up to 120 characters' if name.empty? || name.length > 120
+  desc = m['description'].to_s
+  err['description'] = 'Up to 2000 characters' if desc.length > 2000
+
+  av, tr, rw, wg, wl = %w[availability triggers reward wagering walletRules].map { |k| h.(m[k]) }
+  cap = h.(wg['maxWithdrawCap'])
+  s_dt, e_dt = parse_dt(av['startTime']), parse_dt(av['endTime'])
+  err['availability.startTime'] = 'Use format YYYY-MM-DDTHH:MM' unless s_dt
+  err['availability.endTime'] = 'Use format YYYY-MM-DDTHH:MM' unless e_dt
+  err['availability.endTime'] = 'End time must be after start time' if s_dt && e_dt && e_dt <= s_dt
+
+  cap_type = enum.('wagering.maxWithdrawCap.type', cap['type'], CAP_TYPES)
+  min_dep = num.('triggers.minDeposit', tr['minDeposit'], 0, 1_000_000, false)
+  max_dep = num.('triggers.maxDeposit', tr['maxDeposit'], 0, 1_000_000, false)
+  err['triggers.maxDeposit'] = 'Must be greater than or equal to min deposit' if min_dep && max_dep && max_dep < min_dep
+
+  out = {
+    'name' => name, 'description' => desc,
+    'status' => enum.('status', m['status'], %w[active inactive]),
+    'bonusType' => enum.('bonusType', m['bonusType'], BONUS_TYPES),
+    'category' => enum.('category', m['category'], CATEGORIES),
+    'availability' => { 'startTime' => av['startTime'], 'endTime' => av['endTime'],
+                        'includeSegments' => subset.('availability.includeSegments', av['includeSegments'], INCLUDE_SEGMENTS),
+                        'excludeSegments' => subset.('availability.excludeSegments', av['excludeSegments'], EXCLUDE_SEGMENTS) },
+    'triggers' => { 'event' => enum.('triggers.event', tr['event'], TRIGGER_EVENTS), 'minDeposit' => min_dep, 'maxDeposit' => max_dep,
+                    'depositNumber' => num.('triggers.depositNumber', tr['depositNumber'], 0, 1000, true) },
+    'reward' => { 'dmp' => num.('reward.dmp', rw['dmp'], 0, 1000, false),
+                  'maxBonusAmount' => num.('reward.maxBonusAmount', rw['maxBonusAmount'], 0, 1_000_000, false) },
+    'wagering' => { 'multiplier' => num.('wagering.multiplier', wg['multiplier'], 0, 500, false),
+                    'timeToCompleteDays' => num.('wagering.timeToCompleteDays', wg['timeToCompleteDays'], 1, 365, true),
+                    'maxBetPerRound' => num.('wagering.maxBetPerRound', wg['maxBetPerRound'], 0, 100_000, false),
+                    'appliesTo' => enum.('wagering.appliesTo', wg['appliesTo'], APPLIES_TO),
+                    'maxWithdrawCap' => { 'type' => cap_type,
+                                          'value' => num.('wagering.maxWithdrawCap.value', cap['value'], 0, 1_000_000, false) } },
+    'walletRules' => { 'deduction' => enum.('walletRules.deduction', wl['deduction'], WALLET_ORDER),
+                       'winnings' => enum.('walletRules.winnings', wl['winnings'], WALLET_ORDER),
+                       'allowCancelBeforeWagering' => bool.('walletRules.allowCancelBeforeWagering', wl['allowCancelBeforeWagering']),
+                       'allowWithdrawBeforeWagering' => bool.('walletRules.allowWithdrawBeforeWagering', wl['allowWithdrawBeforeWagering']) }
+  }
+  [out, err]
+end
+
+def read_json(req, res)
+  unless req.content_type.to_s.start_with?('application/json')
+    json(res, 415, { error: 'Use Content-Type: application/json' })
+    return nil
+  end
+  body = JSON.parse(req.body.to_s)
+  return body if body.is_a?(Hash)
+  json(res, 400, { error: 'JSON object expected' })
+  nil
+rescue JSON::ParserError
+  json(res, 400, { error: 'Invalid JSON' })
+  nil
+end
+
+def update_bonus(b, clean, actor)
+  before = editable(b)
+  after = clean
+  changes = flat(after).reject { |k, v| flat(before)[k] == v }.map { |k, v| { 'field' => k, 'from' => flat(before)[k], 'to' => v } }
+  return [] if changes.empty?
+  prev_event = b['triggers']['event']
+  b['status'] = after['status'] == 'inactive' ? 'inactive' : (b['status'] == 'auto' ? 'auto' : 'active')
+  %w[name description bonusType category availability triggers reward wagering walletRules].each { |k| b[k] = after[k] }
+  b['groups'] = after['availability']['includeSegments']
+  b['dateStart'] = after['availability']['startTime'][0, 10]
+  b['dateEnd'] = after['availability']['endTime'][0, 10]
+  if prev_event != after['triggers']['event']
+    b['event'] = after['triggers']['event'] == 'on_registration' ? 'Registration' : 'Any deposit'
+  end
+  CHANGELOG[b['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Updated #{changes.length} field#{changes.length == 1 ? '' : 's'}", 'changes' => changes })
+  changes
+end
+
+# Public API for other servers (secured = true): bearer token required.
+# The UI route (secured = false) is the backend-for-frontend of the CRM web app; in production it must sit
+# behind the signed-in user's session and CSRF protection, and `actor` should be that user.
 handler = lambda do |req, res, rest, secured|
   LOCK.synchronize do
-    if rest.empty?
-      next json(res, 405, { error: 'Method not allowed' }) unless req.request_method == 'GET'
-      next if secured && !authorize(req, res, 'bonuses:read')
+    m = req.request_method
+    route = case rest
+            when 'bonuses' then [:list, %w[GET]]
+            when %r{\Abonuses/([\w-]+)\z} then [:detail, %w[GET PATCH], Regexp.last_match(1)]
+            when %r{\Abonuses/([\w-]+)/changelog\z} then [:changelog, %w[GET], Regexp.last_match(1)]
+            when %r{\Abonuses/([\w-]+)/delete\z} then [:delete, %w[POST], Regexp.last_match(1)]
+            when 'exchange-rates' then [:rates, %w[GET PATCH]]
+            end
+    next json(res, 404, { error: 'Not found' }) unless route
+    action, methods, id = route
+    next json(res, 405, { error: 'Method not allowed' }) unless methods.include?(m)
+    next if secured && !authorize(req, res, m == 'GET' ? 'bonuses:read' : 'bonuses:write')
+    actor = secured ? req.attributes['client'].to_s : 'v.kovalevskiy'
+    bonus = nil
+    if id
+      bonus = BONUSES.find { |x| x['id'] == id }
+      next json(res, 404, { error: 'Bonus not found' }) unless bonus
+    end
+
+    case action
+    when :list
       limit = [[(req.query['limit'] || 20).to_i, 1].max, 100].min
       offset = [(req.query['offset'] || 0).to_i, 0].max
       ql = (req.query['q'] || '').strip.downcase
@@ -234,25 +412,41 @@ handler = lambda do |req, res, rest, secured|
         pool = searched.select { |b| matches.call(b, g) }
         counts[g] = opts.map { |k, f| [k, pool.count(&f)] }.to_h
       end
-      json(res, 200, { items: list[offset, limit] || [], total: list.length, offset: offset, limit: limit, counts: counts })
-    elsif (m = rest.match(%r{\A([\w-]+)/delete\z}))
-      next json(res, 405, { error: 'Method not allowed' }) unless req.request_method == 'POST'
-      next if secured && !authorize(req, res, 'bonuses:write')
-      b = BONUSES.find { |x| x['id'] == m[1] }
-      next json(res, 404, { error: 'Bonus not found' }) unless b
-      b['deleted'] = true
-      json(res, 200, b)
-    else
-      json(res, 404, { error: 'Not found' })
+      json(res, 200, { items: (list[offset, limit] || []).map { |b| list_view(b) }, total: list.length, offset: offset, limit: limit, counts: counts })
+    when :detail
+      next json(res, 200, bonus) if m == 'GET'
+      body = read_json(req, res)
+      next unless body
+      clean, errors = validate_bonus(deep_merge(editable(bonus), body))
+      next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
+      update_bonus(bonus, clean, actor)
+      json(res, 200, bonus)
+    when :changelog
+      json(res, 200, { items: CHANGELOG[bonus['id']] })
+    when :delete
+      bonus['deleted'] = true
+      CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => 'Marked as deleted', 'changes' => [] })
+      json(res, 200, list_view(bonus))
+    when :rates
+      if m == 'PATCH'
+        body = read_json(req, res)
+        next unless body
+        rates = body['rates']
+        bad = rates.is_a?(Hash) ? rates.reject { |k, v| RATES.key?(k) && v.is_a?(Numeric) && v > 0 && v <= 100_000 } : { 'rates' => 'object expected' }
+        next json(res, 422, { error: 'Validation failed', fields: bad.transform_values { |v| v.is_a?(String) ? v : 'Must be a number > 0 for a supported currency' } }) unless bad.empty?
+        rates.each { |k, v| RATES[k] = v.to_f }
+        RATES_META.merge!('updatedAt' => Time.now.utc.iso8601, 'updatedBy' => actor)
+      end
+      json(res, 200, { base: 'EUR', rates: RATES, updatedAt: RATES_META['updatedAt'], updatedBy: RATES_META['updatedBy'] })
     end
   end
 end
 
-# Public API for other servers: bearer token required.
-srv.mount_proc('/crm/api/v1/bonuses') { |req, res| handler.call(req, res, req.path.sub(%r{\A/crm/api/v1/bonuses/?}, ''), true) }
-# Backend-for-frontend used by the CRM web UI. Browsers must never hold client secrets; in production
-# this route must sit behind the signed-in user's session (and CSRF protection), not be exposed publicly.
-srv.mount_proc('/crm/ui-api/v1/bonuses') { |req, res| handler.call(req, res, req.path.sub(%r{\A/crm/ui-api/v1/bonuses/?}, ''), false) }
+# WEBrick's proc handler only answers GET/POST by default.
+WEBrick::HTTPServlet::ProcHandler.class_eval { alias_method :do_PATCH, :do_GET }
+
+srv.mount_proc('/crm/api/v1') { |req, res| handler.call(req, res, req.path.sub(%r{\A/crm/api/v1/?}, ''), true) }
+srv.mount_proc('/crm/ui-api/v1') { |req, res| handler.call(req, res, req.path.sub(%r{\A/crm/ui-api/v1/?}, ''), false) }
 
 trap('INT') { srv.shutdown }
 trap('TERM') { srv.shutdown }

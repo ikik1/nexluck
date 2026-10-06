@@ -19,6 +19,7 @@ servers:
 tags:
   - name: Authentication
   - name: Bonuses
+  - name: Exchange rates
 paths:
   /oauth/token:
     post:
@@ -147,6 +148,200 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /bonuses/{id}:
+    get:
+      tags: [Bonuses]
+      summary: Get a bonus with all its settings
+      operationId: getBonus
+      security:
+        - oauth2: ["bonuses:read"]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          example: BN-1001
+      responses:
+        '200':
+          description: The bonus
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BonusDetail' }
+        '401':
+          description: Missing, invalid or expired access token
+          headers:
+            WWW-Authenticate: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '403':
+          description: Token lacks the required scope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '404':
+          description: Bonus not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      tags: [Bonuses]
+      summary: Update a bonus
+      description: Partial update; nested objects are merged. Every change is recorded in the changelog.
+      operationId: updateBonus
+      security:
+        - oauth2: ["bonuses:write"]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          example: BN-1001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BonusUpdate' }
+      responses:
+        '200':
+          description: The updated bonus
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BonusDetail' }
+        '400':
+          description: Invalid JSON
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Missing, invalid or expired access token
+          headers:
+            WWW-Authenticate: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '403':
+          description: Token lacks the required scope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '404':
+          description: Bonus not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+  /bonuses/{id}/changelog:
+    get:
+      tags: [Bonuses]
+      summary: Bonus changelog (newest first)
+      operationId: getBonusChangelog
+      security:
+        - oauth2: ["bonuses:read"]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          example: BN-1001
+      responses:
+        '200':
+          description: Changelog entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ChangelogEntry' }
+        '401':
+          description: Missing, invalid or expired access token
+          headers:
+            WWW-Authenticate: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '403':
+          description: Token lacks the required scope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '404':
+          description: Bonus not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /exchange-rates:
+    get:
+      tags: [Exchange rates]
+      summary: Exchange rates (units of currency per 1 EUR)
+      operationId: getExchangeRates
+      security:
+        - oauth2: ["bonuses:read"]
+      responses:
+        '200':
+          description: Current rates
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExchangeRates' }
+        '401':
+          description: Missing, invalid or expired access token
+          headers:
+            WWW-Authenticate: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '403':
+          description: Token lacks the required scope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+    patch:
+      tags: [Exchange rates]
+      summary: Adjust exchange rates
+      operationId: updateExchangeRates
+      security:
+        - oauth2: ["bonuses:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rates]
+              properties:
+                rates:
+                  type: object
+                  additionalProperties: { type: number, exclusiveMinimum: true, minimum: 0 }
+                  example: { USD: 1.1 }
+      responses:
+        '200':
+          description: Updated rates
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExchangeRates' }
+        '401':
+          description: Missing, invalid or expired access token
+          headers:
+            WWW-Authenticate: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '403':
+          description: Token lacks the required scope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '422':
+          description: Unknown currency or invalid rate
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
 components:
   securitySchemes:
     oauth2:
@@ -205,6 +400,97 @@ components:
             status: { type: object, additionalProperties: { type: integer }, example: { active: 73, inactive: 27, auto: 36 } }
             promo: { type: object, additionalProperties: { type: integer }, example: { banner: 49, nobanner: 51 } }
             bonusType: { type: object, additionalProperties: { type: integer }, example: { dep match: 31, no-deposit: 1, free spins: 30, cashback: 8, multiplier: 30 } }
+    Availability:
+      type: object
+      properties:
+        startTime: { type: string, example: "2026-09-01T00:00", description: "YYYY-MM-DDTHH:MM" }
+        endTime: { type: string, example: "2026-12-31T23:59", description: "Must be after startTime" }
+        includeSegments:
+          type: array
+          items: { type: string, enum: [registered, no_deposit, kyc_verified] }
+        excludeSegments:
+          type: array
+          items: { type: string, enum: [restricted_countries, restricted_currencies] }
+    Triggers:
+      type: object
+      properties:
+        event: { type: string, enum: [on_registration, on_deposit] }
+        minDeposit: { type: number, description: EUR }
+        maxDeposit: { type: number, description: "EUR, must be >= minDeposit" }
+        depositNumber: { type: integer, minimum: 0 }
+    Reward:
+      type: object
+      properties:
+        dmp: { type: number, description: "Deposit match percentage", example: 50 }
+        maxBonusAmount: { type: number, description: "EUR" }
+    Wagering:
+      type: object
+      properties:
+        multiplier: { type: number, example: 35 }
+        timeToCompleteDays: { type: integer, example: 14 }
+        maxBetPerRound: { type: number, description: EUR }
+        appliesTo: { type: string, enum: [BONUS_ONLY, BONUS_PLUS_DEPOSIT, WINNINGS_ONLY] }
+        maxWithdrawCap:
+          type: object
+          properties:
+            type: { type: string, enum: [MULTIPLIER, FIXED] }
+            value: { type: number, description: "EUR when FIXED, a multiplier otherwise" }
+    WalletRules:
+      type: object
+      properties:
+        deduction: { type: string, enum: [MAIN_WALLET_FIRST, BONUS_MONEY_FIRST] }
+        winnings: { type: string, enum: [MAIN_WALLET_FIRST, BONUS_MONEY_FIRST] }
+        allowCancelBeforeWagering: { type: boolean }
+        allowWithdrawBeforeWagering: { type: boolean }
+    BonusUpdate:
+      type: object
+      properties:
+        name: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 2000 }
+        status: { type: string, enum: [active, inactive] }
+        bonusType: { type: string, enum: [dep match, no-deposit, free spins, cashback, multiplier] }
+        category: { type: string, enum: [SLOTS, TABLE_GAMES, LIVE_CASINO, CRASH] }
+        availability: { $ref: '#/components/schemas/Availability' }
+        triggers: { $ref: '#/components/schemas/Triggers' }
+        reward: { $ref: '#/components/schemas/Reward' }
+        wagering: { $ref: '#/components/schemas/Wagering' }
+        walletRules: { $ref: '#/components/schemas/WalletRules' }
+    BonusDetail:
+      allOf:
+        - $ref: '#/components/schemas/Bonus'
+        - $ref: '#/components/schemas/BonusUpdate'
+        - type: object
+          properties:
+            createdBy: { type: string, example: v.kovalevskiy }
+    ChangelogEntry:
+      type: object
+      properties:
+        at: { type: string, format: date-time }
+        by: { type: string }
+        summary: { type: string }
+        changes:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string, example: reward.dmp }
+              from: {}
+              to: {}
+    ExchangeRates:
+      type: object
+      properties:
+        base: { type: string, example: EUR }
+        rates: { type: object, additionalProperties: { type: number }, example: { USD: 1.08, GBP: 0.85 } }
+        updatedAt: { type: string, format: date-time }
+        updatedBy: { type: string }
+    ValidationError:
+      type: object
+      properties:
+        error: { type: string, example: Validation failed }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+          example: { "reward.dmp": "Must be a number between 0 and 1000" }
     TokenResponse:
       type: object
       required: [access_token, token_type, expires_in, scope]

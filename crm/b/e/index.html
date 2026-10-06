@@ -1,0 +1,66 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NextLuck CRM — Edit bonus</title><link rel="stylesheet" href="/crm/crm.css?v=2">
+<style>
+main{max-width:1500px}
+.bar{display:flex;align-items:center;gap:10px;margin:8px 0 16px;flex-wrap:wrap}
+.bar .sp{flex:1}
+.btn{background:#fff;border:1px solid var(--line);color:var(--brand);padding:8px 18px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none}
+.btn:hover{background:#f3f3f3}.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}.btn.pri:hover{background:#094a8a}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.msg{font-size:13px;padding:6px 12px;border-radius:6px}.msg.ok{background:#eaf6ee;color:var(--green)}.msg.bad{background:#fbeaea;color:var(--red)}
+.sat{position:relative;display:grid;grid-template-columns:minmax(260px,1fr) minmax(340px,1.25fr) minmax(260px,1fr);grid-template-areas:"av ce tr" "rw ce wg" "rw wl wg";gap:36px 56px;align-items:start;padding:8px 0 24px}
+.sat>svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.card{position:relative;z-index:1;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;border-top:4px solid var(--c,var(--brand))}
+.card h3{font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--c,var(--brand));margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card.center{grid-area:ce;border-top-width:6px;box-shadow:0 6px 24px #0b5cab26;padding:18px 20px;align-self:center}
+.card.center h3{font-size:15px}
+.f{display:flex;flex-direction:column;gap:3px;margin-bottom:11px}
+.f>label,.lbl{font-size:12px;font-weight:600;color:#444;display:flex;align-items:center;gap:4px}
+.f input[type=text],.f input[type=number],.f input[type=datetime-local],.f select,.f textarea,.f .ro,.pick{border:1px solid var(--line);border-radius:6px;padding:7px 10px;font-size:14px;font-family:inherit;background:#fff;width:100%}
+.f textarea{min-height:64px;resize:vertical}
+.f .ro{background:#f3f3f3;color:#666}
+.f select{appearance:none;-webkit-appearance:none;padding-right:36px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23444' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center}
+.f input:focus,.f select:focus,.f textarea:focus{outline:2px solid #0b5cab55;border-color:var(--brand)}
+.f.err input,.f.err select,.f.err textarea,.f.err .pick{border-color:var(--red)}
+.emsg{color:var(--red);font-size:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.money{display:flex;align-items:center;border:1px solid var(--line);border-radius:6px;background:#fff;overflow:hidden}
+.money input{border:0!important;border-radius:0!important;flex:1;min-width:0;outline:0!important}
+.f.err .money{border-color:var(--red)}
+.cur{border:0;border-left:1px solid var(--line);background:#f3f3f3;color:var(--brand);font-weight:700;font-size:12px;padding:0 10px;align-self:stretch;cursor:pointer;text-decoration:underline dotted}
+.cur:hover{background:#e6eef8}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chk{display:inline-flex;align-items:center;gap:5px;border:1px solid #cfcfcf;border-radius:99px;padding:3px 10px;font-size:12px;cursor:pointer;background:#fff;user-select:none}
+.chk input{margin:0}.chk.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.chk.on input{accent-color:#fff}
+.chk.rect{border-radius:6px;font-size:13px;padding:6px 10px}
+.pick{text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;color:var(--text)}
+.pick:hover{border-color:var(--brand)}
+.hint{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;background:var(--brand);color:#fff;font-size:10px;font-weight:700;cursor:help;position:relative;border:0;padding:0;flex:none}
+.hint .tip{display:none;position:absolute;left:20px;top:-6px;width:290px;background:#222;color:#fff;font-weight:400;font-size:12px;line-height:1.45;padding:8px 10px;border-radius:6px;text-align:left;z-index:30;white-space:normal;text-transform:none;letter-spacing:0}
+.hint:hover .tip,.hint:focus .tip{display:block}
+.calc{background:#eef5fc;border:1px dashed var(--brand);border-radius:8px;padding:8px 10px;margin-bottom:6px}
+.calc b{font-size:18px;color:var(--brand)}
+.kvl{font-size:13px;color:#444;margin-bottom:6px}.kvl b{color:var(--text)}
+.link{background:none;border:0;color:var(--brand);text-decoration:underline;cursor:pointer;font-size:13px;padding:0}
+.ovl{position:fixed;inset:0;background:#0006;display:grid;place-items:center;z-index:100}
+.modal{background:#fff;border-radius:10px;padding:18px 20px;width:min(520px,94vw);max-height:86vh;overflow:auto;box-shadow:0 10px 40px #0005}
+.modal h2{font-size:17px;margin-bottom:10px}.modal .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer}
+.opt.on{border-color:var(--brand);background:#eef5fc}.opt small{display:block;color:var(--muted)}
+table.rt{width:100%;border-collapse:collapse;font-size:13px}.rt td,.rt th{padding:5px 6px;border-bottom:1px solid #eee;text-align:left}
+.rt input{width:90px;padding:4px 6px;border:1px solid var(--line);border-radius:4px}
+.cl{border-left:3px solid var(--brand);padding:4px 10px;margin-bottom:10px;font-size:13px}.cl small{color:var(--muted)}.cl ul{margin:4px 0 0 18px}
+.cl code{background:#f3f3f3;padding:0 4px;border-radius:3px}
+@media(max-width:1100px){.sat{grid-template-columns:1fr;grid-template-areas:"ce" "av" "tr" "rw" "wg" "wl";gap:16px}.sat>svg{display:none}}
+</style></head>
+<body><header id="hdr"></header><div class="subbar" id="sub"></div>
+<main><h1>🎁 Edit bonus</h1><p class="lead">Bonus configuration, grouped around the bonus itself.</p>
+<div id="root"></div>
+</main><footer id="ftr"></footer>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js" crossorigin></script>
+<script src="/crm/data.js"></script>
+<script>chrome('<span class="crumb"><a href="/crm/">Home</a> / <a href="/crm/b/">Bonuses / Promotion</a> / Edit</span>');</script>
+<script type="text/babel" src="/crm/b/e/BonusEditor.jsx"></script>
+</body></html>
