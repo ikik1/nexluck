@@ -1,7 +1,11 @@
 const { useState, useEffect, useRef, useCallback } = React;
 const API = '/crm/ui-api/v1';
 const STEP = 20;
-const TABS = [['all', 'All'], ['active', 'Active'], ['inactive', 'Inactive'], ['auto', 'Auto-generated'], ['banner', 'With promotion banners'], ['nobanner', 'No promotion banners']];
+const GROUPS = [
+  ['status', 'Status', [['active', 'Active'], ['inactive', 'Inactive'], ['auto', 'Auto-generated']]],
+  ['promo', 'Promotion', [['banner', 'With banner'], ['nobanner', 'No banner']]],
+  ['bonusType', 'Type', ['dep match', 'no-deposit', 'free spins', 'cashback', 'multiplier'].map(t => [t, t])]
+];
 const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 const eur = n => '\u20ac' + n.toLocaleString('en-US');
 
@@ -12,7 +16,7 @@ function BonusRow({ b, onEdit }) {
     <tr className={b.status + (b.deleted ? ' deleted' : '')} data-id={b.id}>
       <td className="bn">
         <div className="bn-top"><span className="name">{b.name}</span></div>
-        <div className="bn-bot"><span className="info" data-id={'ID: ' + b.id} title={'ID: ' + b.id}>i</span>{b.hasPromo && <span className="promo">Has promo</span>}</div>
+        <div className="bn-bot"><span className="info" data-id={'ID: ' + b.id} title={'ID: ' + b.id}>i</span><span className="promo">{b.bonusType}</span>{b.hasPromo && <span className="promo">Has promo</span>}</div>
       </td>
       <td><span className={'st ' + (on ? 'on' : 'off')}>{on ? 'Active' : 'Inactive'}</span></td>
       <td className="num">{fmt(b.createdAt)}</td>
@@ -59,12 +63,14 @@ function ContextMenu({ menu, onDelete, onCopy, onClose }) {
 }
 
 function BonusList() {
-  const [tab, setTab] = useState('all');
+  const [sel, setSel] = useState({ status: [], promo: [], bonusType: [] });
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({});
+  const anySel = GROUPS.some(([g]) => sel[g].length);
+  const toggle = (g, v) => setSel(s => ({ ...s, [g]: s[g].includes(v) ? s[g].filter(x => x !== v) : s[g].concat(v) }));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [menu, setMenu] = useState(null);
@@ -78,7 +84,7 @@ function BonusList() {
     const c = ctrl.current = new AbortController();
     setLoading(true); setError(null);
     try {
-      const params = new URLSearchParams({ tab, q: query, offset, limit: STEP });
+      const params = new URLSearchParams({ status: sel.status.join(','), promo: sel.promo.join(','), bonusType: sel.bonusType.join(','), q: query, offset, limit: STEP });
       const res = await fetch(`${API}/bonuses?${params}`, { signal: c.signal });
       if (!res.ok) throw new Error('Server returned ' + res.status);
       const data = await res.json();
@@ -88,7 +94,7 @@ function BonusList() {
       if (e.name === 'AbortError') return;
       setError(e.message); setLoading(false);
     }
-  }, [tab, query]);
+  }, [sel, query]);
 
   useEffect(() => { load(0); return () => ctrl.current && ctrl.current.abort(); }, [load]);
 
@@ -108,15 +114,22 @@ function BonusList() {
 
   return (
     <>
-      <div className="tools"><input className="search" type="search" placeholder="Search bonuses by name or ID…" value={q} onChange={e => setQ(e.target.value)} /></div>
-      <div className="tabs">
-        {TABS.map(([k, label]) => (
-          <button key={k} className={'tab' + (k === tab ? ' on' : '')} onClick={() => setTab(k)}>{label}<span>{counts[k] ?? '…'}</span></button>
+      <div className="tools"><input className="search" type="search" placeholder="Search bonuses by name or ID…" value={q} onChange={e => setQ(e.target.value)} />
+      </div>
+      <div className="filters">
+        <button className={'chip' + (anySel ? '' : ' on')} onClick={() => setSel({ status: [], promo: [], bonusType: [] })}>All<span>{counts.total ?? '…'}</span></button>
+        {GROUPS.map(([g, title, opts]) => (
+          <div className="fgroup" key={g}>
+            <small className="ftitle">{title}</small>
+            {opts.map(([v, label]) => (
+              <button key={v} className={'chip' + (sel[g].includes(v) ? ' on' : '')} aria-pressed={sel[g].includes(v)} onClick={() => toggle(g, v)}>{label}<span>{counts[g]?.[v] ?? '…'}</span></button>
+            ))}
+          </div>
         ))}
       </div>
       <div className="wrap">
         <table className="bt">
-          <thead><tr><th>Bonus</th><th>Status</th><th>Created at</th><th>Date start</th><th>Date end</th><th>Given on</th><th>Bonus value / wagered</th><th>Total wins</th><th>Total wagered</th><th>Player groups</th><th>Received by</th><th>Edit</th></tr></thead>
+          <thead><tr><th>Bonus</th><th>Status</th><th>Created at</th><th>Date start</th><th>Date end</th><th>Triggers on</th><th>Bonus value / wagered</th><th>Total wins</th><th>Total wagered</th><th>Segments</th><th>Received by</th><th>Edit</th></tr></thead>
           <tbody onContextMenu={e => {
             const tr = e.target.closest('tr[data-id]');
             if (!tr) return;

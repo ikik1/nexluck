@@ -1,12 +1,16 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NextLuck CRM — Bonuses</title><link rel="stylesheet" href="/crm/crm.css">
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NextLuck CRM — Bonuses</title><link rel="stylesheet" href="/crm/crm.css?v=2">
 <style>
 main{max-width:1600px}
 .tools{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:16px 0 12px}
 .search{flex:1;min-width:240px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;font-size:14px}
-.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--line);margin-bottom:12px}
-.tab{background:none;border:0;padding:10px 14px;font-size:14px;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px}
-.tab.on{color:var(--brand);border-color:var(--brand);font-weight:600}
-.tab span{background:#e8e8e8;border-radius:99px;padding:1px 7px;font-size:11px;margin-left:4px}
+.filters{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-bottom:12px}
+.fgroup{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+.ftitle{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-right:2px}
+.chip{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #cfcfcf;border-radius:99px;padding:3px 10px;font-size:12px;color:#444;cursor:pointer;text-transform:capitalize;line-height:1.5}
+.chip:hover{border-color:var(--brand);color:var(--brand)}
+.chip.on{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.chip span{background:#00000014;border-radius:99px;padding:0 6px;font-size:10px}
+.chip.on span{background:#ffffff33}
 .wrap{background:#fff;border:1px solid var(--line);border-radius:4px;overflow-x:auto}
 table.bt{min-width:1100px;border-collapse:collapse;width:100%;font-size:13px}
 .bt th{background:#f3f3f3;color:#444;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:8px 12px;border-bottom:1px solid var(--line);border-right:1px solid #e5e5e5;white-space:nowrap;position:sticky;top:0}

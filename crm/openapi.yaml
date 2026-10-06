@@ -61,15 +61,23 @@ paths:
     get:
       tags: [Bonuses]
       summary: List bonuses
-      description: Returns one page of bonuses plus the per-tab counters. Use `offset` to implement "Show more".
+      description: Returns one page of bonuses plus per-filter counters. Different filter groups (`status`, `promo`, `bonusType`) are AND-ed; values inside one group are OR-ed. Use `offset` to implement "Show more".
       operationId: listBonuses
       security:
         - oauth2: ["bonuses:read"]
       parameters:
-        - name: tab
+        - name: status
           in: query
-          schema: { type: string, enum: [all, active, inactive, auto, banner, nobanner], default: all }
-          description: Filter tab (`banner` / `nobanner` = with / without promotion banners).
+          schema: { type: string, example: "active,auto" }
+          description: Comma-separated statuses (`active`, `inactive`, `auto`). `active` includes auto-generated bonuses. Values are OR-ed.
+        - name: promo
+          in: query
+          schema: { type: string, example: banner }
+          description: Comma-separated promotion banner filters (`banner` = with, `nobanner` = without). Values are OR-ed.
+        - name: bonusType
+          in: query
+          schema: { type: string, example: "free spins,cashback" }
+          description: Comma-separated bonus types (`dep match`, `no-deposit`, `free spins`, `cashback`, `multiplier`). Values are OR-ed.
         - name: q
           in: query
           schema: { type: string }
@@ -99,7 +107,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/OAuthError' }
         '400':
-          description: Unknown tab
+          description: Unknown filter value
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -157,11 +165,12 @@ components:
   schemas:
     Bonus:
       type: object
-      required: [id, name, status, hasPromo, createdAt, dateStart, dateEnd, event, bonusValue, wagered, wins, received, groups, deleted]
+      required: [id, name, status, bonusType, hasPromo, createdAt, dateStart, dateEnd, event, bonusValue, wagered, wins, received, groups, deleted]
       properties:
         id: { type: string, example: BN-1001 }
         name: { type: string, example: Welcome Pack 100% }
         status: { type: string, enum: [active, inactive, auto] }
+        bonusType: { type: string, enum: [dep match, no-deposit, free spins, cashback, multiplier] }
         hasPromo: { type: boolean }
         createdAt: { type: string, format: date }
         dateStart: { type: string, format: date }
@@ -173,7 +182,7 @@ components:
         received: { type: integer, description: Number of players who received the bonus, example: 2140 }
         groups:
           type: array
-          description: Player groups the bonus is available to
+          description: Segments (player groups) the bonus is available to
           items: { type: string }
           example: [first_dep, registered]
         deleted: { type: boolean }
@@ -184,14 +193,18 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/Bonus' }
-        total: { type: integer, description: Number of bonuses matching tab and search }
+        total: { type: integer, description: Number of bonuses matching all filters and search }
         offset: { type: integer }
         limit: { type: integer }
         counts:
           type: object
-          description: Number of bonuses per tab (ignores search)
-          additionalProperties: { type: integer }
-          example: { all: 100, active: 70, inactive: 30, auto: 20, banner: 50, nobanner: 50 }
+          description: Facet counters. Each option is counted with the other groups' selections and the search applied, but not its own group's.
+          required: [total, status, promo, bonusType]
+          properties:
+            total: { type: integer }
+            status: { type: object, additionalProperties: { type: integer }, example: { active: 73, inactive: 27, auto: 36 } }
+            promo: { type: object, additionalProperties: { type: integer }, example: { banner: 49, nobanner: 51 } }
+            bonusType: { type: object, additionalProperties: { type: integer }, example: { dep match: 31, no-deposit: 1, free spins: 30, cashback: 8, multiplier: 30 } }
     TokenResponse:
       type: object
       required: [access_token, token_type, expires_in, scope]

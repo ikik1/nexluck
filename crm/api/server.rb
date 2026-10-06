@@ -29,6 +29,14 @@ EV = ['First deposit','Registration','Any deposit','Weekly loss','Player birthda
 NM = ['Welcome Pack','Reload','Free Spins','Cashback','Level-Up Reward','Win-back','Boost','Mega Match','Lucky Spin','Weekend Special']
 GR = %w[first_dep registered vip no_deposit newcomers high_roller inactive_30d kyc_verified]
 
+BONUS_TYPES = ['dep match', 'no-deposit', 'free spins', 'cashback', 'multiplier']
+TYPE_RULES = [[/no-deposit/i, 'no-deposit'], [/free spins|win-back|lucky spin|birthday/i, 'free spins'],
+              [/cashback/i, 'cashback'], [/boost|level-up|weekend|referral|tournament/i, 'multiplier']]
+
+def type_of(name)
+  (TYPE_RULES.find { |re, _| name =~ re } || [nil, 'dep match'])[1]
+end
+
 def groups_of(id)
   n = id[3..-1].to_i
   out = []
@@ -63,20 +71,25 @@ def build
     { 'id' => b[0], 'name' => b[1], 'status' => b[2], 'hasPromo' => b[3] == 1,
       'createdAt' => b[4], 'dateStart' => b[5], 'dateEnd' => b[6], 'event' => b[7],
       'bonusValue' => b[8], 'wagered' => b[9], 'wins' => b[10], 'received' => b[11],
-      'groups' => groups_of(b[0]), 'deleted' => false }
+      'bonusType' => type_of(b[1]), 'groups' => groups_of(b[0]), 'deleted' => false }
   end
 end
 
 BONUSES = build
 LOCK = Mutex.new
 
-TABS = {
-  'all' => ->(b) { true },
-  'active' => ->(b) { b['status'] != 'inactive' },
-  'inactive' => ->(b) { b['status'] == 'inactive' },
-  'auto' => ->(b) { b['status'] == 'auto' },
-  'banner' => ->(b) { b['hasPromo'] },
-  'nobanner' => ->(b) { !b['hasPromo'] }
+# Filter groups: values inside one group are OR-ed, different groups are AND-ed.
+FILTERS = {
+  'status' => {
+    'active' => ->(b) { b['status'] != 'inactive' },
+    'inactive' => ->(b) { b['status'] == 'inactive' },
+    'auto' => ->(b) { b['status'] == 'auto' }
+  },
+  'promo' => {
+    'banner' => ->(b) { b['hasPromo'] },
+    'nobanner' => ->(b) { !b['hasPromo'] }
+  },
+  'bonusType' => BONUS_TYPES.map { |t| [t, ->(b) { b['bonusType'] == t }] }.to_h
 }
 
 def json(res, status, body)
@@ -169,6 +182,8 @@ end
 srv = WEBrick::HTTPServer.new(Port: PORT, BindAddress: '127.0.0.1', DocumentRoot: ROOT,
                               AccessLog: [], Logger: WEBrick::Log.new($stderr, WEBrick::Log::WARN))
 srv.config[:MimeTypes]['yaml'] = 'application/yaml'
+# Dev server: always revalidate static files so edits show up without a hard refresh.
+srv.config[:RequestCallback] = ->(_req, res) { res['Cache-Control'] = 'no-cache' }
 
 srv.mount_proc('/crm/api/v1/oauth/token') do |req, res|
   res['Cache-Control'] = 'no-store'
@@ -197,13 +212,28 @@ handler = lambda do |req, res, rest, secured|
     if rest.empty?
       next json(res, 405, { error: 'Method not allowed' }) unless req.request_method == 'GET'
       next if secured && !authorize(req, res, 'bonuses:read')
-      tab = req.query['tab'] || 'all'
-      next json(res, 400, { error: "Unknown tab '#{tab}'" }) unless TABS.key?(tab)
       limit = [[(req.query['limit'] || 20).to_i, 1].max, 100].min
       offset = [(req.query['offset'] || 0).to_i, 0].max
       ql = (req.query['q'] || '').strip.downcase
-      counts = TABS.map { |k, f| [k, BONUSES.count(&f)] }.to_h
-      list = BONUSES.select(&TABS[tab]).select { |b| ql.empty? || b['name'].downcase.include?(ql) || b['id'].downcase.include?(ql) }
+      selected = {}
+      bad = nil
+      FILTERS.each do |group, opts|
+        vals = req.query[group].to_s.split(',').map(&:strip).reject(&:empty?).uniq
+        bad ||= "Unknown #{group} '#{(vals - opts.keys).first}'" unless (vals - opts.keys).empty?
+        selected[group] = vals
+      end
+      next json(res, 400, { error: bad }) if bad
+      searched = BONUSES.select { |b| ql.empty? || b['name'].downcase.include?(ql) || b['id'].downcase.include?(ql) }
+      matches = lambda do |b, skip|
+        selected.all? { |g, vals| g == skip || vals.empty? || vals.any? { |v| FILTERS[g][v].call(b) } }
+      end
+      list = searched.select { |b| matches.call(b, nil) }
+      # Facet counts: what each option would return given the other groups' selections.
+      counts = { 'total' => list.length }
+      FILTERS.each do |g, opts|
+        pool = searched.select { |b| matches.call(b, g) }
+        counts[g] = opts.map { |k, f| [k, pool.count(&f)] }.to_h
+      end
       json(res, 200, { items: list[offset, limit] || [], total: list.length, offset: offset, limit: limit, counts: counts })
     elsif (m = rest.match(%r{\A([\w-]+)/delete\z}))
       next json(res, 405, { error: 'Method not allowed' }) unless req.request_method == 'POST'
