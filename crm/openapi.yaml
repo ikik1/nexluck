@@ -358,6 +358,7 @@ paths:
               type: object
               required: [startTime, endTime]
               properties:
+                code: { type: string, example: "WELCOME100", description: "Optional, 4-32 chars A-Z 0-9 _ -; generated when omitted" }
                 startTime: { type: string, example: "2026-09-01T00:00" }
                 endTime: { type: string, example: "2026-12-31T23:59" }
       responses:

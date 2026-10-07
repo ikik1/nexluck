@@ -470,11 +470,20 @@ handler = lambda do |req, res, rest, secured|
         errors['endTime'] = 'Use format YYYY-MM-DDTHH:MM' unless end_dt
         errors['endTime'] = 'End time must be after start time' if start_dt && end_dt && end_dt <= start_dt
         next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
-        code = nil
+        requested = body['code']
+        if requested
+          if !requested.is_a?(String) || requested !~ /\A[A-Z0-9_-]{4,32}\z/
+            errors['code'] = 'Use 4-32 characters: A-Z, 0-9, _ or -'
+          elsif PROMO_CODES.values.flatten.any? { |item| item['code'] == requested }
+            errors['code'] = 'Code already exists'
+          end
+        end
+        next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
+        code = requested
         loop do
+          break if code
           candidate = "PROMO-#{SecureRandom.alphanumeric(8).upcase}"
           code = candidate unless PROMO_CODES.values.flatten.any? { |item| item['code'] == candidate }
-          break if code
         end
         item = { 'code' => code, 'startTime' => start_time, 'endTime' => end_time,
                  'createdAt' => Time.now.utc.iso8601 }

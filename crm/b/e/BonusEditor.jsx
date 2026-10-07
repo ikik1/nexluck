@@ -232,13 +232,21 @@ function AIAgentModal({ onClose }) {
 function PromoCodes({ bonus, dates, setDates, codes, setCodes }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const draft = !bonus;
   const load = async () => {
     const result = await api(`/bonuses/${bonus.id}/promo-codes`);
     setCodes(result.items);
   };
   const generate = async () => {
-    setBusy(true);
     setError('');
+    if (draft) {
+      if (!dates.startTime || !dates.endTime) return setError('Set both Valid from and Valid until');
+      if (dates.endTime <= dates.startTime) return setError('endTime: End time must be after start time');
+      const code = 'PROMO-' + Array.from({ length: 8 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+      setCodes((items) => [...items, { code, startTime: dates.startTime, endTime: dates.endTime }]);
+      return;
+    }
+    setBusy(true);
     try {
       const item = await api(`/bonuses/${bonus.id}/promo-codes`, {
         method: 'POST',
@@ -253,6 +261,7 @@ function PromoCodes({ bonus, dates, setDates, codes, setCodes }) {
   };
   const remove = async (code) => {
     if (!window.confirm(`Delete promo code ${code}?`)) return;
+    if (draft) return setCodes((items) => items.filter((item) => item.code !== code));
     setBusy(true);
     setError('');
     try {
@@ -266,8 +275,8 @@ function PromoCodes({ bonus, dates, setDates, codes, setCodes }) {
   };
 
   useEffect(() => {
-    load().catch((e) => setError(e.message));
-  }, [bonus.id]);
+    if (!draft) load().catch((e) => setError(e.message));
+  }, [bonus && bonus.id]);
 
   return (
     <>
@@ -294,6 +303,7 @@ function PromoCodes({ bonus, dates, setDates, codes, setCodes }) {
           ))}</tbody>
         </table>
       ) : <div className="promo-empty">No promo codes have been generated for this bonus.</div>}
+      {draft && codes.length > 0 && <div className="promo-empty">These codes are created together with the bonus.</div>}
     </>
   );
 }
@@ -421,7 +431,7 @@ function Editor() {
     { id: 'wg', title: 'Wagering' },
     { id: 'wl', title: 'Wallet rules' },
     { id: 'ab', title: 'Anti-bonus-hunter' },
-    ...(orig ? [{ id: 'pc', title: 'Promo codes' }] : []),
+    { id: 'pc', title: 'Promo codes' },
   ];
   const selectMapNode = (id) => {
     setShowMap(false);
@@ -439,12 +449,19 @@ function Editor() {
     try {
       const b = await api(creating ? '/bonuses' : '/bonuses/' + orig.id, { method: creating ? 'POST' : 'PATCH', body: JSON.stringify(form) });
       setOrig(b); setForm(pick(b));
+      let failed = 0;
       if (creating) {
         history.replaceState(null, '', '/crm/b/e/?id=' + encodeURIComponent(b.id));
+        const created = [];
+        for (const c of promoCodes) {
+          try {
+            created.push(await api(`/bonuses/${b.id}/promo-codes`, { method: 'POST', body: JSON.stringify(c) }));
+          } catch (e) { failed++; }
+        }
+        setPromoCodes(created);
         setPromoDates({ startTime: b.availability.startTime, endTime: b.availability.endTime });
-        setPromoCodes([]);
       }
-      setStatus({ text: creating ? 'Bonus created' : 'Saved' });
+      setStatus(failed ? { bad: true, text: `Bonus created, but ${failed} promo code(s) could not be created` } : { text: creating ? 'Bonus created' : 'Saved' });
     } catch (e) {
       setErrors(e.fields || {});
       setStatus({ bad: true, text: e.status === 422 ? 'Please fix the highlighted fields' : e.message });
@@ -575,10 +592,10 @@ function Editor() {
           <Num label="Min even money coverage percentage" path="antiBonusHunter.minEvenMoneyCoveragePercentage" {...p} />
         </section>
 
-        {orig && <section className={'card' + (highlighted === 'pc' ? ' map-highlight' : '')} style={{ gridArea: 'pc', '--c': '#087f8c' }} ref={refs.pc} tabIndex="-1">
+        <section className={'card' + (highlighted === 'pc' ? ' map-highlight' : '')} style={{ gridArea: 'pc', '--c': '#087f8c' }} ref={refs.pc} tabIndex="-1">
           <h3>Promo codes</h3>
-          <PromoCodes bonus={orig} dates={promoDates} setDates={setPromoDates} codes={promoCodes} setCodes={setPromoCodes} />
-        </section>}
+          <PromoCodes bonus={orig} dates={creating ? { startTime: promoDates.startTime || form.availability.startTime, endTime: promoDates.endTime || form.availability.endTime } : promoDates} setDates={setPromoDates} codes={promoCodes} setCodes={setPromoCodes} />
+        </section>
       </div>
 
       {modal && modal.t === 'rates' && <RatesModal amount={modal.amount} onClose={() => setModal(null)} />}
