@@ -7,7 +7,7 @@ main{max-width:1500px}
 .btn:hover{background:#f3f3f3}.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}.btn.pri:hover{background:#094a8a}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .msg{font-size:13px;padding:6px 12px;border-radius:6px}.msg.ok{background:#eaf6ee;color:var(--green)}.msg.bad{background:#fbeaea;color:var(--red)}
-.sat{position:relative;display:grid;grid-template-columns:minmax(260px,1fr) minmax(340px,1.25fr) minmax(260px,1fr);grid-template-areas:"av ce tr" "rw ce wg" "rw wl wg";gap:36px 56px;align-items:start;padding:8px 0 24px}
+.sat{position:relative;display:grid;grid-template-columns:minmax(260px,1fr) minmax(340px,1.25fr) minmax(260px,1fr);grid-template-areas:"av ce tr" "rw ce wg" "ab wl wg";gap:36px 56px;align-items:start;padding:8px 0 24px}
 .sat>svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
 .card{position:relative;z-index:1;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;border-top:4px solid var(--c,var(--brand))}
 .card h3{font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--c,var(--brand));margin-bottom:10px;display:flex;align-items:center;gap:6px}
@@ -51,7 +51,7 @@ table.rt{width:100%;border-collapse:collapse;font-size:13px}.rt td,.rt th{paddin
 .rt input{width:90px;padding:4px 6px;border:1px solid var(--line);border-radius:4px}
 .cl{border-left:3px solid var(--brand);padding:4px 10px;margin-bottom:10px;font-size:13px}.cl small{color:var(--muted)}.cl ul{margin:4px 0 0 18px}
 .cl code{background:#f3f3f3;padding:0 4px;border-radius:3px}
-@media(max-width:1100px){.sat{grid-template-columns:1fr;grid-template-areas:"ce" "av" "tr" "rw" "wg" "wl";gap:16px}.sat>svg{display:none}}
+@media(max-width:1100px){.sat{grid-template-columns:1fr;grid-template-areas:"ce" "av" "tr" "rw" "wg" "wl" "ab";gap:16px}.sat>svg{display:none}}
 </style></head>
 <body><header id="hdr"></header><div class="subbar" id="sub"></div>
 <main><h1>🎁 Edit bonus</h1><p class="lead">Bonus configuration, grouped around the bonus itself.</p>

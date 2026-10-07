@@ -10,6 +10,8 @@ const INCLUDE = ['registered', 'no_deposit', 'kyc_verified'];
 const EXCLUDE = ['restricted_countries', 'restricted_currencies'];
 const APPLIES = ['BONUS_ONLY', 'BONUS_PLUS_DEPOSIT', 'WINNINGS_ONLY'];
 const WALLET = ['MAIN_WALLET_FIRST', 'BONUS_MONEY_FIRST'];
+const PAYMENT_METHODS = ['SKRILL', 'NETELLER', 'CRYPTO'];
+const KYC_LEVELS = ['NONE', 'VERIFIED_EMAIL', 'VERIFIED_ID', 'VERIFIED_ID_AND_ADDRESS'];
 const APPLIES_HINT =
   'BONUS_ONLY - The wagering multiplier applies strictly to the issued Bonus Amount.\n' +
   'BONUS_PLUS_DEPOSIT - The wagering multiplier applies to the sum of the Deposit Amount + Bonus Amount.\n' +
@@ -25,7 +27,7 @@ const setIn = (o, path, v) => {
 const pick = (b) => ({
   name: b.name, description: b.description, status: b.status === 'inactive' ? 'inactive' : 'active',
   bonusType: b.bonusType, category: b.category, availability: b.availability, triggers: b.triggers,
-  reward: b.reward, wagering: b.wagering, walletRules: b.walletRules,
+  reward: b.reward, wagering: b.wagering, walletRules: b.walletRules, antiBonusHunter: b.antiBonusHunter,
 });
 const fmt = (n) => (Math.round(n * 100) / 100).toLocaleString('en-US');
 const api = async (path, opts) => {
@@ -206,7 +208,7 @@ function Editor() {
   const [modal, setModal] = useState(null);
   const [sample, setSample] = useState(100);
   const root = useRef(null);
-  const refs = { ce: useRef(null), av: useRef(null), tr: useRef(null), rw: useRef(null), wg: useRef(null), wl: useRef(null) };
+  const refs = { ce: useRef(null), av: useRef(null), tr: useRef(null), rw: useRef(null), wg: useRef(null), wl: useRef(null), ab: useRef(null) };
   const [lines, setLines] = useState([]);
 
   const load = () => api('/bonuses/' + ID).then((b) => { setOrig(b); setForm(pick(b)); }).catch((e) => setStatus({ bad: true, text: e.message }));
@@ -220,7 +222,7 @@ function Editor() {
       const c = refs.ce.current.getBoundingClientRect();
       const mid = (x) => ({ x: x.left + x.width / 2 - r.left, y: x.top + x.height / 2 - r.top });
       const cc = mid(c);
-      setLines(['av', 'tr', 'rw', 'wg', 'wl'].map((k) => {
+      setLines(['av', 'tr', 'rw', 'wg', 'wl', 'ab'].map((k) => {
         const b = refs[k].current.getBoundingClientRect();
         const p = mid(b);
         return { k, x1: cc.x, y1: cc.y, x2: p.x, y2: p.y };
@@ -352,6 +354,22 @@ function Editor() {
           </div>
           <Check label="Allow to cancel before wagering" path="walletRules.allowCancelBeforeWagering" {...p} />
           <Check label="Allow withdraw before wagering" path="walletRules.allowWithdrawBeforeWagering" {...p} />
+        </section>
+
+        <section className="card" style={{ gridArea: 'ab', '--c': '#8b3a62' }} ref={refs.ab}>
+          <h3>Anti-bonus-hunter</h3>
+          <div className="two">
+            <Num label="Max claims per IP" path="antiBonusHunter.maxClaimsPerIp" int {...p} />
+            <Num label="Max claims per device" path="antiBonusHunter.maxClaimsPerDevice" int {...p} />
+          </div>
+          <Check label="Block shared IP subnets" path="antiBonusHunter.blockSharedIpSubnets" {...p} />
+          <Check label="Block known VPNs and proxies" path="antiBonusHunter.blockKnownVpnsAndProxies" {...p} />
+          <Multi label="Payment method blacklist" path="antiBonusHunter.paymentMethodBlacklist" options={PAYMENT_METHODS} {...p} />
+          <Select label="Require KYC level before claim" path="antiBonusHunter.requireKycLevelBeforeClaim" options={KYC_LEVELS} {...p} />
+          <Money label="Max bet per round" path="antiBonusHunter.maxBetPerRound" {...p} />
+          <Num label="Max bet percentage of bonus" hint="Restricts a single wager from exceeding a percentage of the total awarded bonus balance." path="antiBonusHunter.maxBetPercentageOfBonus" {...p} />
+          <Check label="Restrict zero risk betting" path="antiBonusHunter.restrictZeroRiskBetting" {...p} />
+          <Num label="Min even money coverage percentage" path="antiBonusHunter.minEvenMoneyCoveragePercentage" {...p} />
         </section>
       </div>
 

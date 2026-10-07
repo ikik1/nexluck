@@ -35,8 +35,10 @@ TRIGGER_EVENTS = %w[on_registration on_deposit]
 APPLIES_TO = %w[BONUS_ONLY BONUS_PLUS_DEPOSIT WINNINGS_ONLY]
 CAP_TYPES = %w[MULTIPLIER FIXED]
 WALLET_ORDER = %w[MAIN_WALLET_FIRST BONUS_MONEY_FIRST]
+PAYMENT_METHODS = %w[SKRILL NETELLER CRYPTO]
+KYC_LEVELS = %w[NONE VERIFIED_EMAIL VERIFIED_ID VERIFIED_ID_AND_ADDRESS]
 CREATORS = %w[v.kovalevskiy a.petrova m.rossi]
-DETAIL_KEYS = %w[description category createdBy availability triggers reward wagering walletRules]
+DETAIL_KEYS = %w[description category createdBy availability triggers reward wagering walletRules antiBonusHunter]
 
 BONUS_TYPES = ['dep match', 'no-deposit', 'free spins', 'cashback', 'multiplier']
 TYPE_RULES = [[/no-deposit/i, 'no-deposit'], [/free spins|win-back|lucky spin|birthday/i, 'free spins'],
@@ -67,7 +69,13 @@ def detail_for(b, type, groups)
                     'appliesTo' => type == 'free spins' ? 'WINNINGS_ONLY' : APPLIES_TO[n % 2],
                     'maxWithdrawCap' => n.even? ? { 'type' => 'MULTIPLIER', 'value' => 5 + n % 6 } : { 'type' => 'FIXED', 'value' => [500, 1000, 2000][n % 3] } },
     'walletRules' => { 'deduction' => WALLET_ORDER[n % 2], 'winnings' => WALLET_ORDER[(n / 2) % 2],
-                       'allowCancelBeforeWagering' => n % 3 != 0, 'allowWithdrawBeforeWagering' => n % 5 == 0 }
+                       'allowCancelBeforeWagering' => n % 3 != 0, 'allowWithdrawBeforeWagering' => n % 5 == 0 },
+    'antiBonusHunter' => { 'maxClaimsPerIp' => 1, 'maxClaimsPerDevice' => 1,
+                           'blockSharedIpSubnets' => true, 'blockKnownVpnsAndProxies' => true,
+                           'paymentMethodBlacklist' => PAYMENT_METHODS.dup,
+                           'requireKycLevelBeforeClaim' => 'VERIFIED_ID_AND_ADDRESS',
+                           'maxBetPerRound' => 10, 'maxBetPercentageOfBonus' => 10.0,
+                           'restrictZeroRiskBetting' => true, 'minEvenMoneyCoveragePercentage' => 67.0 }
   }
 end
 
@@ -254,7 +262,7 @@ def list_view(b) b.reject { |k, _| DETAIL_KEYS.include?(k) } end
 
 # The part of a bonus the editor may change. `auto` bonuses are reported as active.
 def editable(b)
-  deep_dup(b.slice('name', 'description', 'bonusType', 'category', 'availability', 'triggers', 'reward', 'wagering', 'walletRules'))
+  deep_dup(b.slice('name', 'description', 'bonusType', 'category', 'availability', 'triggers', 'reward', 'wagering', 'walletRules', 'antiBonusHunter'))
     .merge('status' => b['status'] == 'inactive' ? 'inactive' : 'active')
 end
 
@@ -294,7 +302,7 @@ def validate_bonus(m)
   desc = m['description'].to_s
   err['description'] = 'Up to 2000 characters' if desc.length > 2000
 
-  av, tr, rw, wg, wl = %w[availability triggers reward wagering walletRules].map { |k| h.(m[k]) }
+  av, tr, rw, wg, wl, abh = %w[availability triggers reward wagering walletRules antiBonusHunter].map { |k| h.(m[k]) }
   cap = h.(wg['maxWithdrawCap'])
   s_dt, e_dt = parse_dt(av['startTime']), parse_dt(av['endTime'])
   err['availability.startTime'] = 'Use format YYYY-MM-DDTHH:MM' unless s_dt
@@ -327,7 +335,19 @@ def validate_bonus(m)
     'walletRules' => { 'deduction' => enum.('walletRules.deduction', wl['deduction'], WALLET_ORDER),
                        'winnings' => enum.('walletRules.winnings', wl['winnings'], WALLET_ORDER),
                        'allowCancelBeforeWagering' => bool.('walletRules.allowCancelBeforeWagering', wl['allowCancelBeforeWagering']),
-                       'allowWithdrawBeforeWagering' => bool.('walletRules.allowWithdrawBeforeWagering', wl['allowWithdrawBeforeWagering']) }
+                       'allowWithdrawBeforeWagering' => bool.('walletRules.allowWithdrawBeforeWagering', wl['allowWithdrawBeforeWagering']) },
+    'antiBonusHunter' => {
+      'maxClaimsPerIp' => num.('antiBonusHunter.maxClaimsPerIp', abh['maxClaimsPerIp'], 0, 1000, true),
+      'maxClaimsPerDevice' => num.('antiBonusHunter.maxClaimsPerDevice', abh['maxClaimsPerDevice'], 0, 1000, true),
+      'blockSharedIpSubnets' => bool.('antiBonusHunter.blockSharedIpSubnets', abh['blockSharedIpSubnets']),
+      'blockKnownVpnsAndProxies' => bool.('antiBonusHunter.blockKnownVpnsAndProxies', abh['blockKnownVpnsAndProxies']),
+      'paymentMethodBlacklist' => subset.('antiBonusHunter.paymentMethodBlacklist', abh['paymentMethodBlacklist'], PAYMENT_METHODS),
+      'requireKycLevelBeforeClaim' => enum.('antiBonusHunter.requireKycLevelBeforeClaim', abh['requireKycLevelBeforeClaim'], KYC_LEVELS),
+      'maxBetPerRound' => num.('antiBonusHunter.maxBetPerRound', abh['maxBetPerRound'], 0, 100_000, false),
+      'maxBetPercentageOfBonus' => num.('antiBonusHunter.maxBetPercentageOfBonus', abh['maxBetPercentageOfBonus'], 0, 100, false),
+      'restrictZeroRiskBetting' => bool.('antiBonusHunter.restrictZeroRiskBetting', abh['restrictZeroRiskBetting']),
+      'minEvenMoneyCoveragePercentage' => num.('antiBonusHunter.minEvenMoneyCoveragePercentage', abh['minEvenMoneyCoveragePercentage'], 0, 100, false)
+    }
   }
   [out, err]
 end
@@ -353,7 +373,7 @@ def update_bonus(b, clean, actor)
   return [] if changes.empty?
   prev_event = b['triggers']['event']
   b['status'] = after['status'] == 'inactive' ? 'inactive' : (b['status'] == 'auto' ? 'auto' : 'active')
-  %w[name description bonusType category availability triggers reward wagering walletRules].each { |k| b[k] = after[k] }
+  %w[name description bonusType category availability triggers reward wagering walletRules antiBonusHunter].each { |k| b[k] = after[k] }
   b['groups'] = after['availability']['includeSegments']
   b['dateStart'] = after['availability']['startTime'][0, 10]
   b['dateEnd'] = after['availability']['endTime'][0, 10]

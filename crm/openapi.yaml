@@ -442,6 +442,21 @@ components:
         winnings: { type: string, enum: [MAIN_WALLET_FIRST, BONUS_MONEY_FIRST] }
         allowCancelBeforeWagering: { type: boolean }
         allowWithdrawBeforeWagering: { type: boolean }
+    AntiBonusHunter:
+      type: object
+      properties:
+        maxClaimsPerIp: { type: integer, minimum: 0, maximum: 1000 }
+        maxClaimsPerDevice: { type: integer, minimum: 0, maximum: 1000 }
+        blockSharedIpSubnets: { type: boolean }
+        blockKnownVpnsAndProxies: { type: boolean }
+        paymentMethodBlacklist:
+          type: array
+          items: { type: string, enum: [SKRILL, NETELLER, CRYPTO] }
+        requireKycLevelBeforeClaim: { type: string, enum: [NONE, VERIFIED_EMAIL, VERIFIED_ID, VERIFIED_ID_AND_ADDRESS] }
+        maxBetPerRound: { type: number, description: EUR }
+        maxBetPercentageOfBonus: { type: number, minimum: 0, maximum: 100 }
+        restrictZeroRiskBetting: { type: boolean }
+        minEvenMoneyCoveragePercentage: { type: number, minimum: 0, maximum: 100 }
     BonusUpdate:
       type: object
       properties:
@@ -455,6 +470,7 @@ components:
         reward: { $ref: '#/components/schemas/Reward' }
         wagering: { $ref: '#/components/schemas/Wagering' }
         walletRules: { $ref: '#/components/schemas/WalletRules' }
+        antiBonusHunter: { $ref: '#/components/schemas/AntiBonusHunter' }
     BonusDetail:
       allOf:
         - $ref: '#/components/schemas/Bonus'
