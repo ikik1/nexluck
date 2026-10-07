@@ -59,6 +59,41 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/OAuthError' }
   /bonuses:
+    post:
+      tags: [Bonuses]
+      summary: Create a bonus
+      description: Creates a new bonus from its validated configuration.
+      operationId: createBonus
+      security:
+        - oauth2: ["bonuses:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BonusCreate' }
+      responses:
+        '201':
+          description: The created bonus
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BonusDetail' }
+        '401':
+          description: Missing, invalid or expired access token
+          headers:
+            WWW-Authenticate: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '403':
+          description: Token lacks the required scope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
     get:
       tags: [Bonuses]
       summary: List bonuses
@@ -276,6 +311,101 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /bonuses/{id}/promo-codes:
+    get:
+      tags: [Bonuses]
+      summary: List promo codes for a bonus
+      operationId: listBonusPromoCodes
+      security:
+        - oauth2: ["bonuses:read"]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Promo codes and their validity windows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/PromoCode' }
+        '404':
+          description: Bonus not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      tags: [Bonuses]
+      summary: Generate a promo code for a bonus
+      operationId: generateBonusPromoCode
+      security:
+        - oauth2: ["bonuses:write"]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startTime, endTime]
+              properties:
+                startTime: { type: string, example: "2026-09-01T00:00" }
+                endTime: { type: string, example: "2026-12-31T23:59" }
+      responses:
+        '201':
+          description: Generated promo code
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PromoCode' }
+        '422':
+          description: Invalid validity window
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+        '404':
+          description: Bonus not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /bonuses/{id}/promo-codes/{code}:
+    delete:
+      tags: [Bonuses]
+      summary: Delete a promo code from a bonus
+      operationId: deleteBonusPromoCode
+      security:
+        - oauth2: ["bonuses:write"]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted promo code
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: string }
+        '404':
+          description: Bonus or promo code not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /exchange-rates:
     get:
       tags: [Exchange rates]
@@ -457,6 +587,13 @@ components:
         maxBetPercentageOfBonus: { type: number, minimum: 0, maximum: 100 }
         restrictZeroRiskBetting: { type: boolean }
         minEvenMoneyCoveragePercentage: { type: number, minimum: 0, maximum: 100 }
+    PromoCode:
+      type: object
+      properties:
+        code: { type: string, example: PROMO-7H3K9P2Q }
+        startTime: { type: string, example: "2026-09-01T00:00" }
+        endTime: { type: string, example: "2026-12-31T23:59" }
+        createdAt: { type: string, format: date-time }
     BonusUpdate:
       type: object
       properties:
@@ -471,6 +608,11 @@ components:
         wagering: { $ref: '#/components/schemas/Wagering' }
         walletRules: { $ref: '#/components/schemas/WalletRules' }
         antiBonusHunter: { $ref: '#/components/schemas/AntiBonusHunter' }
+    BonusCreate:
+      allOf:
+        - $ref: '#/components/schemas/BonusUpdate'
+        - type: object
+          required: [name, description, status, bonusType, category, availability, triggers, reward, wagering, walletRules, antiBonusHunter]
     BonusDetail:
       allOf:
         - $ref: '#/components/schemas/Bonus'

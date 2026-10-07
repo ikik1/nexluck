@@ -10,7 +10,7 @@ const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'n
 const eur = n => '\u20ac' + n.toLocaleString('en-US');
 
 function BonusRow({ b, onEdit }) {
-  const p = Math.min(100, Math.round(b.wagered / b.bonusValue * 100));
+  const p = b.bonusValue > 0 ? Math.min(100, Math.round(b.wagered / b.bonusValue * 100)) : 0;
   const on = b.status !== 'inactive';
   return (
     <tr className={b.status + (b.deleted ? ' deleted' : '')} data-id={b.id}>
@@ -28,7 +28,9 @@ function BonusRow({ b, onEdit }) {
       <td className="num">{eur(b.wagered)}</td>
       <td className="grp">{b.groups.join(', ')}</td>
       <td className="num">{b.received.toLocaleString('en-US')}</td>
-      <td className="ed"><button className="edit" title="Modify" aria-label={'Modify ' + b.name} onClick={() => onEdit(b)}>✏️</button></td>
+      <td className="ed"><button className="edit" title="Modify" aria-label={'Modify ' + b.name} onClick={() => onEdit(b)}>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 14.75V17h2.25L15.9 6.35l-2.25-2.25L3 14.75Z" /><path d="m12.8 5.2 2.25 2.25M3 17h14" /></svg>
+      </button></td>
     </tr>
   );
 }
@@ -111,10 +113,16 @@ function BonusList() {
     setMenu(null);
     if (navigator.clipboard) navigator.clipboard.writeText(JSON.stringify(b)).catch(() => {});
   };
+  const newBonus = (ai) => { location.href = '/crm/b/e/?new=1' + (ai ? '&ai=1' : ''); };
 
   return (
     <>
-      <div className="tools"><input className="search" type="search" placeholder="Search bonuses by name or ID…" value={q} onChange={e => setQ(e.target.value)} />
+      <div className="tools">
+        <input className="search" type="search" placeholder="Search bonuses by name or ID…" value={q} onChange={e => setQ(e.target.value)} />
+        <div className="new-actions">
+          <button className="new-btn" onClick={() => newBonus(false)}>＋ New empty bonus</button>
+          <button className="new-btn ai" onClick={() => newBonus(true)}><span aria-hidden="true">✦</span> New with AI agent</button>
+        </div>
       </div>
       <div className="filters">
         <button className={'chip' + (anySel ? '' : ' on')} onClick={() => setSel({ status: [], promo: [], bonusType: [] })}>All<span>{counts.total ?? '…'}</span></button>

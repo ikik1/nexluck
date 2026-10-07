@@ -115,6 +115,7 @@ CHANGELOG = BONUSES.map { |b| [b['id'], [{ 'at' => "#{b['createdAt']}T09:00:00Z"
 # Units of each currency per 1 EUR; editable through /exchange-rates.
 RATES = { 'USD' => 1.08, 'GBP' => 0.85, 'CAD' => 1.47, 'AUD' => 1.65, 'CHF' => 0.95, 'SEK' => 11.5, 'NOK' => 11.7, 'PLN' => 4.28 }
 RATES_META = { 'updatedAt' => Time.now.utc.iso8601, 'updatedBy' => 'system' }
+PROMO_CODES = BONUSES.map { |b| [b['id'], []] }.to_h
 
 # Filter groups: values inside one group are OR-ed, different groups are AND-ed.
 FILTERS = {
@@ -391,14 +392,16 @@ handler = lambda do |req, res, rest, secured|
   LOCK.synchronize do
     m = req.request_method
     route = case rest
-            when 'bonuses' then [:list, %w[GET]]
+            when 'bonuses' then [:list, %w[GET POST]]
+            when %r{\Abonuses/([\w-]+)/promo-codes/([A-Z0-9-]+)\z} then [:promo_code, %w[DELETE], Regexp.last_match(1), Regexp.last_match(2)]
+            when %r{\Abonuses/([\w-]+)/promo-codes\z} then [:promo_codes, %w[GET POST], Regexp.last_match(1)]
             when %r{\Abonuses/([\w-]+)\z} then [:detail, %w[GET PATCH], Regexp.last_match(1)]
             when %r{\Abonuses/([\w-]+)/changelog\z} then [:changelog, %w[GET], Regexp.last_match(1)]
             when %r{\Abonuses/([\w-]+)/delete\z} then [:delete, %w[POST], Regexp.last_match(1)]
             when 'exchange-rates' then [:rates, %w[GET PATCH]]
             end
     next json(res, 404, { error: 'Not found' }) unless route
-    action, methods, id = route
+    action, methods, id, promo_code = route
     next json(res, 405, { error: 'Method not allowed' }) unless methods.include?(m)
     next if secured && !authorize(req, res, m == 'GET' ? 'bonuses:read' : 'bonuses:write')
     actor = secured ? req.attributes['client'].to_s : 'v.kovalevskiy'
@@ -410,6 +413,27 @@ handler = lambda do |req, res, rest, secured|
 
     case action
     when :list
+      if m == 'POST'
+        body = read_json(req, res)
+        next unless body
+        clean, errors = validate_bonus(body)
+        next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
+        next_id = BONUSES.map { |b| b['id'][/\d+\z/].to_i }.max + 1
+        id = "BN-#{next_id}"
+        detail = {
+          'id' => id, 'name' => clean['name'], 'status' => clean['status'], 'hasPromo' => false,
+          'createdAt' => Date.today.to_s, 'dateStart' => clean['availability']['startTime'][0, 10],
+          'dateEnd' => clean['availability']['endTime'][0, 10],
+          'event' => clean['triggers']['event'] == 'on_registration' ? 'Registration' : 'Any deposit',
+          'bonusValue' => 0, 'wagered' => 0, 'wins' => 0, 'received' => 0,
+          'bonusType' => clean['bonusType'], 'groups' => clean['availability']['includeSegments'], 'deleted' => false,
+          'createdBy' => actor
+        }.merge(clean.reject { |k, _| k == 'status' || k == 'bonusType' })
+        BONUSES << detail
+        CHANGELOG[id] = [{ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => 'Bonus created', 'changes' => [] }]
+        PROMO_CODES[id] = []
+        next json(res, 201, detail)
+      end
       limit = [[(req.query['limit'] || 20).to_i, 1].max, 100].min
       offset = [(req.query['offset'] || 0).to_i, 0].max
       ql = (req.query['q'] || '').strip.downcase
@@ -433,6 +457,38 @@ handler = lambda do |req, res, rest, secured|
         counts[g] = opts.map { |k, f| [k, pool.count(&f)] }.to_h
       end
       json(res, 200, { items: (list[offset, limit] || []).map { |b| list_view(b) }, total: list.length, offset: offset, limit: limit, counts: counts })
+    when :promo_codes
+      if m == 'GET'
+        json(res, 200, { items: PROMO_CODES[bonus['id']] })
+      else
+        body = read_json(req, res)
+        next unless body
+        start_time, end_time = body['startTime'], body['endTime']
+        start_dt, end_dt = parse_dt(start_time), parse_dt(end_time)
+        errors = {}
+        errors['startTime'] = 'Use format YYYY-MM-DDTHH:MM' unless start_dt
+        errors['endTime'] = 'Use format YYYY-MM-DDTHH:MM' unless end_dt
+        errors['endTime'] = 'End time must be after start time' if start_dt && end_dt && end_dt <= start_dt
+        next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
+        code = nil
+        loop do
+          candidate = "PROMO-#{SecureRandom.alphanumeric(8).upcase}"
+          code = candidate unless PROMO_CODES.values.flatten.any? { |item| item['code'] == candidate }
+          break if code
+        end
+        item = { 'code' => code, 'startTime' => start_time, 'endTime' => end_time,
+                 'createdAt' => Time.now.utc.iso8601 }
+        PROMO_CODES[bonus['id']] << item
+        CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Generated promo code #{code}", 'changes' => [] })
+        json(res, 201, item)
+      end
+    when :promo_code
+      codes = PROMO_CODES[bonus['id']]
+      item = codes.find { |x| x['code'] == promo_code }
+      next json(res, 404, { error: 'Promo code not found' }) unless item
+      codes.delete(item)
+      CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Deleted promo code #{promo_code}", 'changes' => [] })
+      json(res, 200, { deleted: promo_code })
     when :detail
       next json(res, 200, bonus) if m == 'GET'
       body = read_json(req, res)
@@ -464,6 +520,7 @@ end
 
 # WEBrick's proc handler only answers GET/POST by default.
 WEBrick::HTTPServlet::ProcHandler.class_eval { alias_method :do_PATCH, :do_GET }
+WEBrick::HTTPServlet::ProcHandler.class_eval { alias_method :do_DELETE, :do_GET }
 
 srv.mount_proc('/crm/api/v1') { |req, res| handler.call(req, res, req.path.sub(%r{\A/crm/api/v1/?}, ''), true) }
 srv.mount_proc('/crm/ui-api/v1') { |req, res| handler.call(req, res, req.path.sub(%r{\A/crm/ui-api/v1/?}, ''), false) }
