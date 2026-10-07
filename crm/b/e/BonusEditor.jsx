@@ -400,7 +400,7 @@ function PromoModal({ initial, segments, onSave, onClose }) {
     }
   };
   return (
-    <Modal title="Promo banner" className="promo-modal" onClose={onClose} actions={<>
+    <Modal title="🖼️ Promo banner" className="promo-modal" onClose={onClose} actions={<>
       <button className="btn" type="button" onClick={onClose}>Cancel</button>
       <button className="btn pri" type="button" disabled={busy} onClick={save}>Save promo</button>
     </>}>
@@ -563,10 +563,7 @@ function Editor() {
 
   return (
     <>
-      <div className="title-row">
-        <h1>🎁 {creating ? 'New bonus' : 'Edit bonus'}</h1>
-        <button className="btn" type="button" onClick={() => setModal({ t: 'promo' })}>Promo</button>
-      </div>
+      <h1>🎁 {creating ? 'New bonus' : 'Edit bonus'}</h1>
       <p className="lead">Bonus configuration, grouped around the bonus itself.</p>
       <div className="bar">
         <a className="btn" href="/crm/b/">← Back to list</a>
@@ -581,7 +578,10 @@ function Editor() {
         <svg aria-hidden="true">{lines.map((l) => <line key={l.k} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#9bb8d8" strokeWidth="2" strokeDasharray="5 5" />)}</svg>
 
         <section className={'card center' + (highlighted === 'ce' ? ' map-highlight' : '')} ref={refs.ce} tabIndex="-1">
-          <h3>🎁 Bonus</h3>
+          <div className="title-row">
+            <h3>🎁 Bonus</h3>
+            <button className="btn" type="button" onClick={() => setModal({ t: 'promo' })}>Promo</button>
+          </div>
           <Field label="Name" error={errors.name}><input type="text" value={form.name} maxLength={120} onChange={(e) => set('name', e.target.value)} /></Field>
           <Field label="ID"><div className="ro">{orig ? orig.id : 'Assigned when saved'}</div></Field>
           <Field label="Description" error={errors.description}><textarea value={form.description} onChange={(e) => set('description', e.target.value)} /></Field>

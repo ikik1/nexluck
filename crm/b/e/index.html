@@ -1,14 +1,15 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NextLuck CRM — Edit bonus</title><link rel="stylesheet" href="/crm/crm.css?v=2">
 <style>
 main{max-width:1500px}
-.title-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.modal.promo-modal{width:min(760px,96vw)}
+.title-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.title-row .btn{padding:3px 12px;font-size:13px}
+.modal.promo-modal{width:min(760px,96vw);border:1px solid var(--line);border-top:6px solid var(--brand);border-radius:10px;padding:18px 20px;box-shadow:0 6px 24px #0b5cab26,0 10px 40px #0005}
+.modal.promo-modal h2{font-size:15px;text-transform:uppercase;letter-spacing:.5px;color:var(--brand);margin-bottom:10px;display:flex;align-items:center;gap:6px}
 .promo-imgs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .img-prev{border:1px dashed #cfcfcf;border-radius:6px;background:#fafafa;display:grid;place-items:center;overflow:hidden;color:#888;font-size:12px;width:100%}
 .img-web{aspect-ratio:16/9}.img-tablet{aspect-ratio:4/3}.img-mobile{aspect-ratio:9/16;max-height:200px}
 .img-prev img{width:100%;height:100%;object-fit:cover}
 .img-acts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
-.promo-modal textarea.code{width:100%;font:12px/1.4 ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:6px;padding:8px}
+.promo-modal textarea.code{width:100%;box-sizing:border-box;font:12px/1.4 ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:6px;padding:8px}
 .chk-row{display:flex;gap:8px;flex-wrap:wrap}.promo-modal .chk{margin:0!important}
 .seg-ro{display:flex;gap:6px;flex-wrap:wrap}
 @media(max-width:600px){.promo-imgs{grid-template-columns:1fr}.img-mobile{max-height:160px}}
