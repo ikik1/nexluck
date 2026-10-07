@@ -115,6 +115,49 @@ CHANGELOG = BONUSES.map { |b| [b['id'], [{ 'at' => "#{b['createdAt']}T09:00:00Z"
 # Units of each currency per 1 EUR; editable through /exchange-rates.
 RATES = { 'USD' => 1.08, 'GBP' => 0.85, 'CAD' => 1.47, 'AUD' => 1.65, 'CHF' => 0.95, 'SEK' => 11.5, 'NOK' => 11.7, 'PLN' => 4.28 }
 RATES_META = { 'updatedAt' => Time.now.utc.iso8601, 'updatedBy' => 'system' }
+PROMO_BANNERS = {}
+PROMO_BANNER_DEFAULT = lambda do
+  { 'images' => { 'web' => nil, 'tablet' => nil, 'mobile' => nil }, 'title' => '', 'description' => '',
+    'buttons' => { 'depositForSignedUsers' => false, 'signUpForAnonymous' => false },
+    'pages' => { 'home' => false, 'welcome' => false } }
+end
+MAX_IMAGE_CHARS = 2_800_000
+
+def validate_banner(body)
+  errors = {}
+  out = PROMO_BANNER_DEFAULT.call
+  imgs = body['images']
+  out['images'].each_key do |k|
+    v = imgs.is_a?(Hash) ? imgs[k] : nil
+    if v.nil? || v == ''
+      next
+    elsif !v.is_a?(String) || v !~ %r{\Adata:image/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+\z}
+      errors["images.#{k}"] = 'Use a PNG, JPEG, WEBP or GIF image'
+    elsif v.length > MAX_IMAGE_CHARS
+      errors["images.#{k}"] = 'Image is too large (max 2 MB)'
+    else
+      out['images'][k] = v
+    end
+  end
+  %w[title description].each do |k|
+    v = body[k].nil? ? '' : body[k]
+    if !v.is_a?(String) || v.length > 20_000
+      errors[k] = 'Text expected (max 20000 characters)'
+    else
+      out[k] = v
+    end
+  end
+  { 'buttons' => out['buttons'], 'pages' => out['pages'] }.each do |group, defaults|
+    src = body[group]
+    defaults.each_key do |k|
+      v = src.is_a?(Hash) && src.key?(k) ? src[k] : false
+      errors["#{group}.#{k}"] = 'true or false expected' unless v == true || v == false
+      defaults[k] = v == true
+    end
+  end
+  [out, errors]
+end
+
 PROMO_CODES = BONUSES.map { |b| [b['id'], []] }.to_h
 
 # Filter groups: values inside one group are OR-ed, different groups are AND-ed.
@@ -394,6 +437,7 @@ handler = lambda do |req, res, rest, secured|
     route = case rest
             when 'bonuses' then [:list, %w[GET POST]]
             when %r{\Abonuses/([\w-]+)/promo-codes/([A-Z0-9-]+)\z} then [:promo_code, %w[DELETE], Regexp.last_match(1), Regexp.last_match(2)]
+            when %r{\Abonuses/([\w-]+)/promo-banner\z} then [:promo_banner, %w[GET PUT], Regexp.last_match(1)]
             when %r{\Abonuses/([\w-]+)/promo-codes\z} then [:promo_codes, %w[GET POST], Regexp.last_match(1)]
             when %r{\Abonuses/([\w-]+)\z} then [:detail, %w[GET PATCH], Regexp.last_match(1)]
             when %r{\Abonuses/([\w-]+)/changelog\z} then [:changelog, %w[GET], Regexp.last_match(1)]
@@ -512,6 +556,19 @@ handler = lambda do |req, res, rest, secured|
       bonus['deleted'] = true
       CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => 'Marked as deleted', 'changes' => [] })
       json(res, 200, list_view(bonus))
+    when :promo_banner
+      if m == 'GET'
+        json(res, 200, PROMO_BANNERS[bonus['id']] || PROMO_BANNER_DEFAULT.call)
+      else
+        body = read_json(req, res)
+        next unless body
+        banner, errors = validate_banner(body)
+        next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
+        PROMO_BANNERS[bonus['id']] = banner
+        bonus['hasPromo'] = true
+        CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => 'Updated promo banner', 'changes' => [] })
+        json(res, 200, banner)
+      end
     when :rates
       if m == 'PATCH'
         body = read_json(req, res)

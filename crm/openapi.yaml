@@ -311,6 +311,61 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /bonuses/{id}/promo-banner:
+    get:
+      tags: [Bonuses]
+      summary: Get the promo banner shown on the casino site for a bonus
+      operationId: getBonusPromoBanner
+      security:
+        - oauth2: ["bonuses:read"]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Promo banner (empty defaults when not configured)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PromoBanner' }
+        '404':
+          description: Bonus not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    put:
+      tags: [Bonuses]
+      summary: Replace the promo banner of a bonus
+      operationId: updateBonusPromoBanner
+      security:
+        - oauth2: ["bonuses:write"]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PromoBanner' }
+      responses:
+        '200':
+          description: Saved promo banner
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PromoBanner' }
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+        '404':
+          description: Bonus not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /bonuses/{id}/promo-codes:
     get:
       tags: [Bonuses]
@@ -588,6 +643,29 @@ components:
         maxBetPercentageOfBonus: { type: number, minimum: 0, maximum: 100 }
         restrictZeroRiskBetting: { type: boolean }
         minEvenMoneyCoveragePercentage: { type: number, minimum: 0, maximum: 100 }
+    PromoBanner:
+      type: object
+      description: Banner shown on the casino web site. Target segments are the bonus include segments.
+      properties:
+        images:
+          type: object
+          description: Data URLs (png, jpeg, webp, gif; max about 2 MB each) or null
+          properties:
+            web: { type: string, nullable: true }
+            tablet: { type: string, nullable: true }
+            mobile: { type: string, nullable: true }
+        title: { type: string, description: HTML, maxLength: 20000 }
+        description: { type: string, description: HTML, maxLength: 20000 }
+        buttons:
+          type: object
+          properties:
+            depositForSignedUsers: { type: boolean }
+            signUpForAnonymous: { type: boolean }
+        pages:
+          type: object
+          properties:
+            home: { type: boolean }
+            welcome: { type: boolean }
     PromoCode:
       type: object
       properties:

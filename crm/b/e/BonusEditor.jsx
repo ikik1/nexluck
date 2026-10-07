@@ -366,6 +366,87 @@ function SatelliteMap({ title, items, onSelect, onClose }) {
   );
 }
 
+const emptyBanner = () => ({
+  images: { web: null, tablet: null, mobile: null }, title: '', description: '',
+  buttons: { depositForSignedUsers: false, signUpForAnonymous: false },
+  pages: { home: false, welcome: false },
+});
+const BANNER_IMAGES = [['web', 'Web'], ['tablet', 'Tablet'], ['mobile', 'Mobile']];
+const MAX_IMAGE_BYTES = 2_000_000;
+
+function PromoModal({ initial, segments, onSave, onClose }) {
+  const [b, setB] = useState(initial);
+  const [errors, setErrors] = useState({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const upd = (path, v) => setB((x) => setIn(x, path, v));
+  const upload = (key, file) => {
+    if (!file) return;
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) return setErrors((e) => ({ ...e, ['images.' + key]: 'Use a PNG, JPEG, WEBP or GIF image' }));
+    if (file.size > MAX_IMAGE_BYTES) return setErrors((e) => ({ ...e, ['images.' + key]: 'Image is too large (max 2 MB)' }));
+    const reader = new FileReader();
+    reader.onload = () => { upd('images.' + key, reader.result); setErrors((e) => ({ ...e, ['images.' + key]: '' })); };
+    reader.readAsDataURL(file);
+  };
+  const save = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await onSave(b);
+    } catch (e) {
+      setErrors(e.fields || {});
+      setError(e.message);
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal title="Promo banner" className="promo-modal" onClose={onClose} actions={<>
+      <button className="btn" type="button" onClick={onClose}>Cancel</button>
+      <button className="btn pri" type="button" disabled={busy} onClick={save}>Save promo</button>
+    </>}>
+      <p className="kvl">The banner that is shown on the casino web site for this bonus.</p>
+      <div className="promo-imgs">
+        {BANNER_IMAGES.map(([k, label]) => (
+          <Field key={k} label={'Banner image: ' + label} error={errors['images.' + k]}>
+            <div className={'img-prev img-' + k}>
+              {b.images[k] ? <img src={b.images[k]} alt={label + ' banner preview'} /> : <span>No image</span>}
+            </div>
+            <div className="img-acts">
+              <label className="btn">
+                {b.images[k] ? 'Replace' : 'Upload'}
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(e) => { upload(k, e.target.files[0]); e.target.value = ''; }} />
+              </label>
+              {b.images[k] && <button type="button" className="btn" onClick={() => upd('images.' + k, null)}>Remove</button>}
+            </div>
+          </Field>
+        ))}
+      </div>
+      <Field label="Title (HTML)" error={errors.title}>
+        <textarea className="code" rows="3" value={b.title} onChange={(e) => upd('title', e.target.value)} placeholder="<h2>Welcome bonus</h2>" />
+      </Field>
+      <Field label="Full description (HTML)" error={errors.description}>
+        <textarea className="code" rows="6" value={b.description} onChange={(e) => upd('description', e.target.value)} placeholder="<p>Deposit and get 100% up to 100 EUR…</p>" />
+      </Field>
+      <Field label="Show for segments" hint="Taken from the bonus Availability → Include segments.">
+        <div className="seg-ro">{segments.length ? segments.map((x) => <span key={x} className="chk on">{x}</span>) : <span className="kvl">No segments selected: shown to everyone.</span>}</div>
+      </Field>
+      <Field label="Show buttons" error={errors['buttons.depositForSignedUsers'] || errors['buttons.signUpForAnonymous']}>
+        <div className="chk-row">
+          <Check label="DEPOSIT_FOR_SIGNED_USERS" path="buttons.depositForSignedUsers" form={b} set={upd} />
+          <Check label="SIGN_UP_FOR_ANONYMOUS" path="buttons.signUpForAnonymous" form={b} set={upd} />
+        </div>
+      </Field>
+      <Field label="Show on pages" error={errors['pages.home'] || errors['pages.welcome']}>
+        <div className="chk-row">
+          <Check label="Home page" path="pages.home" form={b} set={upd} />
+          <Check label="Welcome page" path="pages.welcome" form={b} set={upd} />
+        </div>
+      </Field>
+      {error && <div className="msg bad">{error}</div>}
+    </Modal>
+  );
+}
+
 function Editor() {
   const [orig, setOrig] = useState(null);
   const [form, setForm] = useState(null);
@@ -378,6 +459,8 @@ function Editor() {
   const [showAIAgent, setShowAIAgent] = useState(AI_MODE);
   const [sample, setSample] = useState(100);
   const [promoCodes, setPromoCodes] = useState([]);
+  const [banner, setBanner] = useState(emptyBanner());
+  const [bannerDirty, setBannerDirty] = useState(false);
   const [promoDates, setPromoDates] = useState({ startTime: '', endTime: '' });
   const root = useRef(null);
   const refs = { ce: useRef(null), av: useRef(null), tr: useRef(null), rw: useRef(null), wg: useRef(null), wl: useRef(null), ab: useRef(null), pc: useRef(null) };
@@ -389,6 +472,7 @@ function Editor() {
     setOrig(b);
     setForm(pick(b));
     setPromoDates({ startTime: b.availability.startTime, endTime: b.availability.endTime });
+    api('/bonuses/' + b.id + '/promo-banner').then(setBanner).catch(() => {});
   }).catch((e) => setStatus({ bad: true, text: e.message }));
   useEffect(() => {
     document.title = NEW ? 'NextLuck CRM — New bonus' : 'NextLuck CRM — Edit bonus';
@@ -459,9 +543,12 @@ function Editor() {
           } catch (e) { failed++; }
         }
         setPromoCodes(created);
+        if (bannerDirty) {
+          try { await api(`/bonuses/${b.id}/promo-banner`, { method: 'PUT', body: JSON.stringify(banner) }); setBannerDirty(false); } catch (e) { failed++; }
+        }
         setPromoDates({ startTime: b.availability.startTime, endTime: b.availability.endTime });
       }
-      setStatus(failed ? { bad: true, text: `Bonus created, but ${failed} promo code(s) could not be created` } : { text: creating ? 'Bonus created' : 'Saved' });
+      setStatus(failed ? { bad: true, text: `Bonus created, but ${failed} promo code(s) could not be saved` } : { text: creating ? 'Bonus created' : 'Saved' });
     } catch (e) {
       setErrors(e.fields || {});
       setStatus({ bad: true, text: e.status === 422 ? 'Please fix the highlighted fields' : e.message });
@@ -476,7 +563,10 @@ function Editor() {
 
   return (
     <>
-      <h1>🎁 {creating ? 'New bonus' : 'Edit bonus'}</h1>
+      <div className="title-row">
+        <h1>🎁 {creating ? 'New bonus' : 'Edit bonus'}</h1>
+        <button className="btn" type="button" onClick={() => setModal({ t: 'promo' })}>Promo</button>
+      </div>
       <p className="lead">Bonus configuration, grouped around the bonus itself.</p>
       <div className="bar">
         <a className="btn" href="/crm/b/">← Back to list</a>
@@ -600,6 +690,12 @@ function Editor() {
 
       {modal && modal.t === 'rates' && <RatesModal amount={modal.amount} onClose={() => setModal(null)} />}
       {modal && modal.t === 'cat' && <CategoryModal value={form.category} onPick={(c) => set('category', c)} onClose={() => setModal(null)} />}
+      {modal && modal.t === 'promo' && <PromoModal initial={banner} segments={form.availability.includeSegments || []} onClose={() => setModal(null)} onSave={async (b) => {
+        if (creating) { setBanner(b); setBannerDirty(true); }
+        else setBanner(await api(`/bonuses/${orig.id}/promo-banner`, { method: 'PUT', body: JSON.stringify(b) }));
+        setModal(null);
+        setStatus({ text: creating ? 'Promo will be saved with the bonus' : 'Promo saved' });
+      }} />}
       {modal && modal.t === 'log' && <ChangelogModal id={orig.id} onClose={() => setModal(null)} />}
       {showAIAgent && creating && <AIAgentModal onClose={() => { setShowAIAgent(false); history.replaceState(null, '', '/crm/b/e/?new=1'); }} />}
       {showMap && <SatelliteMap title={form.name} items={mapItems} onSelect={selectMapNode} onClose={() => setShowMap(false)} />}
