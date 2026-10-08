@@ -607,7 +607,7 @@ components:
     Reward:
       type: object
       properties:
-        dmp: { type: number, description: "Deposit match percentage", example: 50 }
+        dmp: { type: number, description: "Deposit match percentage. When 0, the bonus amount equals maxBonusAmount; otherwise min(deposit * dmp / 100, maxBonusAmount)", example: 50 }
         maxBonusAmount: { type: number, description: "EUR" }
     Wagering:
       type: object

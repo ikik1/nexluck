@@ -19,8 +19,12 @@ const APPLIES_HINT =
   'BONUS_ONLY - The wagering multiplier applies strictly to the issued Bonus Amount.\n' +
   'BONUS_PLUS_DEPOSIT - The wagering multiplier applies to the sum of the Deposit Amount + Bonus Amount.\n' +
   'WINNINGS_ONLY - Common in Free Spins campaigns where no fixed bonus amount is awarded upfront.';
-const DMP_HINT =
-  '100 (Standard Match): If a player deposits $100, the casino adds $100 in bonus funds ($100 × 100%). Total balance: $200.';
+const DMP_HINT = (
+  <><b>100 (Standard Match):</b> If a player deposits <b>$100</b>, the casino adds <b>$100</b> in bonus funds ($100 × 100%). Total balance: <b>$200</b>.</>
+);
+const BONUS_AMOUNT_HINT = (
+  <>Bonus Amount = min(deposit amount × DMP / 100, MBA)<br />If DMP = 0, Bonus Amount = MBA.</>
+);
 
 const get = (o, path) => path.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
 const setIn = (o, path, v) => {
@@ -557,7 +561,7 @@ function Editor() {
   };
 
   const dmp = Number(form.reward.dmp) || 0, mba = Number(form.reward.maxBonusAmount) || 0;
-  const calculated = Math.min((Number(sample) || 0) * dmp / 100, mba);
+  const calculated = dmp === 0 ? mba : Math.min((Number(sample) || 0) * dmp / 100, mba);
   const cap = form.wagering.maxWithdrawCap;
   const p = { form, set, errors, openRates };
 
@@ -622,11 +626,11 @@ function Editor() {
           </Field>
           <Money label="Max bonus amount (MBA)" path="reward.maxBonusAmount" {...p} />
           <div className="calc">
-            <span className="lbl">Bonus amount (calculated)<Hint text="min(deposit amount * DMP/100, MBA)" /></span>
+            <span className="lbl">Bonus amount (calculated)<Hint text={BONUS_AMOUNT_HINT} /></span>
             <b>{fmt(calculated)} EUR</b>
             <div className="kvl" style={{ margin: '6px 0 0' }}>
-              for a sample deposit of{' '}
-              <input type="number" min="0" value={sample} onChange={(e) => setSample(e.target.value === '' ? '' : Number(e.target.value))} style={{ width: 80, padding: '2px 6px', border: '1px solid var(--line)', borderRadius: 4 }} /> EUR
+              {dmp === 0 ? 'DMP is 0, so the bonus equals MBA.' : <>for a sample deposit of{' '}
+              <input type="number" min="0" value={sample} onChange={(e) => setSample(e.target.value === '' ? '' : Number(e.target.value))} style={{ width: 80, padding: '2px 6px', border: '1px solid var(--line)', borderRadius: 4 }} /> EUR</>}
             </div>
           </div>
         </section>

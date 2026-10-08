@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="landing.css" />
+  <link rel="stylesheet" href="/deposit/deposit.css" />
 </head>
 <body class="landing-body">
   <div class="landing-shell">
@@ -45,6 +46,7 @@
   <div class="landing-modal" id="auth-modal" hidden><div class="modal-scrim" data-close-modal></div><section class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title"><button class="modal-close" data-close-modal aria-label="Close">×</button><span class="eyebrow">WELCOME TO NEXLUCK</span><h2 id="auth-title">Sign up</h2><p id="auth-copy">Create an account to explore games and offers.</p><form id="auth-form"><label>Email address<input type="email" name="email" placeholder="you@example.com" required autocomplete="email" /></label><label>Password<input type="password" name="password" placeholder="At least 6 characters" minlength="6" required autocomplete="new-password" /></label><button class="hero-cta" type="submit">Continue <span>→</span></button></form><p class="auth-switch">Already have an account? <button data-auth="signin">Sign in</button></p><small>18+ only. By continuing, you agree to the Terms and Conditions.</small></section></div>
   <div class="menu-drawer" id="menu-drawer" hidden><div class="modal-scrim" data-close-menu></div><section class="drawer-panel" role="dialog" aria-modal="true" aria-label="Menu"><div class="drawer-heading"><strong>Menu</strong><button data-close-menu aria-label="Close menu">×</button></div><a href="#games-title" data-close-menu>Popular games</a><a href="#promotions-title" data-close-menu>Promotions</a><a href="#tournaments-title" data-close-menu>Tournaments</a><a href="#terms" data-close-menu>Terms and Conditions</a><a href="#license" data-close-menu>License</a></section></div>
   <div class="landing-toast" id="landing-toast" role="status" aria-live="polite"></div>
+  <script src="/deposit/deposit.js" defer></script>
   <script src="landing.js" defer></script>
 </body>
 </html>
