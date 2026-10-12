@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0e122f" />
+  <title>Nexluck Casino | My wallet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Manrope:wght@400;600;700;800&display=swap" />
+  <link rel="stylesheet" href="/deposit/deposit.css" />
+  <link rel="stylesheet" href="/w/wallet.css" />
+</head>
+<body class="wl-body">
+  <header class="wl-header">
+    <a class="wl-brand" href="/h/" aria-label="Nexluck home">nex<span>luck</span><small>CASINO</small></a>
+    <a class="wl-back" href="/h/">← Back to casino</a>
+  </header>
+
+  <main class="wl-main" id="wl-app">
+    <h1 class="wl-title">My wallet</h1>
+
+    <section class="wl-card wl-profile" id="wl-profile" aria-label="Profile"></section>
+
+    <section class="wl-balances" id="wl-balances" aria-label="Balances"></section>
+
+    <section class="wl-actions" aria-label="Wallet actions">
+      <button type="button" class="wl-act" id="wl-topup"><span aria-hidden="true">＋</span>Top-up</button>
+      <button type="button" class="wl-act" id="wl-withdraw"><span aria-hidden="true">↑</span>Withdrawal</button>
+      <button type="button" class="wl-act" id="wl-exchange"><span aria-hidden="true">⇄</span>Exchange</button>
+    </section>
+
+    <section class="wl-card" aria-labelledby="wl-bonuses-title">
+      <h2 class="wl-h" id="wl-bonuses-title">My bonuses</h2>
+      <div id="wl-bonuses"></div>
+    </section>
+
+    <section class="wl-card" aria-labelledby="wl-tx-title">
+      <h2 class="wl-h" id="wl-tx-title">Transaction history</h2>
+      <div id="wl-filters"></div>
+      <div id="wl-tx" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <div id="wl-toast" class="wl-toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="/deposit/deposit.js" defer></script>
+  <script src="/w/wallet.js" defer></script>
+</body>
+</html>

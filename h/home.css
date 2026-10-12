@@ -9,7 +9,7 @@
 .bonus-notice { color: #ffda36; }
 .header-notice i { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border: 1px solid #101631; border-radius: 50%; background: #ffda36; }
 .message-notice i { background: #6df5ff; }
-.profile-avatar { position: relative; width: 39px; height: 39px; flex: 0 0 39px; display: grid; place-items: center; border: 2px solid #6df5ff; border-radius: 50%; color: #111631; background: linear-gradient(145deg, #ffda36, #ff7d8f); font-size: 16px; font-weight: 800; }
+.profile-avatar { text-decoration: none; position: relative; width: 39px; height: 39px; flex: 0 0 39px; display: grid; place-items: center; border: 2px solid #6df5ff; border-radius: 50%; color: #111631; background: linear-gradient(145deg, #ffda36, #ff7d8f); font-size: 16px; font-weight: 800; }
 .loyalty-badge { position: absolute; right: -6px; bottom: -3px; width: 19px; height: 19px; display: grid; place-items: center; border: 2px solid #080b20; border-radius: 50%; color: #141a35; background: #ffda36; font-size: 9px; }
 .home-main { padding: 17px 0 20px; }
 .home-section { margin: 28px 0 34px; scroll-margin-top: 88px; }

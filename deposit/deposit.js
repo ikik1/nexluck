@@ -67,7 +67,7 @@
     + '<div class="dp-sec"><label class="dp-lbl" for="dp-promo">Promo code</label><input id="dp-promo" type="text" autocomplete="off" autocapitalize="characters" maxlength="32" placeholder="Enter promo code"></div>'
     + '<button type="button" class="dp-go" id="dp-go">Deposit</button>'
     + '<div id="dp-msg" role="status" aria-live="polite"></div>'
-    + '<a class="dp-wallet" href="#wallet" id="dp-wallet">My wallet →</a>'
+    + '<a class="dp-wallet" href="/w/" id="dp-wallet">My wallet →</a>'
     + TRUST + '</section>';
 
   const setAmount = (v) => {
@@ -237,7 +237,8 @@
     });
     widget.addEventListener('input', onWidgetInput);
     root.querySelector('#dp-go').addEventListener('click', submit);
-    root.querySelector('#dp-wallet').addEventListener('click', (e) => { e.preventDefault(); message('The wallet screen is coming soon.', false); });
+    // Already on the wallet page: just close the screen instead of reloading it.
+    root.querySelector('#dp-wallet').addEventListener('click', (e) => { if (/^\/w\/?$/.test(location.pathname)) { e.preventDefault(); close(); } });
     root.addEventListener('click', (e) => { if (e.target.closest('[data-dp-close]')) close(); });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !root.hidden) close(); });
   };
@@ -254,6 +255,8 @@
     loadBonuses();
     root.querySelector('.dp-x').focus();
   };
+
+  window.NexDeposit = { open };
 
   // Capture phase so the page's own Deposit handlers (signup / toast) don't run.
   window.addEventListener('click', (e) => {
