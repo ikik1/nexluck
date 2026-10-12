@@ -27,7 +27,7 @@ function BonusRow({ b, onEdit }) {
       <td className="pb"><div className="bar"><i style={{ width: p + '%' }}></i></div><small>{eur(b.bonusValue)} / {eur(b.wagered)} ({p}%)</small></td>
       <td className="num">{eur(b.wins)}</td>
       <td className="num">{eur(b.wagered)}</td>
-      <td className="grp">{b.groups.join(', ')}</td>
+      <td className="grp">{b.groups.map(g => <span key={g} className="promo">{g}</span>)}</td>
       <td className="num">{b.received.toLocaleString('en-US')}</td>
       <td className="ed"><button className="edit" title="Modify" aria-label={'Modify ' + b.name} onClick={() => onEdit(b)}>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 14.75V17h2.25L15.9 6.35l-2.25-2.25L3 14.75Z" /><path d="m12.8 5.2 2.25 2.25M3 17h14" /></svg>

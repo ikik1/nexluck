@@ -1,0 +1,36 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NextLuck CRM — Transactions</title><link rel="stylesheet" href="/crm/crm.css?v=2"><link rel="stylesheet" href="/crm/f/f.css?v=1">
+<style>
+.ff{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:end;margin:14px 0 10px}
+.ff .fld{margin:0;min-width:150px;flex:1 1 150px}
+.ff .fld.q{flex:2 1 240px}
+.ff .fld select,.ff .fld input{margin-top:4px}
+.st{display:inline-block;font-size:11px;font-weight:700;padding:1px 9px;border-radius:99px;border:1px solid}
+.st.Approved{background:#eaf6ee;color:#1f6b3a;border-color:#9ed2b2}.st.Declined{background:#fdecee;color:#ba0517;border-color:#f1a9b1}
+.st.Pending{background:#fff7e0;color:#8a6200;border-color:#f0d27a}.st.Refunded{background:#eef2ff;color:#4a3fb5;border-color:#b9b3ee}.st.Chargeback{background:#f3e8fb;color:#7b2aa8;border-color:#d1a8ea}
+.id{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--brand);background:none;border:0;cursor:pointer;text-decoration:underline;padding:0}
+.num{text-align:right;white-space:nowrap}
+.bt tbody tr{cursor:pointer}
+.dkv{display:grid;grid-template-columns:130px 1fr 130px 1fr;gap:8px 12px;font-size:13px;margin-bottom:14px}
+.dkv dt{color:var(--muted)}.dkv dd{overflow-wrap:anywhere}
+.sec2{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:10px 0 8px;display:flex;justify-content:space-between;align-items:center}
+.log{border:1px solid var(--line);border-left:4px solid #999;border-radius:6px;margin-bottom:8px;background:#fff}
+.log.request{border-left-color:#0b5cab}.log.response{border-left-color:#2e844a}.log.internal{border-left-color:#999}.log.webhook{border-left-color:#7b2aa8}
+.log summary{padding:8px 10px;cursor:pointer;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.log summary b{flex:1 1 200px}
+.log time{font-size:11px;color:var(--muted);font-family:ui-monospace,Menlo,monospace}
+.dir{font-size:10px;font-weight:700;text-transform:uppercase;padding:0 7px;border-radius:99px;background:#f1f1f1;color:#555;line-height:16px}
+.log pre{margin:0;padding:8px 12px 10px;background:#0d1b2e;color:#cfe3ff;font-size:12px;overflow:auto;border-radius:0 0 4px 4px;white-space:pre-wrap;word-break:break-all}
+.pg{display:flex;justify-content:center;margin:12px 0}
+@media(max-width:700px){.dkv{grid-template-columns:110px 1fr}}
+</style></head>
+<body><header id="hdr"></header><div class="subbar" id="sub"></div>
+<main><h1>☰ Payment Transactions</h1><p class="lead">Every payment attempt with its gateway communication log. Click a row for details.</p><div id="root"></div></main><footer id="ftr"></footer>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js" crossorigin></script>
+<script src="/crm/data.js"></script>
+<script src="/crm/f/data.js"></script>
+<script src="/crm/f/nav.js"></script>
+<script>chrome('<span class="crumb"><a href="/crm/">Home</a> / <a href="/crm/f/">Finance</a> / Transactions</span>');</script>
+<script type="text/babel" src="/crm/f/transactions/Transactions.jsx"></script>
+</body></html>
