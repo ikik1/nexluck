@@ -26,6 +26,20 @@ const BONUS_AMOUNT_HINT = (
   <>Bonus Amount = min(deposit amount × DMP / 100, MBA)<br />If DMP = 0, Bonus Amount = MBA.</>
 );
 
+const ANTI_HEDGING_HINT = 'Applicable to Roulette/Baccarat - doesn\'t allow you to bet on 50/50.';
+const SATELLITE_INFO = {
+  ce: 'The bonus itself: name, status, type and category. Every other block is attached to it.',
+  av: 'When the bonus can be claimed, and which player segments are eligible or excluded.',
+  tr: 'What awards the bonus: registration or a deposit, with the deposit amount and deposit-count conditions.',
+  rw: 'What the player receives: a deposit-match bonus amount, or a Free Spins package and how it is spread over days.',
+  gm: 'Where the bonus can be played: one or several game categories, or a single game.',
+  wg: 'Playthrough rules: wagering multiplier, time limit, maximum bet and the withdrawal cap.',
+  wl: 'Which wallet is charged first and which receives winnings, and whether the player may cancel or withdraw before wagering is done.',
+  ab: 'Abuse protection: claim limits per IP and device, VPN and payment-method blocks, KYC level and betting restrictions.',
+  pc: 'Codes a player enters to claim the bonus, each with its own validity period. Codes can be edited here.',
+};
+const CODE_RE = /^[A-Z0-9_-]{4,32}$/;
+
 const get = (o, path) => path.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
 const setIn = (o, path, v) => {
   const [k, ...rest] = path.split('.');
@@ -33,14 +47,15 @@ const setIn = (o, path, v) => {
 };
 const pick = (b) => ({
   name: b.name, description: b.description, status: b.status === 'inactive' ? 'inactive' : 'active',
-  bonusType: b.bonusType, category: b.category, availability: b.availability, triggers: b.triggers,
+  bonusType: b.bonusType, category: b.category, availability: b.availability, triggers: b.triggers, games: b.games,
   reward: b.reward, wagering: b.wagering, walletRules: b.walletRules, antiBonusHunter: b.antiBonusHunter,
 });
 const emptyBonus = () => ({
   name: '', description: '', status: '', bonusType: '', category: '',
   availability: { startTime: '', endTime: '', includeSegments: [], excludeSegments: [] },
-  triggers: { event: '', minDeposit: '', maxDeposit: '', depositNumber: '' },
-  reward: { dmp: '', maxBonusAmount: '' },
+  triggers: { event: '', minDeposit: '', maxDeposit: '', depositNumber: '', minDepositCount: '', maxDepositCount: '' },
+  games: { linkType: 'categories', categories: [], game: '' },
+  reward: { mode: 'BONUS_MONEY', dmp: '', maxBonusAmount: '', freeSpins: { quantity: '', spinsPerDay: '' } },
   wagering: { multiplier: '', timeToCompleteDays: '', maxBetPerRound: '', appliesTo: '',
     maxWithdrawCap: { type: '', value: '' } },
   walletRules: { deduction: '', winnings: '', allowCancelBeforeWagering: false, allowWithdrawBeforeWagering: false },
@@ -49,6 +64,15 @@ const emptyBonus = () => ({
     maxBetPerRound: '', maxBetPercentageOfBonus: '', restrictZeroRiskBetting: false,
     minEvenMoneyCoveragePercentage: '' },
 });
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// 'YYYY-MM-DD', 'YYYY-MM-DDTHH:MM' or an ISO timestamp -> '31 Dec 26' (with ', 23:59' when withTime)
+const fmtDate = (v, withTime) => {
+  if (!v) return '';
+  const d = /Z$|[+-]\d\d:\d\d$/.test(v) ? new Date(v) : new Date(v.length === 10 ? v + 'T00:00' : v);
+  if (isNaN(d)) return v;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${pad(d.getFullYear() % 100)}` + (withTime ? `, ${pad(d.getHours())}:${pad(d.getMinutes())}` : '');
+};
 const fmt = (n) => (Math.round(n * 100) / 100).toLocaleString('en-US');
 const api = async (path, opts) => {
   const r = await fetch(API + path, opts && opts.body ? { ...opts, headers: { 'Content-Type': 'application/json' } } : opts);
@@ -84,6 +108,18 @@ function Modal({ title, onClose, children, actions, className = '' }) {
         {children}
         <div className="acts">{actions}</div>
       </div>
+    </div>
+  );
+}
+
+function DateTime({ value, onChange }) {
+  const input = useRef(null);
+  const open = () => { try { input.current.showPicker(); } catch (err) { input.current.focus(); } };
+  return (
+    <div className="dt" onClick={open}>
+      <span className={value ? '' : 'ph'}>{value ? fmtDate(value, true) : 'Select date…'}</span>
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2v2M13 2v2M2 6h12M3 3h10a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+      <input ref={input} type="datetime-local" value={value} tabIndex={-1} aria-label="Pick date and time" onChange={(ev) => onChange(ev.target.value)} />
     </div>
   );
 }
@@ -181,7 +217,7 @@ function RatesModal({ amount, onClose }) {
               ))}
             </tbody>
           </table>
-          <p className="kvl" style={{ marginTop: 8 }}>Last updated {new Date(rates.updatedAt).toLocaleString()} by {rates.updatedBy}.</p>
+          <p className="kvl" style={{ marginTop: 8 }}>Last updated {fmtDate(rates.updatedAt, true)} by {rates.updatedBy}.</p>
         </>
       )}
     </Modal>
@@ -212,7 +248,7 @@ function ChangelogModal({ id, onClose }) {
       {!items && !err && 'Loading…'}
       {items && items.map((c, i) => (
         <div className="cl" key={i}>
-          <b>{c.summary}</b> <small>· {new Date(c.at).toLocaleString()} · {c.by}</small>
+          <b>{c.summary}</b> <small>· {fmtDate(c.at, true)} · {c.by}</small>
           {c.changes.length > 0 && <ul>{c.changes.map((x, j) => <li key={j}><code>{x.field}</code>: {show(x.from)} → {show(x.to)}</li>)}</ul>}
         </div>
       ))}
@@ -237,6 +273,8 @@ function PromoCodes({ bonus, dates, setDates, codes, setCodes }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const draft = !bonus;
+  const [edits, setEdits] = useState({});
+  const modified = codes.filter((c) => edits[c.code] !== undefined && edits[c.code] !== c.code);
   const load = async () => {
     const result = await api(`/bonuses/${bonus.id}/promo-codes`);
     setCodes(result.items);
@@ -278,6 +316,31 @@ function PromoCodes({ bonus, dates, setDates, codes, setCodes }) {
     }
   };
 
+  const saveEdits = async () => {
+    setError('');
+    const renames = modified.map((c) => [c.code, edits[c.code]]);
+    const invalid = renames.find(([, next]) => !CODE_RE.test(next));
+    if (invalid) return setError(`${invalid[1] || 'Code'}: use 4-32 characters: A-Z, 0-9, _ or -`);
+    const finals = codes.map((c) => (renames.find(([old]) => old === c.code) || [0, c.code])[1]);
+    if (new Set(finals).size !== finals.length) return setError('Promo codes must be unique');
+    const apply = (old, next) => {
+      setCodes((items) => items.map((x) => (x.code === old ? { ...x, code: next } : x)));
+      setEdits((e) => { const { [old]: _, ...rest } = e; return rest; });
+    };
+    if (draft) return renames.forEach(([old, next]) => apply(old, next));
+    setBusy(true);
+    try {
+      for (const [old, next] of renames) {
+        await api(`/bonuses/${bonus.id}/promo-codes/${encodeURIComponent(old)}`, { method: 'PATCH', body: JSON.stringify({ code: next }) });
+        apply(old, next);
+      }
+    } catch (e) {
+      setError(Object.values(e.fields || {}).join('; ') || e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   useEffect(() => {
     if (!draft) load().catch((e) => setError(e.message));
   }, [bonus && bonus.id]);
@@ -286,10 +349,10 @@ function PromoCodes({ bonus, dates, setDates, codes, setCodes }) {
     <>
       <div className="promo-add">
         <Field label="Valid from">
-          <input type="datetime-local" value={dates.startTime} onChange={(e) => setDates((d) => ({ ...d, startTime: e.target.value }))} />
+          <DateTime value={dates.startTime} onChange={(v) => setDates((d) => ({ ...d, startTime: v }))} />
         </Field>
         <Field label="Valid until">
-          <input type="datetime-local" value={dates.endTime} onChange={(e) => setDates((d) => ({ ...d, endTime: e.target.value }))} />
+          <DateTime value={dates.endTime} onChange={(v) => setDates((d) => ({ ...d, endTime: v }))} />
         </Field>
         <button type="button" className="btn pri" disabled={busy} onClick={generate}>Generate promo code</button>
       </div>
@@ -299,20 +362,31 @@ function PromoCodes({ bonus, dates, setDates, codes, setCodes }) {
           <thead><tr><th>Promo code</th><th>Starts</th><th>Ends</th><th></th></tr></thead>
           <tbody>{codes.map((item) => (
             <tr key={item.code}>
-              <td><code>{item.code}</code></td>
-              <td>{item.startTime.replace('T', ' ')}</td>
-              <td>{item.endTime.replace('T', ' ')}</td>
+              <td>
+                <input type="text" className={'promo-code-input' + (edits[item.code] !== undefined && edits[item.code] !== item.code ? ' changed' : '')}
+                  aria-label={`Promo code ${item.code}`} maxLength={32} spellCheck="false" disabled={busy}
+                  value={edits[item.code] ?? item.code}
+                  onChange={(e) => { const v = e.target.value.toUpperCase().replace(/\s/g, ''); setEdits((m) => ({ ...m, [item.code]: v })); }} />
+              </td>
+              <td>{fmtDate(item.startTime, true)}</td>
+              <td>{fmtDate(item.endTime, true)}</td>
               <td><button type="button" className="btn" disabled={busy} onClick={() => remove(item.code)}>Delete</button></td>
             </tr>
           ))}</tbody>
         </table>
       ) : <div className="promo-empty">No promo codes have been generated for this bonus.</div>}
+      {modified.length > 0 && (
+        <div className="promo-save">
+          <button type="button" className="btn pri" disabled={busy} onClick={saveEdits}>Save promo codes</button>
+          <button type="button" className="btn" disabled={busy} onClick={() => { setEdits({}); setError(''); }}>Discard</button>
+        </div>
+      )}
       {draft && codes.length > 0 && <div className="promo-empty">These codes are created together with the bonus.</div>}
     </>
   );
 }
 
-function SatelliteMap({ title, items, onSelect, onClose }) {
+function SatelliteMap({ title, items, centerInfo, onSelect, onClose }) {
   const root = useRef(null);
   const nodes = useRef({});
   const center = useRef(null);
@@ -354,7 +428,7 @@ function SatelliteMap({ title, items, onSelect, onClose }) {
           <line key={line.id} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} />
         ))}</svg>
         <button type="button" className="map-node map-center" ref={center} onClick={() => onSelect('ce')}>
-          <small>Bonus</small><strong>{title || 'Untitled bonus'}</strong>
+          <small>Bonus</small><strong>{title || 'Untitled bonus'}</strong><span>{centerInfo}</span>
         </button>
         {items.map((item) => (
           <button
@@ -363,7 +437,7 @@ function SatelliteMap({ title, items, onSelect, onClose }) {
             ref={(node) => { nodes.current[item.id] = node; }}
             className={'map-node map-' + item.id}
             onClick={() => onSelect(item.id)}
-          >{item.title}</button>
+          ><strong>{item.title}</strong><span>{item.info}</span></button>
         ))}
       </div>
     </Modal>
@@ -465,9 +539,10 @@ function Editor() {
   const [promoCodes, setPromoCodes] = useState([]);
   const [banner, setBanner] = useState(emptyBanner());
   const [bannerDirty, setBannerDirty] = useState(false);
+  const [games, setGames] = useState([]);
   const [promoDates, setPromoDates] = useState({ startTime: '', endTime: '' });
   const root = useRef(null);
-  const refs = { ce: useRef(null), av: useRef(null), tr: useRef(null), rw: useRef(null), wg: useRef(null), wl: useRef(null), ab: useRef(null), pc: useRef(null) };
+  const refs = { ce: useRef(null), av: useRef(null), tr: useRef(null), rw: useRef(null), wg: useRef(null), wl: useRef(null), ab: useRef(null), gm: useRef(null), pc: useRef(null) };
   const [lines, setLines] = useState([]);
   const highlightTimer = useRef(null);
   useEffect(() => () => window.clearTimeout(highlightTimer.current), []);
@@ -480,6 +555,7 @@ function Editor() {
   }).catch((e) => setStatus({ bad: true, text: e.message }));
   useEffect(() => {
     document.title = NEW ? 'NextLuck CRM — New bonus' : 'NextLuck CRM — Edit bonus';
+    api('/games').then((r) => setGames(r.items)).catch(() => {});
     if (ID) load();
     else if (NEW) { setOrig(null); setForm(emptyBonus()); }
     else setStatus({ bad: true, text: 'Missing bonus id' });
@@ -493,7 +569,7 @@ function Editor() {
       const c = refs.ce.current.getBoundingClientRect();
       const mid = (x) => ({ x: x.left + x.width / 2 - r.left, y: x.top + x.height / 2 - r.top });
       const cc = mid(c);
-      setLines(['av', 'tr', 'rw', 'wg', 'wl', 'ab', 'pc'].filter((k) => refs[k].current).map((k) => {
+      setLines(['av', 'tr', 'rw', 'gm', 'wg', 'wl', 'ab', 'pc'].filter((k) => refs[k].current).map((k) => {
         const b = refs[k].current.getBoundingClientRect();
         const p = mid(b);
         return { k, x1: cc.x, y1: cc.y, x2: p.x, y2: p.y };
@@ -516,11 +592,12 @@ function Editor() {
     { id: 'av', title: 'Availability' },
     { id: 'tr', title: 'Triggers on' },
     { id: 'rw', title: 'Reward / value' },
+    { id: 'gm', title: 'Games' },
     { id: 'wg', title: 'Wagering' },
     { id: 'wl', title: 'Wallet rules' },
     { id: 'ab', title: 'Anti-bonus-hunter' },
     { id: 'pc', title: 'Promo codes' },
-  ];
+  ].map((item) => ({ ...item, info: SATELLITE_INFO[item.id] }));
   const selectMapNode = (id) => {
     setShowMap(false);
     const target = refs[id].current;
@@ -563,6 +640,9 @@ function Editor() {
   const dmp = Number(form.reward.dmp) || 0, mba = Number(form.reward.maxBonusAmount) || 0;
   const calculated = dmp === 0 ? mba : Math.min((Number(sample) || 0) * dmp / 100, mba);
   const cap = form.wagering.maxWithdrawCap;
+  const freeSpinMode = form.reward.mode === 'FREE_SPINS';
+  const spinQty = Number(form.reward.freeSpins.quantity) || 0, spinsPerDay = Number(form.reward.freeSpins.spinsPerDay) || 0;
+  const spinDays = spinQty > 0 && spinsPerDay > 0 ? Math.ceil(spinQty / spinsPerDay) : 0;
   const p = { form, set, errors, openRates };
 
   return (
@@ -597,7 +677,7 @@ function Editor() {
             <button type="button" className="pick" onClick={() => setModal({ t: 'cat' })}><span>{form.category || 'Select category…'}</span><span>▾</span></button>
           </Field>
           <div className="two">
-            <Field label="Created at"><div className="ro">{orig ? orig.createdAt : 'Assigned when saved'}</div></Field>
+            <Field label="Created at"><div className="ro">{orig ? fmtDate(orig.createdAt) : 'Assigned when saved'}</div></Field>
             <Field label="Created by"><div className="ro">{orig ? orig.createdBy : 'Assigned when saved'}</div></Field>
           </div>
           {orig && <button type="button" className="link" onClick={() => setModal({ t: 'log' })}>Changelog →</button>}
@@ -605,8 +685,8 @@ function Editor() {
 
         <section className={'card' + (highlighted === 'av' ? ' map-highlight' : '')} style={{ gridArea: 'av', '--c': '#2e844a' }} ref={refs.av} tabIndex="-1">
           <h3>Availability</h3>
-          <Field label="Start time" error={errors['availability.startTime']}><input type="datetime-local" value={form.availability.startTime} onChange={(e) => set('availability.startTime', e.target.value)} /></Field>
-          <Field label="End time" error={errors['availability.endTime']}><input type="datetime-local" value={form.availability.endTime} onChange={(e) => set('availability.endTime', e.target.value)} /></Field>
+          <Field label="Start time" error={errors['availability.startTime']}><DateTime value={form.availability.startTime} onChange={(v) => set('availability.startTime', v)} /></Field>
+          <Field label="End time" error={errors['availability.endTime']}><DateTime value={form.availability.endTime} onChange={(v) => set('availability.endTime', v)} /></Field>
           <Multi label="Include segments" path="availability.includeSegments" options={INCLUDE} {...p} />
           <Multi label="Exclude segments" path="availability.excludeSegments" options={EXCLUDE} {...p} />
         </section>
@@ -617,22 +697,67 @@ function Editor() {
           <Money label="Min deposit" path="triggers.minDeposit" {...p} />
           <Money label="Max deposit" path="triggers.maxDeposit" {...p} />
           <Num label="Deposit number" path="triggers.depositNumber" int {...p} />
+          <div className="two">
+            <Num label="Min deposit count" hint="Minimum number of deposits the player has made. Leave empty for no minimum." path="triggers.minDepositCount" int {...p} />
+            <Num label="Max deposit count" hint="Maximum number of deposits the player has made. Leave empty for no maximum." path="triggers.maxDepositCount" int {...p} />
+          </div>
         </section>
 
         <section className={'card' + (highlighted === 'rw' ? ' map-highlight' : '')} style={{ gridArea: 'rw', '--c': '#7b3fc4' }} ref={refs.rw} tabIndex="-1">
           <h3>Reward / value</h3>
-          <Field label="Deposit match percentage (DMP)" hint={DMP_HINT} error={errors['reward.dmp']}>
-            <div className="money"><input type="number" min="0" step="any" value={form.reward.dmp ?? ''} onChange={(e) => set('reward.dmp', e.target.value === '' ? '' : Number(e.target.value))} /><span className="cur" style={{ textDecoration: 'none', cursor: 'default', display: 'grid', placeItems: 'center' }}>%</span></div>
-          </Field>
-          <Money label="Max bonus amount (MBA)" path="reward.maxBonusAmount" {...p} />
-          <div className="calc">
-            <span className="lbl">Bonus amount (calculated)<Hint text={BONUS_AMOUNT_HINT} /></span>
-            <b>{fmt(calculated)} EUR</b>
-            <div className="kvl" style={{ margin: '6px 0 0' }}>
-              {dmp === 0 ? 'DMP is 0, so the bonus equals MBA.' : <>for a sample deposit of{' '}
-              <input type="number" min="0" value={sample} onChange={(e) => setSample(e.target.value === '' ? '' : Number(e.target.value))} style={{ width: 80, padding: '2px 6px', border: '1px solid var(--line)', borderRadius: 4 }} /> EUR</>}
-            </div>
+          <div className="seg" role="group" aria-label="Reward type">
+            <button type="button" aria-pressed={!freeSpinMode} onClick={() => set('reward.mode', 'BONUS_MONEY')}>Bonus money</button>
+            <button type="button" aria-pressed={freeSpinMode} onClick={() => set('reward.mode', 'FREE_SPINS')}>Free spins</button>
           </div>
+          {freeSpinMode ? (
+            <>
+              <Num label="Spin quantity" path="reward.freeSpins.quantity" int {...p} />
+              <Num label="Distribution: spins per day" hint="Free spins are credited in daily portions. Example: 100 free spins split as 20 spins/day for 5 days." path="reward.freeSpins.spinsPerDay" int {...p} />
+              <div className="calc">
+                <span className="lbl">Distribution</span>
+                <b>{spinDays ? `${spinQty} free spins split as ${spinsPerDay} spins/day for ${spinDays} day${spinDays === 1 ? '' : 's'}` : '—'}</b>
+                {spinDays > 0 && spinQty % spinsPerDay !== 0 && <div className="kvl" style={{ margin: '6px 0 0' }}>The last day gets the remaining {spinQty % spinsPerDay} spins.</div>}
+              </div>
+            </>
+          ) : (
+            <>
+              <Field label="Deposit match percentage (DMP)" hint={DMP_HINT} error={errors['reward.dmp']}>
+                <div className="money"><input type="number" min="0" step="any" value={form.reward.dmp ?? ''} onChange={(e) => set('reward.dmp', e.target.value === '' ? '' : Number(e.target.value))} /><span className="cur" style={{ textDecoration: 'none', cursor: 'default', display: 'grid', placeItems: 'center' }}>%</span></div>
+              </Field>
+              <Money label="Max bonus amount (MBA)" path="reward.maxBonusAmount" {...p} />
+              <div className="calc">
+                <span className="lbl">Bonus amount (calculated)<Hint text={BONUS_AMOUNT_HINT} /></span>
+                <b>{fmt(calculated)} EUR</b>
+                <div className="kvl" style={{ margin: '6px 0 0' }}>
+                  {dmp === 0 ? 'DMP is 0, so the bonus equals MBA.' : <>for a sample deposit of{' '}
+                  <input type="number" min="0" value={sample} onChange={(e) => setSample(e.target.value === '' ? '' : Number(e.target.value))} style={{ width: 80, padding: '2px 6px', border: '1px solid var(--line)', borderRadius: 4 }} /> EUR</>}
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+
+        <section className={'card' + (highlighted === 'gm' ? ' map-highlight' : '')} style={{ gridArea: 'gm', '--c': '#4b5ec9' }} ref={refs.gm} tabIndex="-1">
+          <h3>Games</h3>
+          <div className="seg" role="group" aria-label="Link bonus to">
+            <button type="button" aria-pressed={form.games.linkType === 'categories'} onClick={() => set('games.linkType', 'categories')}>Categories</button>
+            <button type="button" aria-pressed={form.games.linkType === 'game'} onClick={() => set('games.linkType', 'game')}>Single game</button>
+          </div>
+          {form.games.linkType === 'game' ? (
+            <Field label="Game" error={errors['games.game']}>
+              <select value={form.games.game ?? ''} onChange={(e) => set('games.game', e.target.value)}>
+                <option value="">Select a game…</option>
+                {CATEGORIES.map(([cat]) => games.some((g) => g.category === cat) && (
+                  <optgroup key={cat} label={cat}>{games.filter((g) => g.category === cat).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</optgroup>
+                ))}
+              </select>
+            </Field>
+          ) : (
+            <>
+              <Multi label="Game categories" path="games.categories" options={CATEGORIES.map(([c]) => c)} {...p} />
+              <div className="kvl" style={{ margin: 0 }}>Leave empty to allow all games.</div>
+            </>
+          )}
         </section>
 
         <section className={'card' + (highlighted === 'wg' ? ' map-highlight' : '')} style={{ gridArea: 'wg', '--c': '#c23934' }} ref={refs.wg} tabIndex="-1">
@@ -683,7 +808,7 @@ function Editor() {
           <Money label="Max bet per round" path="antiBonusHunter.maxBetPerRound" {...p} />
           <Num label="Max bet percentage of bonus" hint="Restricts a single wager from exceeding a percentage of the total awarded bonus balance." path="antiBonusHunter.maxBetPercentageOfBonus" {...p} />
           <Check label="Restrict zero risk betting" path="antiBonusHunter.restrictZeroRiskBetting" {...p} />
-          <Num label="Min even money coverage percentage" path="antiBonusHunter.minEvenMoneyCoveragePercentage" {...p} />
+          <Num label="Anti-hedging threshold" hint={ANTI_HEDGING_HINT} path="antiBonusHunter.minEvenMoneyCoveragePercentage" {...p} />
         </section>
 
         <section className={'card' + (highlighted === 'pc' ? ' map-highlight' : '')} style={{ gridArea: 'pc', '--c': '#087f8c' }} ref={refs.pc} tabIndex="-1">
@@ -702,7 +827,7 @@ function Editor() {
       }} />}
       {modal && modal.t === 'log' && <ChangelogModal id={orig.id} onClose={() => setModal(null)} />}
       {showAIAgent && creating && <AIAgentModal onClose={() => { setShowAIAgent(false); history.replaceState(null, '', '/crm/b/e/?new=1'); }} />}
-      {showMap && <SatelliteMap title={form.name} items={mapItems} onSelect={selectMapNode} onClose={() => setShowMap(false)} />}
+      {showMap && <SatelliteMap title={form.name} items={mapItems} centerInfo={SATELLITE_INFO.ce} onSelect={selectMapNode} onClose={() => setShowMap(false)} />}
     </>
   );
 }

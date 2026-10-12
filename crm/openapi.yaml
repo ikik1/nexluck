@@ -433,6 +433,43 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
   /bonuses/{id}/promo-codes/{code}:
+    patch:
+      tags: [Bonuses]
+      summary: Change the text of a promo code
+      operationId: updateBonusPromoCode
+      security:
+        - oauth2: ["bonuses:write"]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, pattern: '^[A-Z0-9_-]{4,32}$' }
+      responses:
+        '200':
+          description: Updated promo code
+        '404':
+          description: Bonus or promo code not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: Invalid or duplicate code
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
     delete:
       tags: [Bonuses]
       summary: Delete a promo code from a bonus
@@ -462,6 +499,29 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /games:
+    get:
+      tags: [Bonuses]
+      summary: Game catalog that a bonus can be linked to
+      operationId: listGames
+      security:
+        - oauth2: ["bonuses:read"]
+      responses:
+        '200':
+          description: Games with their categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, example: gates-of-olympus }
+                        name: { type: string, example: Gates of Olympus }
+                        category: { type: string, enum: [SLOTS, TABLE_GAMES, LIVE_CASINO, CRASH] }
   /exchange-rates:
     get:
       tags: [Exchange rates]
@@ -604,9 +664,27 @@ components:
         minDeposit: { type: number, description: EUR }
         maxDeposit: { type: number, description: "EUR, must be >= minDeposit" }
         depositNumber: { type: integer, minimum: 0 }
+        minDepositCount: { type: integer, minimum: 0, maximum: 1000, nullable: true, description: "Player must have made at least this many deposits. Empty means no minimum." }
+        maxDepositCount: { type: integer, minimum: 0, maximum: 1000, nullable: true, description: "Player must have made at most this many deposits, must be >= minDepositCount. Empty means no maximum." }
+    Games:
+      type: object
+      description: Games the bonus can be played on.
+      properties:
+        linkType: { type: string, enum: [categories, game], description: "categories - one or more game categories (empty list means all games); game - a single game" }
+        categories:
+          type: array
+          items: { type: string, enum: [SLOTS, TABLE_GAMES, LIVE_CASINO, CRASH] }
+        game: { type: string, nullable: true, description: "Game id from GET /games, required when linkType is game", example: gates-of-olympus }
     Reward:
       type: object
       properties:
+        mode: { type: string, enum: [BONUS_MONEY, FREE_SPINS], description: "FREE_SPINS uses freeSpins; BONUS_MONEY uses dmp and maxBonusAmount" }
+        freeSpins:
+          type: object
+          description: "Distribution example: 100 spins at 20 spins per day are given over 5 days"
+          properties:
+            quantity: { type: integer, minimum: 1, maximum: 10000, example: 100 }
+            spinsPerDay: { type: integer, minimum: 1, description: "Must not exceed quantity; days = ceil(quantity / spinsPerDay)", example: 20 }
         dmp: { type: number, description: "Deposit match percentage. When 0, the bonus amount equals maxBonusAmount; otherwise min(deposit * dmp / 100, maxBonusAmount)", example: 50 }
         maxBonusAmount: { type: number, description: "EUR" }
     Wagering:
@@ -642,7 +720,7 @@ components:
         maxBetPerRound: { type: number, description: EUR }
         maxBetPercentageOfBonus: { type: number, minimum: 0, maximum: 100 }
         restrictZeroRiskBetting: { type: boolean }
-        minEvenMoneyCoveragePercentage: { type: number, minimum: 0, maximum: 100 }
+        minEvenMoneyCoveragePercentage: { type: number, minimum: 0, maximum: 100, description: "Shown as Anti-hedging threshold. Applies to Roulette/Baccarat: stops betting on 50/50 outcomes" }
     PromoBanner:
       type: object
       description: Banner shown on the casino web site. Target segments are the bonus include segments.
@@ -683,6 +761,7 @@ components:
         category: { type: string, enum: [SLOTS, TABLE_GAMES, LIVE_CASINO, CRASH] }
         availability: { $ref: '#/components/schemas/Availability' }
         triggers: { $ref: '#/components/schemas/Triggers' }
+        games: { $ref: '#/components/schemas/Games' }
         reward: { $ref: '#/components/schemas/Reward' }
         wagering: { $ref: '#/components/schemas/Wagering' }
         walletRules: { $ref: '#/components/schemas/WalletRules' }

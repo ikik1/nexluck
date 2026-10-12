@@ -6,7 +6,8 @@ const GROUPS = [
   ['promo', 'Promotion', [['banner', 'With banner'], ['nobanner', 'No banner']]],
   ['bonusType', 'Type', ['dep match', 'no-deposit', 'free spins', 'cashback', 'multiplier'].map(t => [t, t])]
 ];
-const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const fmt = d => { const [y, m, day] = d.split('-').map(Number); return `${day} ${MONTHS[m - 1]} ${String(y % 100).padStart(2, '0')}`; };
 const eur = n => '\u20ac' + n.toLocaleString('en-US');
 
 function BonusRow({ b, onEdit }) {

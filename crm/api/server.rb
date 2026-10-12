@@ -37,8 +37,19 @@ CAP_TYPES = %w[MULTIPLIER FIXED]
 WALLET_ORDER = %w[MAIN_WALLET_FIRST BONUS_MONEY_FIRST]
 PAYMENT_METHODS = %w[SKRILL NETELLER CRYPTO]
 KYC_LEVELS = %w[NONE VERIFIED_EMAIL VERIFIED_ID VERIFIED_ID_AND_ADDRESS]
+REWARD_MODES = %w[BONUS_MONEY FREE_SPINS]
+GAME_LINKS = %w[categories game]
+GAMES = [
+  ['gates-of-olympus', 'Gates of Olympus', 'SLOTS'], ['sweet-bonanza', 'Sweet Bonanza', 'SLOTS'],
+  ['book-of-dead', 'Book of Dead', 'SLOTS'], ['starburst', 'Starburst', 'SLOTS'],
+  ['european-roulette', 'European Roulette', 'TABLE_GAMES'], ['blackjack-classic', 'Blackjack Classic', 'TABLE_GAMES'],
+  ['baccarat-punto-banco', 'Baccarat Punto Banco', 'TABLE_GAMES'],
+  ['live-roulette', 'Live Roulette', 'LIVE_CASINO'], ['live-blackjack', 'Live Blackjack', 'LIVE_CASINO'],
+  ['live-baccarat', 'Live Baccarat', 'LIVE_CASINO'],
+  ['aviator', 'Aviator', 'CRASH'], ['spaceman', 'Spaceman', 'CRASH']
+].map { |id, name, category| { 'id' => id, 'name' => name, 'category' => category } }
 CREATORS = %w[v.kovalevskiy a.petrova m.rossi]
-DETAIL_KEYS = %w[description category createdBy availability triggers reward wagering walletRules antiBonusHunter]
+DETAIL_KEYS = %w[description category createdBy availability triggers games reward wagering walletRules antiBonusHunter]
 
 BONUS_TYPES = ['dep match', 'no-deposit', 'free spins', 'cashback', 'multiplier']
 TYPE_RULES = [[/no-deposit/i, 'no-deposit'], [/free spins|win-back|lucky spin|birthday/i, 'free spins'],
@@ -63,8 +74,13 @@ def detail_for(b, type, groups)
     'availability' => { 'startTime' => "#{b[5]}T00:00", 'endTime' => "#{b[6]}T23:59", 'includeSegments' => groups,
                         'excludeSegments' => [[], %w[restricted_countries], EXCLUDE_SEGMENTS, %w[restricted_currencies]][n % 4] },
     'triggers' => { 'event' => trig, 'minDeposit' => [10, 20, 25, 50][n % 4], 'maxDeposit' => [500, 1000, 2000, 5000][n % 4],
-                    'depositNumber' => trig == 'on_registration' ? 0 : (b[7] =~ /first/i ? 1 : 1 + n % 3) },
-    'reward' => { 'dmp' => (b[1][/(\d+)%/, 1] || [50, 100, 150][n % 3]).to_i, 'maxBonusAmount' => [100, 200, 300, 500][n % 4] },
+                    'depositNumber' => trig == 'on_registration' ? 0 : (b[7] =~ /first/i ? 1 : 1 + n % 3),
+                    'minDepositCount' => nil, 'maxDepositCount' => nil },
+    'games' => type == 'free spins' ? { 'linkType' => 'game', 'categories' => [], 'game' => GAMES[n % 4]['id'] }
+                                    : { 'linkType' => 'categories', 'categories' => [CATEGORIES[n % 4]], 'game' => nil },
+    'reward' => { 'mode' => type == 'free spins' ? 'FREE_SPINS' : 'BONUS_MONEY',
+                  'dmp' => (b[1][/(\d+)%/, 1] || [50, 100, 150][n % 3]).to_i, 'maxBonusAmount' => [100, 200, 300, 500][n % 4],
+                  'freeSpins' => { 'quantity' => [30, 50, 100][n % 3], 'spinsPerDay' => [10, 10, 20][n % 3] } },
     'wagering' => { 'multiplier' => [20, 25, 30, 35, 40][n % 5], 'timeToCompleteDays' => [7, 14, 30][n % 3], 'maxBetPerRound' => [2, 5, 10][n % 3],
                     'appliesTo' => type == 'free spins' ? 'WINNINGS_ONLY' : APPLIES_TO[n % 2],
                     'maxWithdrawCap' => n.even? ? { 'type' => 'MULTIPLIER', 'value' => 5 + n % 6 } : { 'type' => 'FIXED', 'value' => [500, 1000, 2000][n % 3] } },
@@ -306,7 +322,7 @@ def list_view(b) b.reject { |k, _| DETAIL_KEYS.include?(k) } end
 
 # The part of a bonus the editor may change. `auto` bonuses are reported as active.
 def editable(b)
-  deep_dup(b.slice('name', 'description', 'bonusType', 'category', 'availability', 'triggers', 'reward', 'wagering', 'walletRules', 'antiBonusHunter'))
+  deep_dup(b.slice('name', 'description', 'bonusType', 'category', 'availability', 'triggers', 'games', 'reward', 'wagering', 'walletRules', 'antiBonusHunter'))
     .merge('status' => b['status'] == 'inactive' ? 'inactive' : 'active')
 end
 
@@ -336,6 +352,10 @@ def validate_bonus(m)
     err[path] = "Allowed values: #{opts.join(', ')}" unless ok
     ok ? v.uniq : []
   end
+  opt_int = lambda do |path, v, min, max|
+    next nil if v.nil? || v == ''
+    num.(path, v, min, max, true)
+  end
   bool = lambda do |path, v|
     err[path] = 'Must be true or false' unless [true, false].include?(v)
     v
@@ -346,7 +366,7 @@ def validate_bonus(m)
   desc = m['description'].to_s
   err['description'] = 'Up to 2000 characters' if desc.length > 2000
 
-  av, tr, rw, wg, wl, abh = %w[availability triggers reward wagering walletRules antiBonusHunter].map { |k| h.(m[k]) }
+  av, tr, rw, wg, wl, abh, gm = %w[availability triggers reward wagering walletRules antiBonusHunter games].map { |k| h.(m[k]) }
   cap = h.(wg['maxWithdrawCap'])
   s_dt, e_dt = parse_dt(av['startTime']), parse_dt(av['endTime'])
   err['availability.startTime'] = 'Use format YYYY-MM-DDTHH:MM' unless s_dt
@@ -358,6 +378,34 @@ def validate_bonus(m)
   max_dep = num.('triggers.maxDeposit', tr['maxDeposit'], 0, 1_000_000, false)
   err['triggers.maxDeposit'] = 'Must be greater than or equal to min deposit' if min_dep && max_dep && max_dep < min_dep
 
+  min_cnt = opt_int.('triggers.minDepositCount', tr['minDepositCount'], 0, 1000)
+  max_cnt = opt_int.('triggers.maxDepositCount', tr['maxDepositCount'], 0, 1000)
+  err['triggers.maxDepositCount'] = 'Must be greater than or equal to min deposit count' if min_cnt && max_cnt && max_cnt < min_cnt
+
+  link = gm['linkType'].nil? ? 'categories' : enum.('games.linkType', gm['linkType'], GAME_LINKS)
+  game_cats = subset.('games.categories', gm['categories'].nil? ? [] : gm['categories'], CATEGORIES)
+  game_id = nil
+  if link == 'game'
+    game_id = gm['game']
+    err['games.game'] = 'Select a game' unless GAMES.any? { |g| g['id'] == game_id }
+    game_cats = []
+  end
+
+  mode = rw['mode'].nil? ? 'BONUS_MONEY' : enum.('reward.mode', rw['mode'], REWARD_MODES)
+  fs = h.(rw['freeSpins'])
+  if mode == 'FREE_SPINS'
+    qty = num.('reward.freeSpins.quantity', fs['quantity'], 1, 10_000, true)
+    per_day = num.('reward.freeSpins.spinsPerDay', fs['spinsPerDay'], 1, 10_000, true)
+    err['reward.freeSpins.spinsPerDay'] = 'Cannot exceed the spin quantity' if qty && per_day && per_day > qty
+    dmp = rw['dmp'].is_a?(Numeric) ? rw['dmp'] : nil
+    mba = rw['maxBonusAmount'].is_a?(Numeric) ? rw['maxBonusAmount'] : nil
+  else
+    qty = fs['quantity'].is_a?(Numeric) ? fs['quantity'].to_i : nil
+    per_day = fs['spinsPerDay'].is_a?(Numeric) ? fs['spinsPerDay'].to_i : nil
+    dmp = num.('reward.dmp', rw['dmp'], 0, 1000, false)
+    mba = num.('reward.maxBonusAmount', rw['maxBonusAmount'], 0, 1_000_000, false)
+  end
+
   out = {
     'name' => name, 'description' => desc,
     'status' => enum.('status', m['status'], %w[active inactive]),
@@ -367,9 +415,11 @@ def validate_bonus(m)
                         'includeSegments' => subset.('availability.includeSegments', av['includeSegments'], INCLUDE_SEGMENTS),
                         'excludeSegments' => subset.('availability.excludeSegments', av['excludeSegments'], EXCLUDE_SEGMENTS) },
     'triggers' => { 'event' => enum.('triggers.event', tr['event'], TRIGGER_EVENTS), 'minDeposit' => min_dep, 'maxDeposit' => max_dep,
-                    'depositNumber' => num.('triggers.depositNumber', tr['depositNumber'], 0, 1000, true) },
-    'reward' => { 'dmp' => num.('reward.dmp', rw['dmp'], 0, 1000, false),
-                  'maxBonusAmount' => num.('reward.maxBonusAmount', rw['maxBonusAmount'], 0, 1_000_000, false) },
+                    'depositNumber' => num.('triggers.depositNumber', tr['depositNumber'], 0, 1000, true),
+                    'minDepositCount' => min_cnt, 'maxDepositCount' => max_cnt },
+    'games' => { 'linkType' => link, 'categories' => game_cats, 'game' => game_id },
+    'reward' => { 'mode' => mode, 'dmp' => dmp, 'maxBonusAmount' => mba,
+                  'freeSpins' => { 'quantity' => qty, 'spinsPerDay' => per_day } },
     'wagering' => { 'multiplier' => num.('wagering.multiplier', wg['multiplier'], 0, 500, false),
                     'timeToCompleteDays' => num.('wagering.timeToCompleteDays', wg['timeToCompleteDays'], 1, 365, true),
                     'maxBetPerRound' => num.('wagering.maxBetPerRound', wg['maxBetPerRound'], 0, 100_000, false),
@@ -417,7 +467,7 @@ def update_bonus(b, clean, actor)
   return [] if changes.empty?
   prev_event = b['triggers']['event']
   b['status'] = after['status'] == 'inactive' ? 'inactive' : (b['status'] == 'auto' ? 'auto' : 'active')
-  %w[name description bonusType category availability triggers reward wagering walletRules antiBonusHunter].each { |k| b[k] = after[k] }
+  %w[name description bonusType category availability triggers games reward wagering walletRules antiBonusHunter].each { |k| b[k] = after[k] }
   b['groups'] = after['availability']['includeSegments']
   b['dateStart'] = after['availability']['startTime'][0, 10]
   b['dateEnd'] = after['availability']['endTime'][0, 10]
@@ -436,7 +486,8 @@ handler = lambda do |req, res, rest, secured|
     m = req.request_method
     route = case rest
             when 'bonuses' then [:list, %w[GET POST]]
-            when %r{\Abonuses/([\w-]+)/promo-codes/([A-Z0-9-]+)\z} then [:promo_code, %w[DELETE], Regexp.last_match(1), Regexp.last_match(2)]
+            when 'games' then [:games, %w[GET]]
+            when %r{\Abonuses/([\w-]+)/promo-codes/([A-Z0-9_-]+)\z} then [:promo_code, %w[DELETE PATCH], Regexp.last_match(1), Regexp.last_match(2)]
             when %r{\Abonuses/([\w-]+)/promo-banner\z} then [:promo_banner, %w[GET PUT], Regexp.last_match(1)]
             when %r{\Abonuses/([\w-]+)/promo-codes\z} then [:promo_codes, %w[GET POST], Regexp.last_match(1)]
             when %r{\Abonuses/([\w-]+)\z} then [:detail, %w[GET PATCH], Regexp.last_match(1)]
@@ -535,10 +586,29 @@ handler = lambda do |req, res, rest, secured|
         CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Generated promo code #{code}", 'changes' => [] })
         json(res, 201, item)
       end
+    when :games
+      json(res, 200, { items: GAMES })
     when :promo_code
       codes = PROMO_CODES[bonus['id']]
       item = codes.find { |x| x['code'] == promo_code }
       next json(res, 404, { error: 'Promo code not found' }) unless item
+      if m == 'PATCH'
+        body = read_json(req, res)
+        next unless body
+        requested = body['code']
+        errors = {}
+        if !requested.is_a?(String) || requested !~ /\A[A-Z0-9_-]{4,32}\z/
+          errors['code'] = 'Use 4-32 characters: A-Z, 0-9, _ or -'
+        elsif requested != promo_code && PROMO_CODES.values.flatten.any? { |x| x['code'] == requested }
+          errors['code'] = 'Code already exists'
+        end
+        next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
+        if requested != promo_code
+          item['code'] = requested
+          CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Renamed promo code #{promo_code} to #{requested}", 'changes' => [] })
+        end
+        next json(res, 200, item)
+      end
       codes.delete(item)
       CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Deleted promo code #{promo_code}", 'changes' => [] })
       json(res, 200, { deleted: promo_code })
