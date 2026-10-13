@@ -1,3 +1,4 @@
+@import url('/dropdowns.css?v=202610131950');
 :root { --landing-bg: #080b20; --landing-panel: #111b46; --landing-line: rgba(88, 136, 232, .34); }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 82px; }

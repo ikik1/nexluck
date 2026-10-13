@@ -1,7 +1,7 @@
 const SECTIONS=[
 {k:'analytics',n:'Analytics',i:'📈',c:'#0b5cab',big:['€482.3k','GGR (7d)'],kv:[['NGR','€391.8k','up'],['Active players','18,742','up'],['ARPU','€25.7','up'],['Retention D30','21.4%','down']]},
 {k:'casinos',n:'My casinos',i:'🏛️',c:'#7f3fbf',big:['6','Brands live'],kv:[['Jurisdictions','4',''],['Uptime','99.98%','up'],['Licences active','5 / 6',''],['Open incidents','1','down']]},
-{k:'customers',n:'Customers',i:'👥',c:'#2e844a',big:['126,480','Total players'],kv:[['New (7d)','1,356','up'],['VIP','842',''],['Pending KYC','87','down'],['Self-excluded','312','']]},
+{k:'customers',href:'/crm/c/list/',n:'Customers',i:'👥',c:'#2e844a',big:['126,480','Total players'],kv:[['New (7d)','1,356','up'],['VIP','842',''],['Pending KYC','87','down'],['Self-excluded','312','']]},
 {k:'games',n:'Games',i:'🎰',c:'#e8590c',big:['3,214','Games live'],kv:[['Providers','48',''],['Avg RTP','96.2%',''],['Top game','Gates of Olympus',''],['New this month','37','up']]},
 {k:'bonuses',href:'/crm/b/',n:'Bonuses / Promotion',i:'🎁',c:'#c23934',big:['24','Active campaigns'],kv:[['Bonus cost (7d)','€58.2k','down'],['Redemption rate','34%','up'],['Wagering done','61%',''],['Abuse flags','9','down']]},
 {k:'loyalty',n:'Loyalty',i:'⭐',c:'#b8860b',big:['12,904','Club members'],kv:[['Diamond tier','128',''],['Points issued','4.2M','up'],['Redeemed','1.1M',''],['Churn risk VIPs','23','down']]},
@@ -19,6 +19,7 @@ const sel=document.getElementById('nav'),cur=location.search.match(/s=(\w+)/);
 if(cur)sel.value='/crm/section.html?s='+cur[1];
 else if(location.pathname.startsWith('/crm/b'))sel.value='/crm/b/';
 else if(location.pathname.startsWith('/crm/f'))sel.value='/crm/f/';
+else if(location.pathname.startsWith('/crm/c/'))sel.value='/crm/c/list/';
 sel.onchange=()=>location.href=sel.value;
 document.getElementById('ftr').innerHTML=`<span>Powered by NextLuck</span>|<a href="#">Terms of Services</a>|<a href="#">Privacy Policy</a>`;
 }

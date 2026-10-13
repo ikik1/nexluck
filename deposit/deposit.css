@@ -1,3 +1,4 @@
+@import url('/dropdowns.css?v=202610131950');
 body.dp-open { overflow: hidden; }
 .dp[hidden] { display: none; }
 .dp { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; font-family: 'Manrope', sans-serif; color: #fff; }

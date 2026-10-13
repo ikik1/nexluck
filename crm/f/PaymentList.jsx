@@ -64,6 +64,7 @@ function BrandSearchPicker({ value, onChange }) {
   return (
     <div className="brand-picker" ref={boxRef}>
       <input
+        className="dropdown-control"
         type="text"
         placeholder="Type to search brand, payment method, country…"
         value={open ? search : (value ? `${value} — ${selectedGw ? selectedGw.methods.slice(0, 3).join(', ') : ''}` : '')}

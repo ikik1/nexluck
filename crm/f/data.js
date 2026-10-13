@@ -211,10 +211,11 @@ const { WALLETS, WALLET_TX } = (() => {
   const games = ['Gates of Olympus', 'Sweet Bonanza', 'Book of Dead', 'European Roulette', 'Aviator', 'Live Blackjack'];
   const now = Date.parse('2026-10-12T17:00:00');
   const wallets = [], txs = [];
-  PLAYERS.forEach((pl, pi) => {
-    const k = scale[pl.currency];
-    ['Real', 'Bonus'].forEach((type) => {
-      const id = 'W-' + (7000 + pi * 2 + (type === 'Bonus' ? 1 : 0));
+  [0, 1].flatMap(ci => PLAYERS.map((pl, pi) => ({ pl, pi, ci }))).forEach(({ pl, pi, ci }) => {
+    const currency = ci === 0 ? pl.currency : pl.currency === 'EUR' ? 'USD' : 'EUR';
+    const k = scale[currency];
+    WALLET_TYPES.forEach(type => {
+      const id = 'W-' + ((ci === 0 ? 7000 : 9000) + pi * 2 + (type === 'Bonus' ? 1 : 0));
       const n = 8 + Math.floor(rnd() * 8);
       const times = Array.from({ length: n }, () => now - Math.floor(rnd() * 40 * TX_DAY)).sort((a, b) => a - b);
       let bal = 0;
@@ -243,9 +244,9 @@ const { WALLETS, WALLET_TX } = (() => {
         }
         amt = Math.round(amt * 100) / 100;
         bal = Math.round((bal + amt) * 100) / 100;
-        list.push({ id: 'WT-' + id.slice(2) + '-' + (i + 1), wallet: id, ts, player: pl.name, type: t, amount: amt, balance: bal, currency: pl.currency, note, walletType: type, country: pl.country, segments: pl.segments });
+        list.push({ id: 'WT-' + id.slice(2) + '-' + (i + 1), wallet: id, ts, player: pl.name, type: t, amount: amt, balance: bal, currency, note, walletType: type, country: pl.country, segments: pl.segments });
       });
-      wallets.push({ id, player: pl.name, country: pl.country, segments: pl.segments, type, currency: pl.currency, balance: bal });
+      wallets.push({ id, customer_id: 'CU-' + (1001 + pi), player: pl.name, country: pl.country, segments: pl.segments, type, currency, balance: bal });
       txs.push(...list);
     });
   });

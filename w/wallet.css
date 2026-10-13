@@ -1,3 +1,4 @@
+@import url('/dropdowns.css?v=202610131950');
 .wl-body { margin: 0; min-height: 100vh; background: radial-gradient(1100px 500px at 50% -120px, #1a2e73 0%, #080b20 62%); color: #fff; font-family: 'Manrope', sans-serif; }
 .wl-body * { box-sizing: border-box; }
 .wl-header { display: flex; align-items: center; justify-content: space-between; max-width: 960px; margin: 0 auto; padding: 16px 18px; }

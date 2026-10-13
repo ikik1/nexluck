@@ -1,3 +1,4 @@
+@import url('/dropdowns.css?v=202610131950');
 :root{--bg:#f3f3f3;--panel:#fff;--line:#dddbda;--text:#181818;--muted:#5c5c5c;--brand:#0b5cab;--nav:#032d60;--accent:#f5b942;--green:#2e844a;--red:#ba0517}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}

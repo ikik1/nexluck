@@ -18,7 +18,7 @@ function PspPicker({ onPick, onCancel }) {
   };
   return (
     <div className="pick">
-      <input ref={ref} type="text" placeholder="Type to search payment connection by name, brand, method…" value={q} onChange={e => { setQ(e.target.value); setHl(0); }} onKeyDown={key} aria-label="Search payment connection" />
+      <input className="dropdown-control" ref={ref} type="text" placeholder="Type to search payment connection by name, brand, method…" value={q} onChange={e => { setQ(e.target.value); setHl(0); }} onKeyDown={key} aria-label="Search payment connection" />
       <ul role="listbox">
         {list.map((c, i) => (
           <li key={c.id} role="option" aria-selected={i === hl} className={i === hl ? 'hl' : ''} onMouseDown={e => { e.preventDefault(); onPick(c.name); }}>

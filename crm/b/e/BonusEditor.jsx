@@ -674,7 +674,7 @@ function Editor() {
             <Select label="Bonus type" path="bonusType" options={TYPES} {...p} />
           </div>
           <Field label="Category" error={errors.category}>
-            <button type="button" className="pick" onClick={() => setModal({ t: 'cat' })}><span>{form.category || 'Select category…'}</span><span>▾</span></button>
+            <button type="button" className="pick dropdown-control" onClick={() => setModal({ t: 'cat' })}><span>{form.category || 'Select category…'}</span></button>
           </Field>
           <div className="two">
             <Field label="Created at"><div className="ro">{orig ? fmtDate(orig.createdAt) : 'Assigned when saved'}</div></Field>

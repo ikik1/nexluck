@@ -1,3 +1,4 @@
+@import url('/dropdowns.css?v=202610131950');
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;600;700;800&display=swap');
 
 :root { --navy: #0e122f; --panel: #1a2e73; --panel-light: #233f8e; --blue: #49c5ff; --cyan: #6df5ff; --pink: #5888e8; --yellow: #ffda36; --text: #ffffff; --muted: #a8d1f2; --line: rgba(88, 136, 232, .4); --violet: #6a78ef; --live: #0fde00; --sans: 'Manrope', sans-serif; --display: 'Barlow Condensed', sans-serif; --mono: 'DM Mono', monospace; }

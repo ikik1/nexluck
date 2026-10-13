@@ -3,7 +3,7 @@ info:
   title: NextLuck CRM API
   version: 1.0.0
   description: |
-    REST API behind the CRM "Bonuses / Promotion" list (`/crm/b/`).
+    REST API behind the CRM Bonuses (`/crm/b/`) and Customers (`/crm/c/list/`) pages.
 
     ## Server-to-server authentication
     OAuth 2.0 **client credentials** grant (RFC 6749 §4.4). The calling server exchanges its `client_id` / `client_secret`
@@ -20,7 +20,128 @@ tags:
   - name: Authentication
   - name: Bonuses
   - name: Exchange rates
+  - name: Customers
 paths:
+  /customers:
+    get:
+      tags: [Customers]
+      summary: List persisted customer profiles (never includes credentials)
+      operationId: listCustomers
+      description: |
+        Returns `{items, total}`, initially populated from the server's CUSTOMER_OBJECTS constant.
+        The customer list uses the UI API without a bearer token. The secured API requires customers:read.
+      servers:
+        - url: /crm/ui-api/v1
+          description: CRM browser UI (prototype)
+        - url: /crm/api/v1
+          description: Secured server-to-server API
+      security:
+        - oauth2: ["customers:read"]
+      responses:
+        '200':
+          description: Customer list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  total: { type: integer }
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Customer' }
+  /customers/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, example: CU-1001 }
+    get:
+      tags: [Customers]
+      summary: Get a customer profile
+      operationId: getCustomer
+      description: The UI API requires no bearer token; the secured API requires customers:read.
+      servers:
+        - url: /crm/ui-api/v1
+          description: CRM browser UI (prototype)
+        - url: /crm/api/v1
+          description: Secured server-to-server API
+      security:
+        - oauth2: ["customers:read"]
+      responses:
+        '200':
+          description: Customer profile without credentials
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '404': { description: Customer not found }
+    patch:
+      tags: [Customers]
+      summary: Update customer profile information
+      operationId: updateCustomer
+      description: The UI API requires no bearer token; the secured API requires customers:write.
+      servers:
+        - url: /crm/ui-api/v1
+          description: CRM browser UI (prototype)
+        - url: /crm/api/v1
+          description: Secured server-to-server API
+      security:
+        - oauth2: ["customers:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerUpdate' }
+      responses:
+        '200':
+          description: Updated persisted customer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '404': { description: Customer not found }
+        '422':
+          description: Invalid, unknown, read-only or credential field
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+  /customers/{id}/credentials:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, example: CU-1001 }
+    put:
+      tags: [Customers]
+      summary: Set a write-only customer password in the separate credential entity
+      operationId: setCustomerPassword
+      description: |
+        Available only on the secured API, never the UI API. Uses a random 256-bit salt
+        and PBKDF2-HMAC-SHA512 (210,000 iterations). No password, hash or salt is returned.
+      security:
+        - oauth2: ["customers:credentials"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [password]
+              properties:
+                password: { type: string, format: password, writeOnly: true, minLength: 12, maxLength: 256 }
+      responses:
+        '200':
+          description: Credential updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated: { type: boolean }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Missing customers credentials scope, or attempted use of UI API }
+        '404': { description: Customer not found }
+        '422': { description: Invalid password payload }
   /oauth/token:
     post:
       tags: [Authentication]
@@ -599,11 +720,58 @@ components:
           scopes:
             bonuses:read: List bonuses
             bonuses:write: Modify bonuses (mark as deleted)
+            customers:read: Read customer profiles
+            customers:write: Edit customer profiles
+            customers:credentials: Set customer passwords (secured API only)
     basicAuth:
       type: http
       scheme: basic
       description: client_id and client_secret, used only at the token endpoint.
   schemas:
+    CustomerUpdate:
+      type: object
+      additionalProperties: false
+      properties: &CustomerProperties
+        external_id: { type: string, minLength: 1, maxLength: 200 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        DocumentINo: { type: string, maxLength: 200 }
+        country: { type: string, enum: [CA, US, BR, MX, AR, CL, PE, DE, FR, ES, IT, NL, PL, SE, GB, IE, AT, FI, RU, KZ, UA, UZ, AZ, AE, SA, TR, EG, MA, NG, ZA, KE, GH, TH, VN, ID, PH, MY, IN, JP, KR, AU, NZ, BD] }
+        currency: { type: string, enum: [EUR, USD, GBP, CAD, INR, BRL, MXN, TRY, AED, NGN, KES, ZAR, THB, VND, IDR, PHP, JPY, AUD, RUB, KZT, USDT, BTC] }
+        lang: { type: string, enum: [en, de, sv, pl, pt, fr, hi, ar, th] }
+        addr1: { type: string, maxLength: 200 }
+        addr12: { type: string, maxLength: 200 }
+        mfa_type: { type: string, enum: [NONE, TOTP, SMS, EMAIL] }
+        risk_score: { type: integer, minimum: 0, maximum: 100 }
+        kyc_status: { type: string, enum: [NOT_STARTED, PENDING, VERIFIED, REJECTED] }
+        birthday: { type: string, format: date }
+        aml_status: { type: string, enum: [CLEAR, REVIEW, BLOCKED] }
+        funnel_status: { type: string, enum: [Lead, Registered, FTD, Trusted, VIP, Dormant] }
+        info: { type: string, maxLength: 4000 }
+    Customer:
+      type: object
+      additionalProperties: false
+      properties:
+        <<: *CustomerProperties
+        id: { type: string, readOnly: true, example: CU-1001 }
+        created_at: { type: string, format: date-time, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
+        activity:
+          type: object
+          readOnly: true
+          description: Seeded demo activity; last session is a duration, not a timestamp.
+          required: [last_login_at, last_session_hours, overall_game_hours]
+          properties:
+            last_login_at: { type: string, format: date-time, nullable: true }
+            last_session_hours: { type: number, minimum: 0, example: 3 }
+            overall_game_hours: { type: number, minimum: 0, example: 5000 }
+        risk_indicators:
+          type: array
+          readOnly: true
+          description: Seeded demo review signals, not verified risk findings.
+          uniqueItems: true
+          items:
+            type: string
+            enum: [rdw, multiple_payment_methods, pof_pow_violations, abnormal_activity, bonus_abuse, bot_activity, device_fingerprint_mismatches, failed_kyc_attempts, vpn_multiple_ips]
     Bonus:
       type: object
       required: [id, name, status, bonusType, hasPromo, createdAt, dateStart, dateEnd, event, bonusValue, wagered, wins, received, groups, deleted]

@@ -202,7 +202,7 @@ end
 ISSUER = 'nexluck-crm'
 AUDIENCE = 'nexluck-crm-api'
 TOKEN_TTL = 900
-SCOPES = %w[bonuses:read bonuses:write]
+SCOPES = %w[bonuses:read bonuses:write customers:read customers:write customers:credentials]
 JWT_KEY = ENV['CRM_JWT_SECRET'] || SecureRandom.hex(32)
 CLIENT_SECRET = ENV['CRM_CLIENT_SECRET'] || SecureRandom.hex(24)
 CLIENTS = {
@@ -481,9 +481,41 @@ end
 # Public API for other servers (secured = true): bearer token required.
 # The UI route (secured = false) is the backend-for-frontend of the CRM web app; in production it must sit
 # behind the signed-in user's session and CSRF protection, and `actor` should be that user.
+require_relative 'customers'
+CUSTOMER_STORE = CustomerStore.new
+
 handler = lambda do |req, res, rest, secured|
   LOCK.synchronize do
     m = req.request_method
+    if rest == 'customers' || rest.start_with?('customers/')
+      match = rest.match(%r{\Acustomers(?:/(CU-\d+)(/credentials)?)?\z})
+      next json(res, 404, { error: 'Not found' }) unless match
+      customer_id, credential = match.captures
+      methods = credential ? %w[PUT] : (customer_id ? %w[GET PATCH] : %w[GET])
+      next json(res, 405, { error: 'Method not allowed' }) unless methods.include?(m)
+      scope = credential ? 'customers:credentials' : (m == 'GET' ? 'customers:read' : 'customers:write')
+      next json(res, 403, { error: 'Credential updates require the secured API' }) if credential && !secured
+      next if secured && !authorize(req, res, scope)
+      customer = customer_id && CUSTOMER_STORE.find(customer_id)
+      next json(res, 404, { error: 'Customer not found' }) if customer_id && !customer
+      if credential
+        body = read_json(req, res)
+        next unless body
+        password = body['password']
+        unless body.keys == ['password'] && password.is_a?(String) && password.length.between?(12, 256)
+          next json(res, 422, { error: 'Validation failed', fields: { password: 'Supply only a password of 12 to 256 characters' } })
+        end
+        CUSTOMER_STORE.set_password(customer_id, password)
+        next json(res, 200, { updated: true })
+      elsif m == 'PATCH'
+        body = read_json(req, res)
+        next unless body
+        saved, errors = CUSTOMER_STORE.update(customer_id, body)
+        next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
+        next json(res, 200, saved)
+      end
+      next json(res, 200, customer_id ? customer : { items: CUSTOMER_STORE.list, total: CUSTOMER_STORE.list.length })
+    end
     route = case rest
             when 'bonuses' then [:list, %w[GET POST]]
             when 'games' then [:games, %w[GET]]
