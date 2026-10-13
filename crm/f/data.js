@@ -44,17 +44,99 @@ const GATEWAYS = [
   { id: 25, brand: 'Paysafecard', desc: 'prepaid voucher, low limits', methods: ['Prepaid voucher'], currencies: ['EUR', 'GBP', 'USD'], countries: ['DE', 'AT', 'IT', 'ES', 'GB', 'CA'], segments: ['NO_DEPOSIT', 'REGISTERED'], conn: 'online' },
   { id: 26, brand: 'Rapyd', desc: 'global local-methods aggregator', methods: ['Bank transfer', 'E-wallet', 'Visa'], currencies: ['EUR', 'USD', 'ZAR', 'INR'], countries: ['ZA', 'IN', 'BD', 'KR', 'AU'], segments: ['REGISTERED', 'KYC_VERIFIED'], conn: 'online' },
 ];
+const BRAND_SETTINGS_FIELDS = {
+  'Stripe': [
+    { k: 'account_id', label: 'Stripe Account ID', placeholder: 'acct_1N0AbcXYZ', def: 'acct_1N8482Stripe' },
+    { k: 'secret_key', label: 'Secret API Key', placeholder: 'sk_live_...', def: 'sk_live_51M0...92jK', secret: true },
+    { k: 'webhook_secret', label: 'Webhook Signing Secret', placeholder: 'whsec_...', def: 'whsec_9b2a...77' },
+    { k: 'terminal_id', label: 'Terminal / Reader ID', placeholder: 'tm_101_highrisk', def: 'tm_101_highrisk' },
+  ],
+  'Adyen': [
+    { k: 'merchant_account', label: 'Merchant Account', placeholder: 'NextLuckECOM', def: 'NextLuck_EUR' },
+    { k: 'api_key', label: 'Adyen Web API Key', placeholder: 'AQEyhm...', def: 'AQEyhm...K92z', secret: true },
+    { k: 'live_url_prefix', label: 'Live Endpoint Prefix', placeholder: '1797a7906aade9e3-NextLuck', def: '1797a7906-NextLuck' },
+    { k: 'hmac_key', label: 'HMAC Webhook Key', placeholder: '4A3F...', def: '4A3F...B91E', secret: true },
+  ],
+  'Checkout.com': [
+    { k: 'channel_id', label: 'Processing Channel ID', placeholder: 'pc_xyz123', def: 'pc_mcc7995_eu' },
+    { k: 'secret_key', label: 'Secret Key', placeholder: 'sk_sbox_...', def: 'sk_live_c4...9a', secret: true },
+    { k: 'public_key', label: 'Public Key', placeholder: 'pk_sbox_...', def: 'pk_live_81...0f' },
+    { k: 'mcc', label: 'Merchant Category Code (MCC)', placeholder: '7995', def: '7995' },
+  ],
+  'Trustly': [
+    { k: 'username', label: 'Trustly API Username', placeholder: 'nextluck_trustly', def: 'nextluck_eu' },
+    { k: 'password', label: 'Password', placeholder: '••••••••', def: 'tr_sec_9918', secret: true },
+    { k: 'private_key', label: 'RSA Private Key (PEM)', placeholder: '-----BEGIN RSA PRIVATE KEY-----', def: 'rsa_key_loaded' },
+  ],
+  'Razorpay': [
+    { k: 'key_id', label: 'Key ID', placeholder: 'rzp_live_...', def: 'rzp_live_IN9921' },
+    { k: 'key_secret', label: 'Key Secret', placeholder: '••••••••', def: 'rzp_sec_k291', secret: true },
+    { k: 'vpa', label: 'Merchant VPA (UPI handle)', placeholder: 'nextluck@razorpay', def: 'nextluck@icici' },
+  ],
+  'EBANX': [
+    { k: 'integration_key', label: 'Integration Key', placeholder: '••••••••', def: 'ebx_live_br_441', secret: true },
+    { k: 'pix_key', label: 'Pix Key / CNPJ', placeholder: '12.345.678/0001-90', def: '48.910.223/0001-55' },
+  ],
+  'CoinsPaid': [
+    { k: 'api_key', label: 'CoinsPaid API Key', placeholder: '••••••••', def: 'cp_api_live_881', secret: true },
+    { k: 'secret', label: 'CoinsPaid Secret', placeholder: '••••••••', def: 'cp_sec_281a', secret: true },
+    { k: 'deposit_callback', label: 'Deposit Callback URL', placeholder: 'https://...', def: 'https://api.nexluck.com/cb/coinspaid' },
+  ],
+};
+
+function defaultSettingsForBrand(brand) {
+  const fields = BRAND_SETTINGS_FIELDS[brand] || [
+    { k: 'merchant_id', label: 'Merchant / Terminal ID', placeholder: 'mid_123', def: 'mid_' + brand.toLowerCase().replace(/[^a-z0-9]/g, '') + '_01' },
+    { k: 'api_key', label: 'API / Secret Key', placeholder: '••••••••', def: 'key_live_' + brand.toLowerCase().replace(/[^a-z0-9]/g, ''), secret: true },
+    { k: 'endpoint_url', label: 'Gateway Endpoint', placeholder: 'https://api...', def: 'https://api.' + brand.toLowerCase().replace(/[^a-z0-9]/g, '') + '.example/v2' },
+  ];
+  const obj = {};
+  fields.forEach(f => { obj[f.k] = f.def || ''; });
+  return obj;
+}
+
+const INITIAL_CONNECTIONS = [
+  { id: 1, name: 'Stripe terminal 101 for highrisk', brand: 'Stripe', currency: 'EUR', methods: ['Visa', 'MasterCard', 'Apple Pay', 'Google Pay'], countries: [...EU, 'GB'], segments: ['REGISTERED', 'KYC_VERIFIED'], conn: 'online', settings: defaultSettingsForBrand('Stripe') },
+  { id: 2, name: 'Adyen global cards primary', brand: 'Adyen', currency: 'EUR', methods: ['Visa', 'MasterCard', 'Apple Pay'], countries: ['DE', 'FR', 'NL', 'GB', 'AU', 'NZ', 'SE'], segments: ['REGISTERED', 'FIRST_DEP', 'KYC_VERIFIED'], conn: 'online', settings: defaultSettingsForBrand('Adyen') },
+  { id: 3, name: 'Checkout.com highrisk MCC 7995', brand: 'Checkout.com', currency: 'USD', methods: ['Visa', 'MasterCard', 'Google Pay'], countries: ['AE', 'SA', 'TR', 'DE', 'FR'], segments: ['REGISTERED', 'MOBILE'], conn: 'degraded', settings: defaultSettingsForBrand('Checkout.com') },
+  { id: 4, name: 'Trustly pay-n-play Europe', brand: 'Trustly', currency: 'EUR', methods: ['Open banking', 'Bank transfer'], countries: ['SE', 'FI', 'DE', 'AT', 'ES', 'GB'], segments: ['NO_DEPOSIT', 'FIRST_DEP'], conn: 'online', settings: defaultSettingsForBrand('Trustly') },
+  { id: 5, name: 'Skrill VIP e-wallet', brand: 'Skrill', currency: 'EUR', methods: ['E-wallet'], countries: ['DE', 'GB', 'IE', 'CA', 'ES', 'IT'], segments: ['VIP', 'HIGH_ROLLER'], conn: 'online', settings: defaultSettingsForBrand('Skrill') },
+  { id: 6, name: 'Neteller VIP e-wallet', brand: 'Neteller', currency: 'USD', methods: ['E-wallet'], countries: ['DE', 'GB', 'IE', 'IT', 'ES', 'PL'], segments: ['VIP', 'REGISTERED'], conn: 'online', settings: defaultSettingsForBrand('Neteller') },
+  { id: 7, name: 'Razorpay UPI & Paytm instant', brand: 'Razorpay', currency: 'INR', methods: ['UPI', 'Paytm', 'QR Code'], countries: ['IN'], segments: ['REGISTERED', 'MOBILE', 'FIRST_DEP'], conn: 'online', settings: defaultSettingsForBrand('Razorpay') },
+  { id: 8, name: 'PayU India & Poland netbanking', brand: 'PayU', currency: 'INR', methods: ['Visa', 'MasterCard', 'UPI'], countries: ['IN', 'PL'], segments: ['REGISTERED'], conn: 'degraded', settings: defaultSettingsForBrand('PayU') },
+  { id: 9, name: 'EBANX Pix & local cards Brazil', brand: 'EBANX', currency: 'BRL', methods: ['Pix', 'Visa', 'MasterCard'], countries: ['BR', 'MX', 'AR', 'CL', 'PE'], segments: ['REGISTERED', 'MOBILE', 'FIRST_DEP'], conn: 'online', settings: defaultSettingsForBrand('EBANX') },
+  { id: 10, name: 'AstroPay prepaid LATAM', brand: 'AstroPay', currency: 'USD', methods: ['Prepaid voucher', 'E-wallet'], countries: ['BR', 'MX', 'AR', 'CL', 'PE'], segments: ['NO_DEPOSIT', 'REGISTERED'], conn: 'online', settings: defaultSettingsForBrand('AstroPay') },
+  { id: 11, name: 'Interac Canada online banking', brand: 'Interac', currency: 'CAD', methods: ['Interac', 'Bank transfer'], countries: ['CA'], segments: ['REGISTERED', 'KYC_VERIFIED'], conn: 'online', settings: defaultSettingsForBrand('Interac') },
+  { id: 12, name: 'Nuvei US/CA acquirer', brand: 'Nuvei', currency: 'USD', methods: ['Visa', 'MasterCard', 'ACH'], countries: ['US', 'CA'], segments: ['REGISTERED', 'FIRST_DEP'], conn: 'online', settings: defaultSettingsForBrand('Nuvei') },
+  { id: 13, name: 'Plaid ACH instant US bank', brand: 'Plaid ACH', currency: 'USD', methods: ['ACH', 'Bank transfer'], countries: ['US'], segments: ['KYC_VERIFIED', 'REGISTERED'], conn: 'offline', settings: defaultSettingsForBrand('Plaid ACH') },
+  { id: 14, name: 'CoinsPaid crypto gateway (BTC/USDT)', brand: 'CoinsPaid', currency: 'USDT', methods: ['Crypto'], countries: [...EU, 'TR', 'AE', 'BR', 'NG'], segments: ['HIGH_ROLLER', 'VIP', 'NO_DEPOSIT'], conn: 'online', settings: defaultSettingsForBrand('CoinsPaid') },
+  { id: 15, name: 'Paystack West Africa cards & bank', brand: 'Paystack', currency: 'NGN', methods: ['Visa', 'MasterCard', 'Bank transfer'], countries: ['NG', 'GH'], segments: ['REGISTERED', 'MOBILE'], conn: 'online', settings: defaultSettingsForBrand('Paystack') },
+  { id: 16, name: 'M-Pesa Kenya mobile money', brand: 'M-Pesa', currency: 'KES', methods: ['Mobile money'], countries: ['KE'], segments: ['MOBILE', 'REGISTERED'], conn: 'degraded', settings: defaultSettingsForBrand('M-Pesa') },
+  { id: 17, name: 'Fawry Egypt vouchers & wallets', brand: 'Fawry', currency: 'USD', methods: ['Prepaid voucher', 'E-wallet'], countries: ['EG', 'MA'], segments: ['REGISTERED'], conn: 'online', settings: defaultSettingsForBrand('Fawry') },
+  { id: 18, name: 'PayTR Turkey cards terminal', brand: 'PayTR', currency: 'TRY', methods: ['Visa', 'MasterCard', 'Bank transfer'], countries: ['TR'], segments: ['REGISTERED', 'FIRST_DEP'], conn: 'online', settings: defaultSettingsForBrand('PayTR') },
+  { id: 19, name: 'Network International Gulf merchant', brand: 'Network International', currency: 'AED', methods: ['Visa', 'MasterCard'], countries: ['AE', 'SA'], segments: ['KYC_VERIFIED', 'VIP'], conn: 'offline', settings: defaultSettingsForBrand('Network International') },
+  { id: 20, name: 'GCash Philippines QR wallet', brand: 'GCash', currency: 'PHP', methods: ['E-wallet', 'QR Code'], countries: ['PH'], segments: ['MOBILE', 'REGISTERED'], conn: 'online', settings: defaultSettingsForBrand('GCash') },
+  { id: 21, name: 'Momo Vietnam QR & bank gateway', brand: 'Momo', currency: 'VND', methods: ['E-wallet', 'QR Code'], countries: ['VN'], segments: ['MOBILE', 'FIRST_DEP'], conn: 'online', settings: defaultSettingsForBrand('Momo') },
+  { id: 22, name: 'Xendit SEA multi-rail', brand: 'Xendit', currency: 'IDR', methods: ['QR Code', 'Bank transfer', 'E-wallet'], countries: ['ID', 'TH', 'MY'], segments: ['REGISTERED', 'MOBILE'], conn: 'online', settings: defaultSettingsForBrand('Xendit') },
+  { id: 23, name: 'PayPay Japan QR terminal', brand: 'PayPay', currency: 'JPY', methods: ['QR Code', 'E-wallet'], countries: ['JP'], segments: ['REGISTERED'], conn: 'degraded', settings: defaultSettingsForBrand('PayPay') },
+  { id: 24, name: 'Payeer CIS wallet & cards', brand: 'Payeer', currency: 'RUB', methods: ['E-wallet', 'Visa', 'MasterCard'], countries: ['RU', 'KZ', 'UA', 'UZ', 'AZ'], segments: ['REGISTERED', 'NO_DEPOSIT'], conn: 'online', settings: defaultSettingsForBrand('Payeer') },
+  { id: 25, name: 'Paysafecard Europe vouchers', brand: 'Paysafecard', currency: 'EUR', methods: ['Prepaid voucher'], countries: ['DE', 'AT', 'IT', 'ES', 'GB', 'CA'], segments: ['NO_DEPOSIT', 'REGISTERED'], conn: 'online', settings: defaultSettingsForBrand('Paysafecard') },
+  { id: 26, name: 'Rapyd Global aggregator multi-currency', brand: 'Rapyd', currency: 'EUR', methods: ['Bank transfer', 'E-wallet', 'Visa'], countries: ['ZA', 'IN', 'BD', 'KR', 'AU'], segments: ['REGISTERED', 'KYC_VERIFIED'], conn: 'online', settings: defaultSettingsForBrand('Rapyd') },
+];
+
+let PAYMENT_CONNECTIONS = [...INITIAL_CONNECTIONS];
+
 const CONN = { online: 'Connected', degraded: 'Degraded', offline: 'Disconnected' };
 const DECLINE_REASONS = ['Insufficient funds', 'Do not honor', '3-D Secure failed', 'Suspected fraud', 'Issuer unavailable', 'Expired card', 'Any decline'];
 const CASCADES = [
-  { id: 1, name: 'Cascade by declined transaction', type: 'decline', country: '', zone: 'Europe', segments: ['REGISTERED'], method: 'Visa', currency: 'EUR', steps: [{ psp: 'Stripe', value: 'Do not honor' }, { psp: 'Adyen', value: 'Issuer unavailable' }, { psp: 'Checkout.com', value: 'Any decline' }] },
-  { id: 2, name: 'Europe cards by success rate', type: 'success', country: '', zone: 'Europe', segments: [], method: 'MasterCard', currency: 'EUR', steps: [{ psp: 'Adyen', value: 85 }, { psp: 'Stripe', value: 80 }, { psp: 'Checkout.com', value: 70 }] },
-  { id: 3, name: 'India UPI routing', type: 'success', country: 'IN', zone: 'APAC', segments: ['MOBILE'], method: 'UPI', currency: 'INR', steps: [{ psp: 'Razorpay', value: 90 }, { psp: 'PayU', value: 80 }] },
-  { id: 4, name: 'Brazil Pix fallback', type: 'decline', country: 'BR', zone: 'LATM', segments: ['REGISTERED', 'FIRST_DEP'], method: 'Pix', currency: 'BRL', steps: [{ psp: 'EBANX', value: 'Issuer unavailable' }, { psp: 'AstroPay', value: 'Any decline' }] },
-  { id: 5, name: 'Canada deposits', type: 'success', country: 'CA', zone: 'Canada', segments: ['KYC_VERIFIED'], method: 'Interac', currency: 'CAD', steps: [{ psp: 'Interac', value: 88 }, { psp: 'Nuvei', value: 75 }] },
-  { id: 6, name: 'US ACH high success', type: 'success', country: 'US', zone: 'United States', segments: [], method: 'ACH', currency: 'USD', steps: [{ psp: 'Nuvei', value: 85 }, { psp: 'Plaid ACH', value: 70 }] },
-  { id: 7, name: 'Turkey cards fraud decline', type: 'decline', country: 'TR', zone: 'MENA', segments: ['REGISTERED'], method: 'Visa', currency: 'TRY', steps: [{ psp: 'PayTR', value: 'Suspected fraud' }, { psp: 'Checkout.com', value: '3-D Secure failed' }] },
-  { id: 8, name: 'Global crypto', type: 'success', country: '', zone: '', segments: ['VIP', 'HIGH_ROLLER'], method: 'Crypto', currency: 'USDT', steps: [{ psp: 'CoinsPaid', value: 95 }] },
+  { id: 1, name: 'Cascade by declined transaction', type: 'decline', country: '', zone: 'Europe', segments: ['REGISTERED'], method: 'Visa', currency: 'EUR', steps: [{ psp: 'Stripe terminal 101 for highrisk', value: 'Do not honor' }, { psp: 'Adyen global cards primary', value: 'Issuer unavailable' }, { psp: 'Checkout.com highrisk MCC 7995', value: 'Any decline' }] },
+  { id: 2, name: 'Europe cards by success rate', type: 'success', country: '', zone: 'Europe', segments: [], method: 'MasterCard', currency: 'EUR', steps: [{ psp: 'Adyen global cards primary', value: 85 }, { psp: 'Stripe terminal 101 for highrisk', value: 80 }, { psp: 'Checkout.com highrisk MCC 7995', value: 70 }] },
+  { id: 3, name: 'India UPI routing', type: 'success', country: 'IN', zone: 'APAC', segments: ['MOBILE'], method: 'UPI', currency: 'INR', steps: [{ psp: 'Razorpay UPI & Paytm instant', value: 90 }, { psp: 'PayU India & Poland netbanking', value: 80 }] },
+  { id: 4, name: 'Brazil Pix fallback', type: 'decline', country: 'BR', zone: 'LATM', segments: ['REGISTERED', 'FIRST_DEP'], method: 'Pix', currency: 'BRL', steps: [{ psp: 'EBANX Pix & local cards Brazil', value: 'Issuer unavailable' }, { psp: 'AstroPay prepaid LATAM', value: 'Any decline' }] },
+  { id: 5, name: 'Canada deposits', type: 'success', country: 'CA', zone: 'Canada', segments: ['KYC_VERIFIED'], method: 'Interac', currency: 'CAD', steps: [{ psp: 'Interac Canada online banking', value: 88 }, { psp: 'Nuvei US/CA acquirer', value: 75 }] },
+  { id: 6, name: 'US ACH high success', type: 'success', country: 'US', zone: 'United States', segments: [], method: 'ACH', currency: 'USD', steps: [{ psp: 'Nuvei US/CA acquirer', value: 85 }, { psp: 'Plaid ACH instant US bank', value: 70 }] },
+  { id: 7, name: 'Turkey cards fraud decline', type: 'decline', country: 'TR', zone: 'MENA', segments: ['REGISTERED'], method: 'Visa', currency: 'TRY', steps: [{ psp: 'PayTR Turkey cards terminal', value: 'Suspected fraud' }, { psp: 'Checkout.com highrisk MCC 7995', value: '3-D Secure failed' }] },
+  { id: 8, name: 'Global crypto', type: 'success', country: '', zone: '', segments: ['VIP', 'HIGH_ROLLER'], method: 'Crypto', currency: 'USDT', steps: [{ psp: 'CoinsPaid crypto gateway (BTC/USDT)', value: 95 }] },
 ];
 const TX_STATUSES = ['Approved', 'Declined', 'Pending', 'Refunded', 'Chargeback'];
 const TX_TYPES = ['Deposit', 'Withdrawal', 'Refund'];

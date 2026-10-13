@@ -9,19 +9,24 @@ function PspPicker({ onPick, onCancel }) {
   const [hl, setHl] = useState(0);
   const ref = useRef(null);
   useEffect(() => { ref.current && ref.current.focus(); }, []);
-  const list = GATEWAYS.filter(g => (g.brand + ' ' + g.desc).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 30);
+  const list = PAYMENT_CONNECTIONS.filter(c => (c.name + ' ' + c.brand + ' ' + (c.methods || []).join(' ')).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 30);
   const key = e => {
     if (e.key === 'ArrowDown') { e.preventDefault(); setHl(i => Math.min(i + 1, list.length - 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setHl(i => Math.max(i - 1, 0)); }
-    else if (e.key === 'Enter' && list[hl]) { e.preventDefault(); onPick(list[hl].brand); }
+    else if (e.key === 'Enter' && list[hl]) { e.preventDefault(); onPick(list[hl].name); }
     else if (e.key === 'Escape') { e.stopPropagation(); onCancel(); }
   };
   return (
     <div className="pick">
-      <input ref={ref} type="text" placeholder="Type a payment system name…" value={q} onChange={e => { setQ(e.target.value); setHl(0); }} onKeyDown={key} aria-label="Search payment system" />
+      <input ref={ref} type="text" placeholder="Type to search payment connection by name, brand, method…" value={q} onChange={e => { setQ(e.target.value); setHl(0); }} onKeyDown={key} aria-label="Search payment connection" />
       <ul role="listbox">
-        {list.map((g, i) => <li key={g.id} role="option" aria-selected={i === hl} className={i === hl ? 'hl' : ''} onMouseDown={e => { e.preventDefault(); onPick(g.brand); }}><span>{g.brand}</span><small>{g.desc}</small></li>)}
-        {!list.length && <li style={{ cursor: 'default' }}>No payment system found</li>}
+        {list.map((c, i) => (
+          <li key={c.id} role="option" aria-selected={i === hl} className={i === hl ? 'hl' : ''} onMouseDown={e => { e.preventDefault(); onPick(c.name); }}>
+            <span><b>{c.name}</b> <small style={{ color: 'var(--brand)', marginLeft: 6 }}>({c.brand})</small></span>
+            <small>{c.currency} · {c.methods ? c.methods.slice(0, 3).join(', ') : ''} · {c.countries ? c.countries.slice(0, 4).join(', ') : ''}</small>
+          </li>
+        ))}
+        {!list.length && <li style={{ cursor: 'default' }}>No payment connection found</li>}
       </ul>
       <div style={{ marginTop: 6 }}><button className="link" onClick={onCancel}>Cancel</button></div>
     </div>
@@ -43,7 +48,7 @@ function Step({ s, i, n, type, onChange, onRemove, onMove, onInsert, picking, se
           </div>
         </div>
         <div className="sact">
-          <button className="ib" onClick={() => setPicking(cur ? null : i)} title="Insert a payment system after this step">Insert</button>
+          <button className="ib" onClick={() => setPicking(cur ? null : i)} title="Insert a payment connection after this step">Insert</button>
           <button className="ib del" onClick={onRemove} title="Remove this step">Remove</button>
           <button className="ib" disabled={i === 0} onClick={() => onMove(-1)} aria-label="Move up">↑ Up</button>
           <button className="ib" disabled={i === n - 1} onClick={() => onMove(1)} aria-label="Move down">↓ Down</button>
@@ -77,7 +82,7 @@ function CascadeEditor({ cascade, onSave, onClose }) {
   const save = () => {
     const e = [];
     if (!c.name.trim()) e.push('Enter a cascade name.');
-    if (!c.steps.length) e.push('Add at least one payment system.');
+    if (!c.steps.length) e.push('Add at least one payment connection.');
     if (c.type === 'success' && c.steps.some(s => s.value === '' || s.value < 0 || s.value > 100)) e.push('Success rate thresholds must be between 0 and 100.');
     setErrs(e);
     if (!e.length) onSave({ ...c, name: c.name.trim() });
@@ -95,14 +100,19 @@ function CascadeEditor({ cascade, onSave, onClose }) {
           <label className="fld">Currency (optional)<select value={c.currency} onChange={e => set('currency', e.target.value)}><option value="">Any currency</option>{CURRENCIES.map(m => <option key={m}>{m}</option>)}</select></label>
         </div>
         <div className="sec">Segments (optional)</div>
-        <div className="segs">{ALL_SEGMENTS.map(s => <label key={s}><input type="checkbox" checked={c.segments.includes(s)} onChange={() => toggleSeg(s)} />{s}</label>)}</div>
-        <div className="sec">Waterfall: {c.type === 'success' ? 'a transaction falls to the next system when the success rate drops below the threshold' : 'a transaction falls to the next system on the selected decline reason'}</div>
+        <div className="segs">{ALL_SEGMENTS.map(s => (
+          <label key={s} className={'tag-chk' + (c.segments.includes(s) ? ' on' : '')}>
+            <input type="checkbox" checked={c.segments.includes(s)} onChange={() => toggleSeg(s)} />
+            <span>{s}</span>
+          </label>
+        ))}</div>
+        <div className="sec">Waterfall: {c.type === 'success' ? 'a transaction falls to the next connection when the success rate drops below the threshold' : 'a transaction falls to the next connection on the selected decline reason'}</div>
         <div className="wf">
           {c.steps.map((s, i) => <Step key={i + s.psp} s={s} i={i} n={c.steps.length} type={c.type} picking={picking} setPicking={setPicking}
             onChange={v => patchStep(i, v)} onRemove={() => removeStep(i)} onMove={d => move(i, d)} onInsert={psp => insertAfter(i, psp)} />)}
           {!c.steps.length && <div style={{ margin: '4px 0 8px' }}>
             {picking === -1 ? <div className="pick" style={{ border: 0 }}><PspPicker onPick={psp => insertAfter(-1, psp)} onCancel={() => setPicking(null)} /></div>
-              : <button className="new-btn" onClick={() => setPicking(-1)}>+ Add the first payment system</button>}
+              : <button className="new-btn" onClick={() => setPicking(-1)}>+ Add the first payment connection</button>}
           </div>}
         </div>
         {errs.map(e => <div key={e} className="err" role="alert">{e}</div>)}
