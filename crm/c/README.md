@@ -39,16 +39,17 @@ Custom dropdown triggers use the `dropdown-control` class for the same spacing.
 ## Persistence and credentials
 
 Start the existing server with `ruby crm/api/server.rb 8080`. It now also loads
-`crm/api/customers.rb`. Deploy both Ruby files together.
+`crm/api/customers.rb` and `crm/api/segments.rb`. Deploy all three Ruby files together.
 Restart the running Ruby process after updating API code; an older process
 does not load new routes automatically. For the local server on port 8086, use
 `ruby crm/api/server.rb 8086`. Swagger at `/crm/api-docs/` lists the customer
 methods and offers the UI API and secured API servers for profile operations.
 
-Profiles and credentials are separate server-side entities:
+Profiles, credentials and segment definitions are separate server-side entities:
 
 - `profiles.json`: customer information, no password fields.
 - `credentials.json`: customer ID, password derivation parameters and digest.
+- `segments.json`: segment names and validated rule trees.
 
 Set `CRM_CUSTOMER_DATA_DIR` to a private directory **outside the web document
 root**. The default is `~/.local/share/nexluck/customers`. Directory permissions
@@ -84,6 +85,13 @@ separately for balances and turnover. The same wallets are used by Finance.
 - GGR: real-wallet bets minus wins.
 - Wins minus losses: wins minus real-wallet stakes (player net).
 - RTP: wins / bets; shown as N/A without bets.
+- Favourite games, categories and providers: top three ranked by recorded
+  real-wallet bet rounds across currencies (not stake amounts), with ties
+  sorted by name. Categories/providers come from `DEMO_GAME_CATALOG` in
+  `crm/f/data.js`; these are demo catalog assignments, not a live integration.
+  Wins, bonus wagering, other customers and future transactions are excluded.
+  No bets displays an empty state; missing catalog metadata is explicitly
+  shown as "Unmapped category" / "Unmapped provider".
 - Bonus activity: granted, wagered, cancelled amounts and event count.
 - Loyalty demo: 100 points per real-wallet bet; Silver at 200, Gold at 500.
 
@@ -91,3 +99,60 @@ Statistics are labelled as demo activity, grouped by wallet currency, and do
 not imply live analytics or completed bonus wagering requirements.
 
 Validation: `ruby crm/api/test/customer_store_test.rb`.
+
+## Rule-based segments
+
+The list's Segments section opens a searchable library with New and Edit
+buttons. Selected segments filter with OR and combine with existing filters
+using AND. Row tags and the profile's View customer segments widget use the
+same current rule evaluation. Profile widgets show matching segments only.
+New/edited rules update membership immediately; tags are not manual assignments.
+The profile's View segment parameters button displays all current rule
+parameters and values in the same catalog groups. Monetary values are shown
+separately for each wallet currency. Net cash flow days is adjustable in the
+viewer; this only changes the displayed window, not saved segment rules.
+
+The visual editor groups parameters by Profile, Account, Activity, Finance,
+Gaming, Bonus & loyalty and Risk. Conditions use typed list pickers (searchable
+checkbox lists), numeric/date inputs or boolean checkboxes. Nest AND/OR groups
+and negate conditions or groups with NOT. `IS` and `=` mean equality; `!=`
+means inequality; list equality means any selected value. `=<` is the displayed
+less-than-or-equal operator; the API also accepts and normalizes `<=`. Limit: 100 rule/group
+nodes, with at most 5 nested levels. Empty groups/lists cannot be saved.
+Automatic names summarize the rule, currency and cash-flow window; manual
+names are preserved until Use automatic name is chosen.
+
+Definitions persist atomically in private `segments.json` alongside profiles,
+not in browser storage. Deploy `crm/api/segments.rb` with the other API files.
+Endpoints (also documented in Swagger):
+
+- `GET /crm/ui-api/v1/segments` and `/segments/parameters`
+- `GET /crm/ui-api/v1/segments/{id}`
+- `POST /crm/ui-api/v1/segments` and `PATCH /segments/{id}` with `{name, rules}`
+
+Secured `/crm/api/v1` routes require `segments:read` / `segments:write`.
+This prototype evaluates membership in the browser from customer profiles
+and the demo Finance ledger; these APIs persist definitions, not membership
+snapshots. Missing data is unknown and never matches, even under NOT.
+
+Money comparisons select a wallet currency; no FX conversion or summing of
+different currencies takes place. Net cash flow means deposits minus
+withdrawals over the chosen trailing days (default 30). Net cash flow days
+is the rolling-window setting on that rule, not a standalone count metric.
+Number of deposits counts all real-wallet deposits; lifetime frequency is
+deposits/week since registration (minimum one day). Win over loss means wins
+minus stakes, not a ratio. Average bet is real-wallet stakes / rounds.
+RDW rate is deposit count / withdrawal count and is unknown without withdrawals.
+Game favourites reuse the Gaming block's top-three real-wallet rankings;
+the demo category also acts as game type.
+
+Gender is an editable customer field. Devices, sessions/week and bonus
+wagering completion percentage are read-only seeded demo metadata until live
+calculation is available; activity and risk flags remain labelled demo data.
+Age uses completed UTC calendar years; account/login age use elapsed days.
+Demo loyalty remains 100 points per real-wallet bet.
+
+Validation: `ruby crm/api/test/customer_store_test.rb` and
+`python3 crm/api/test/segment_browser_test.py` (requires Playwright and Google
+Chrome). Browser/API checks run against isolated temporary storage and do not
+change local or live customer profiles.

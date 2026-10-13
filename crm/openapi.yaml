@@ -21,7 +21,124 @@ tags:
   - name: Bonuses
   - name: Exchange rates
   - name: Customers
+  - name: Segments
 paths:
+  /segments:
+    servers:
+      - url: /crm/ui-api/v1
+        description: CRM browser UI prototype (no bearer token)
+      - url: /crm/api/v1
+        description: Secured server-to-server API
+    get:
+      tags: [Segments]
+      operationId: listSegments
+      summary: List persisted customer segment definitions
+      security:
+        - oauth2: ["segments:read"]
+      responses:
+        '200':
+          description: Segment definitions; membership is calculated in the demo UI.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  total: { type: integer }
+                  items: { type: array, items: { $ref: '#/components/schemas/CustomerSegment' } }
+        '401': { description: Missing or invalid token on secured API }
+        '403': { description: Missing segments read scope }
+    post:
+      tags: [Segments]
+      operationId: createSegment
+      summary: Create a validated segment
+      security:
+        - oauth2: ["segments:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerSegmentWrite' }
+      responses:
+        '201':
+          description: Persisted segment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerSegment' }
+        '422': { description: Invalid rule tree or duplicate name }
+        '401': { description: Missing or invalid token on secured API }
+        '403': { description: Missing segments write scope }
+  /segments/parameters:
+    servers:
+      - url: /crm/ui-api/v1
+      - url: /crm/api/v1
+    get:
+      tags: [Segments]
+      operationId: listSegmentParameters
+      summary: Get grouped parameters with value types and list options
+      security:
+        - oauth2: ["segments:read"]
+      responses:
+        '200':
+          description: Parameter catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key: { type: string }
+                        label: { type: string }
+                        group: { type: string }
+                        type: { type: string, enum: [list, number, date, boolean] }
+                        options: { type: array, nullable: true, items: { type: string } }
+                        money: { type: boolean }
+                        hint: { type: string, nullable: true }
+  /segments/{id}:
+    servers:
+      - url: /crm/ui-api/v1
+      - url: /crm/api/v1
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, pattern: '^SG-\d+$' }
+    get:
+      tags: [Segments]
+      operationId: getSegment
+      summary: Get a segment definition
+      security:
+        - oauth2: ["segments:read"]
+      responses:
+        '200':
+          description: Segment definition
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerSegment' }
+        '404': { description: Segment not found }
+    patch:
+      tags: [Segments]
+      operationId: updateSegment
+      summary: Replace a segment name and rule tree
+      security:
+        - oauth2: ["segments:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerSegmentWrite' }
+      responses:
+        '200':
+          description: Updated segment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerSegment' }
+        '404': { description: Segment not found }
+        '422': { description: Invalid rule tree or duplicate name }
   /customers:
     get:
       tags: [Customers]
@@ -723,11 +840,58 @@ components:
             customers:read: Read customer profiles
             customers:write: Edit customer profiles
             customers:credentials: Set customer passwords (secured API only)
+            segments:read: Read customer segments and parameter catalog
+            segments:write: Create and edit customer segments
     basicAuth:
       type: http
       scheme: basic
       description: client_id and client_secret, used only at the token endpoint.
   schemas:
+    CustomerSegmentWrite:
+      type: object
+      additionalProperties: false
+      required: [name, rules]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        rules: { $ref: '#/components/schemas/SegmentNode' }
+    CustomerSegment:
+      allOf:
+        - $ref: '#/components/schemas/CustomerSegmentWrite'
+        - type: object
+          properties:
+            id: { type: string, readOnly: true, example: SG-1001 }
+            created_at: { type: string, format: date-time, readOnly: true }
+            updated_at: { type: string, format: date-time, readOnly: true }
+    SegmentNode:
+      description: |
+        At most 100 total nodes and 5 nested levels. List comparisons match any
+        selected value. Money rules require a wallet currency; net cash flow
+        additionally requires days (1-36500). Missing metrics do not match under NOT.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [kind, operator, not, children]
+          properties:
+            kind: { type: string, enum: [group] }
+            operator: { type: string, enum: [AND, OR] }
+            not: { type: boolean }
+            children: { type: array, minItems: 1, maxItems: 100, items: { $ref: '#/components/schemas/SegmentNode' } }
+        - type: object
+          additionalProperties: false
+          required: [kind, field, operator, not, value]
+          properties:
+            kind: { type: string, enum: [rule] }
+            field: { type: string, description: Key from /segments/parameters }
+            operator: { type: string, enum: [IS, '=', '!=', '<', '>', '>=', '<=', '=<'] }
+            not: { type: boolean }
+            value:
+              oneOf:
+                - { type: number }
+                - { type: boolean }
+                - { type: string, format: date }
+                - { type: array, minItems: 1, uniqueItems: true, items: { type: string } }
+            currency: { type: string, description: Required for money rules }
+            days: { type: integer, minimum: 1, maximum: 36500, description: Required only for net_cash_flow }
     CustomerUpdate:
       type: object
       additionalProperties: false
@@ -746,6 +910,7 @@ components:
         birthday: { type: string, format: date }
         aml_status: { type: string, enum: [CLEAR, REVIEW, BLOCKED] }
         funnel_status: { type: string, enum: [Lead, Registered, FTD, Trusted, VIP, Dormant] }
+        gender: { type: string, enum: [Female, Male, Non-binary, Undisclosed] }
         info: { type: string, maxLength: 4000 }
     Customer:
       type: object
@@ -755,6 +920,9 @@ components:
         id: { type: string, readOnly: true, example: CU-1001 }
         created_at: { type: string, format: date-time, readOnly: true }
         updated_at: { type: string, format: date-time, readOnly: true }
+        devices: { type: array, readOnly: true, items: { type: string, enum: [Desktop, Mobile, Tablet] } }
+        sessions_per_week: { type: number, readOnly: true, description: Demo session frequency; not live analytics }
+        bonus_wr_rate: { type: number, minimum: 0, maximum: 100, readOnly: true, description: Demo wagering completion percentage }
         activity:
           type: object
           readOnly: true

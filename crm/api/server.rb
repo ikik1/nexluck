@@ -202,7 +202,7 @@ end
 ISSUER = 'nexluck-crm'
 AUDIENCE = 'nexluck-crm-api'
 TOKEN_TTL = 900
-SCOPES = %w[bonuses:read bonuses:write customers:read customers:write customers:credentials]
+SCOPES = %w[bonuses:read bonuses:write customers:read customers:write customers:credentials segments:read segments:write]
 JWT_KEY = ENV['CRM_JWT_SECRET'] || SecureRandom.hex(32)
 CLIENT_SECRET = ENV['CRM_CLIENT_SECRET'] || SecureRandom.hex(24)
 CLIENTS = {
@@ -487,6 +487,25 @@ CUSTOMER_STORE = CustomerStore.new
 handler = lambda do |req, res, rest, secured|
   LOCK.synchronize do
     m = req.request_method
+    if rest == 'segments' || rest.start_with?('segments/')
+      match = rest.match(%r{\Asegments(?:/(parameters|SG-\d+))?\z})
+      next json(res, 404, { error: 'Not found' }) unless match
+      id = match[1]
+      methods = id == 'parameters' ? %w[GET] : id ? %w[GET PATCH] : %w[GET POST]
+      next json(res, 405, { error: 'Method not allowed' }) unless methods.include?(m)
+      next if secured && !authorize(req, res, m == 'GET' ? 'segments:read' : 'segments:write')
+      next json(res, 200, { items: CustomerSegments::PARAMETERS }) if id == 'parameters'
+      segment = id && CUSTOMER_STORE.segment(id)
+      next json(res, 404, { error: 'Segment not found' }) if id && !segment
+      if %w[POST PATCH].include?(m)
+        body = read_json(req, res)
+        next unless body
+        saved, errors = CUSTOMER_STORE.save_segment(id, body)
+        next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
+        next json(res, m == 'POST' ? 201 : 200, saved)
+      end
+      next json(res, 200, id ? segment : { items: CUSTOMER_STORE.segments, total: CUSTOMER_STORE.segments.length })
+    end
     if rest == 'customers' || rest.start_with?('customers/')
       match = rest.match(%r{\Acustomers(?:/(CU-\d+)(/credentials)?)?\z})
       next json(res, 404, { error: 'Not found' }) unless match

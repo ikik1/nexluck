@@ -2,7 +2,7 @@ const { useState, useEffect, useRef } = React;
 const CUSTOMER_API = '/crm/ui-api/v1/customers';
 const CUSTOMER_FIELDS = [
   ['external_id', 'External ID'], ['name', 'Name'], ['DocumentINo', 'DocumentINo'],
-  ['country', 'Country'], ['currency', 'Currency'], ['lang', 'Language'],
+  ['country', 'Country'], ['currency', 'Currency'], ['lang', 'Language'], ['gender', 'Gender'],
   ['addr1', 'Address line 1'], ['addr12', 'Address line 2 (addr12)'],
   ['mfa_type', 'MFA type'], ['risk_score', 'Risk score'],
   ['kyc_status', 'KYC status'], ['birthday', 'Birthday'], ['aml_status', 'AML status'], ['funnel_status', 'Funnel status'], ['info', 'Info']
@@ -10,6 +10,7 @@ const CUSTOMER_FIELDS = [
 const CUSTOMER_OPTIONS = {
   country: Object.keys(COUNTRIES).sort((a, b) => COUNTRIES[a][0].localeCompare(COUNTRIES[b][0])), currency: CURRENCIES,
   lang: ['en', 'de', 'sv', 'pl', 'pt', 'fr', 'hi', 'ar', 'th'],
+  gender: ['Female', 'Male', 'Non-binary', 'Undisclosed'],
   mfa_type: ['NONE', 'TOTP', 'SMS', 'EMAIL'],
   kyc_status: ['NOT_STARTED', 'PENDING', 'VERIFIED', 'REJECTED'],
   aml_status: ['CLEAR', 'REVIEW', 'BLOCKED'],
@@ -30,9 +31,13 @@ const dateText = value => new Date(value).toLocaleString('en-GB', { dateStyle: '
 const amountText = (value, currency) => value.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currency;
 
 async function customerRequest(path = '', options = {}) {
-  const response = await fetch(CUSTOMER_API + path, options);
+  return apiRequest(CUSTOMER_API + path, options);
+}
+
+async function apiRequest(url, options = {}) {
+  const response = await fetch(url, options);
   if (!response.headers.get('Content-Type')?.includes('application/json')) {
-    throw new Error(`Customer API unavailable (HTTP ${response.status}). Start or update the CRM API server.`);
+    throw new Error(`CRM API unavailable (HTTP ${response.status}). Start or update the CRM API server.`);
   }
   const body = await response.json();
   if (!response.ok) {
@@ -54,6 +59,9 @@ function FunnelStatus({ value }) {
 }
 
 function CustomerList() {
+  const segmentState = useCustomerSegments();
+  const [segmentWidget, setSegmentWidget] = useState(false);
+  const [selectedSegments, setSelectedSegments] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -71,33 +79,46 @@ function CustomerList() {
   };
   useEffect(() => { load(); }, []);
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const membership = segmentState.loading || segmentState.error ? {} : Object.fromEntries(customers.map(c => [c.id, customerSegmentIds(c, segmentState.segments, segmentState.parameters)]));
   const filtered = customers.filter(c => (!country || c.country === country) && (!kyc || c.kyc_status === kyc) && (!aml || c.aml_status === aml) && (!funnel || c.funnel_status === funnel)
+    && (!selectedSegments.length || selectedSegments.some(id => membership[c.id]?.includes(id)))
     && terms.every(term => [c.id, c.external_id, c.name, c.DocumentINo, c.country, COUNTRIES[c.country]?.[0], c.currency, c.lang, c.funnel_status].join(' ').toLowerCase().includes(term)));
   const pages = Math.max(1, Math.ceil(filtered.length / 10));
+  const currentPage = Math.min(page, pages - 1);
   const change = (setter, value) => { setter(value); setPage(0); };
   return <>
+    <section className="customer-segments">
+      <h2>Segments <button type="button" className="btn" disabled={segmentState.loading || Boolean(segmentState.error)} onClick={() => setSegmentWidget(true)}>Segments</button></h2>
+      {segmentState.loading && <p role="status" className="hint">Loading segments…</p>}
+      {segmentState.error && <p role="alert" className="error">{segmentState.error} <button type="button" className="btn" onClick={segmentState.load}>Retry segments</button></p>}
+      <SegmentTags segments={segmentState.segments.filter(s => selectedSegments.includes(s.id))} onRemove={id => { setSelectedSegments(old => old.filter(s => s !== id)); setPage(0); }} />
+      <p className="hint">Select segment tags to filter customers. Selected segments use OR; other filters use AND.</p>
+    </section>
     <div className="customer-tools">
       <label className="field search-field">Search customers<input type="search" placeholder="ID, external ID, name, document, country, currency…" value={query} onChange={e => change(setQuery, e.target.value)} /></label>
       {[['Country', country, setCountry, CUSTOMER_OPTIONS.country], ['Funnel status', funnel, setFunnel, CUSTOMER_OPTIONS.funnel_status], ['KYC status', kyc, setKyc, CUSTOMER_OPTIONS.kyc_status], ['AML status', aml, setAml, CUSTOMER_OPTIONS.aml_status]].map(([label, value, setter, options]) =>
         <label className="field" key={label}>{label}<select aria-label={label} value={value} onChange={e => change(setter, e.target.value)}><option value="">All</option>{options.map(v => <option key={v} value={v}>{label === 'Country' ? COUNTRIES[v][0] : v.replace(/_/g, ' ')}</option>)}</select></label>)}
-      <button className="btn" onClick={() => { setQuery(''); setCountry(''); setKyc(''); setAml(''); setFunnel(''); setPage(0); }}>Clear filters</button>
+      <button className="btn" onClick={() => { setQuery(''); setCountry(''); setKyc(''); setAml(''); setFunnel(''); setSelectedSegments([]); setPage(0); }}>Clear filters</button>
     </div>
     {loading && <p role="status">Loading customers…</p>}
     {error && <div className="error" role="alert">{error} <button className="btn" onClick={load}>Retry</button></div>}
     {!loading && !error && <>
       <p className="count">{filtered.length} of {customers.length} customers</p>
       <div className="customer-table"><table>
-        <thead><tr>{['Customer', 'Funnel status', 'External ID', 'DocumentINo', 'Country', 'Currency', 'Language', 'MFA', 'KYC', 'AML', 'Risk', 'Created', 'Info'].map(label => <th key={label}>{label}</th>)}</tr></thead>
-        <tbody>{filtered.slice(page * 10, (page + 1) * 10).map(c => <tr key={c.id}>
+        <thead><tr>{['Customer', 'Segments', 'Funnel status', 'External ID', 'DocumentINo', 'Country', 'Currency', 'Language', 'MFA', 'KYC', 'AML', 'Risk', 'Created', 'Info'].map(label => <th key={label}>{label}</th>)}</tr></thead>
+        <tbody>{filtered.slice(currentPage * 10, (currentPage + 1) * 10).map(c => <tr key={c.id}>
           <td><a href={'/crm/c/i/?id=' + encodeURIComponent(c.id)}>{c.name}</a><small>{c.id}</small></td>
+          <td>{segmentState.loading ? 'Loading…' : segmentState.error ? 'Unavailable' : <SegmentTags segments={segmentState.segments.filter(s => membership[c.id]?.includes(s.id))} />}</td>
           <td><FunnelStatus value={c.funnel_status} /></td>
           <td>{c.external_id}</td><td>{c.DocumentINo}</td><td>{COUNTRIES[c.country][0]}</td><td>{c.currency}</td><td>{c.lang}</td><td>{c.mfa_type}</td>
           <td><CustomerStatus value={c.kyc_status} /></td><td><CustomerStatus value={c.aml_status} /></td><td>{c.risk_score} / 100</td><td>{dateText(c.created_at)}</td>
           <td><a className="btn" href={'/crm/c/i/?id=' + encodeURIComponent(c.id)} aria-label={'View ' + c.name}>View</a></td>
         </tr>)}</tbody>
       </table>{!filtered.length && <div className="empty">No customers match these filters.</div>}</div>
-      {pages > 1 && <div className="pager"><button className="btn" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</button><span>Page {page + 1} of {pages}</span><button className="btn" disabled={page + 1 === pages} onClick={() => setPage(p => p + 1)}>Next</button></div>}
+      {pages > 1 && <div className="pager"><button className="btn" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</button><span>Page {currentPage + 1} of {pages}</span><button className="btn" disabled={currentPage + 1 === pages} onClick={() => setPage(currentPage + 1)}>Next</button></div>}
     </>}
+    {segmentWidget && <SegmentWidget state={segmentState} customers={customers} selected={selectedSegments} onClose={() => setSegmentWidget(false)}
+      onToggle={id => { setSelectedSegments(old => old.includes(id) ? old.filter(s => s !== id) : [...old, id]); setPage(0); }} />}
   </>;
 }
 
@@ -168,8 +189,20 @@ function customerActivity(id, now = Date.now()) {
       deposits: [1, 7, 30, 365].map(days => tx.filter(t => t.type === 'Deposit' && t.ts >= now - days * 86400000).reduce((total, t) => total + t.amount, 0))
     };
   });
-  const points = transactions.filter(t => t.type === 'Bet').length * 100;
-  return { wallets, stats, points, tier: points >= 500 ? 'Gold' : points >= 200 ? 'Silver' : 'Bronze' };
+  const bets = transactions.filter(t => t.type === 'Bet' && wallets.some(w => w.id === t.wallet && w.type === 'Real'));
+  const rank = names => {
+    const counts = new Map();
+    names.forEach(name => counts.set(name, (counts.get(name) || 0) + 1));
+    return [...counts].sort(([a, ac], [b, bc]) => bc - ac || a.localeCompare(b)).slice(0, 3);
+  };
+  const games = bets.map(t => DEMO_GAME_CATALOG.find(game => game.name === t.note));
+  const favourites = {
+    games: rank(bets.map(t => t.note)),
+    categories: rank(games.map(game => game ? game.category : 'Unmapped category')),
+    providers: rank(games.map(game => game ? game.provider : 'Unmapped provider'))
+  };
+  const points = bets.length * 100;
+  return { wallets, transactions, stats, favourites, points, tier: points >= 500 ? 'Gold' : points >= 200 ? 'Silver' : 'Bronze' };
 }
 
 function Stats({ items }) {
@@ -177,6 +210,11 @@ function Stats({ items }) {
 }
 
 function CustomerInfo() {
+  const segmentState = useCustomerSegments();
+  const [segmentWidget, setSegmentWidget] = useState(false);
+  const [viewParameters, setViewParameters] = useState(false);
+  const [segmentCustomers, setSegmentCustomers] = useState([]);
+  const [segmentCustomerError, setSegmentCustomerError] = useState('');
   const id = new URLSearchParams(location.search).get('id');
   const [customer, setCustomer] = useState(null);
   const [error, setError] = useState('');
@@ -189,6 +227,11 @@ function CustomerInfo() {
     catch (e) { setError(e.message); }
   };
   useEffect(() => { load(); }, [id]);
+  const viewSegments = async () => {
+    setSegmentCustomerError('');
+    try { setSegmentCustomers((await customerRequest()).items); setSegmentWidget(true); }
+    catch (e) { setSegmentCustomerError(e.message); }
+  };
   if (error) return <><a className="btn" href="/crm/c/list/">Back to customers</a><p className="error" role="alert">{error}</p><button className="btn" onClick={load}>Retry</button></>;
   if (!customer) return <p role="status">Loading customer…</p>;
   const activity = customerActivity(customer.id);
@@ -209,12 +252,21 @@ function CustomerInfo() {
         <ol className="customer-pipeline" aria-label="CRM funnel">
           {CUSTOMER_OPTIONS.funnel_status.map(status => <li key={status} aria-current={status === customer.funnel_status ? 'step' : undefined}><FunnelStatus value={status} /></li>)}
         </ol>
+        <div className="profile-segments">
+          <div className="profile-segment-actions">
+          <button type="button" className="btn" disabled={segmentState.loading || Boolean(segmentState.error)} onClick={viewSegments}>View customer segments</button>
+          <button type="button" className="btn" disabled={segmentState.loading || Boolean(segmentState.error)} onClick={() => setViewParameters(true)}>View segment parameters</button>
+          </div>
+          {segmentState.error && <p role="alert" className="error">{segmentState.error} <button className="btn" onClick={segmentState.load}>Retry segments</button></p>}
+          {segmentCustomerError && <p role="alert" className="error">{segmentCustomerError}</p>}
+        </div>
         <dl className="detail-list">{profileFields.map(([key, label]) => <React.Fragment key={key}><dt>{label}</dt><dd>{key === 'country' ? COUNTRIES[customer.country][0] : key === 'risk_score' ? `${customer[key]} / 100` : ['kyc_status', 'aml_status'].includes(key) ? <CustomerStatus value={customer[key]} /> : customer[key] === '' ? '—' : customer[key]}</dd></React.Fragment>)}</dl>
         <h3 className="activity-title">Activity info</h3>
         <Stats items={[
           ['Last login', lastLoginDays === null ? 'No recorded login' : lastLoginDays === 0 ? 'Today' : `${lastLoginDays} day${lastLoginDays === 1 ? '' : 's'} ago`],
           ['Last session', `${customer.activity.last_session_hours} hours`],
-          ['Overall game hours', new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(customer.activity.overall_game_hours).toUpperCase() + ' h']
+          ['Overall game hours', new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(customer.activity.overall_game_hours).toUpperCase() + ' h'],
+          ['Devices (demo)', customer.devices.join(', ')], ['Sessions per week (demo)', customer.sessions_per_week]
         ]} />
         <p className="hint">Activity is seeded demo data. Last session shows duration.</p>
         <p className="hint">Password: separate secured credential entity (never returned).</p>
@@ -239,6 +291,14 @@ function CustomerInfo() {
       </section>
       <section className="customer-card" style={{ gridArea: 'gaming', '--c': '#e8590c' }}>
         <h2>Gaming</h2>
+        <div className="gaming-favourites">
+          {[['games', 'Favourite games'], ['categories', 'Favourite categories'], ['providers', 'Favourite game providers']].map(([key, title]) => <div key={key}>
+            <h3>{title}</h3>
+            {activity.favourites[key].length ? <ol>{activity.favourites[key].map(([name, rounds]) => <li key={name}><span>{name}</span><b>{rounds} {rounds === 1 ? 'round' : 'rounds'}</b></li>)}</ol>
+              : <p className="hint">No recorded real-wallet bets yet.</p>}
+          </div>)}
+          <p className="hint">Top 3 by recorded real-wallet bet rounds across currencies; ties sorted by name. Categories and providers use the demo game catalog.</p>
+        </div>
         {activity.stats.map(s => <div className="currency-stats" key={s.currency}><h3>{s.currency} · recorded demo activity</h3><Stats items={[
           ['Bets / losses (stakes)', amountText(s.bets, s.currency)], ['Wins (payouts)', amountText(s.wins, s.currency)],
           ['Gross gaming revenue', amountText(s.ggr, s.currency)], ['Wins minus losses', amountText(s.net, s.currency)],
@@ -248,6 +308,7 @@ function CustomerInfo() {
       </section>
       <section className="customer-card" style={{ gridArea: 'bonus', '--c': '#c23934' }}>
         <h2>Bonus activity</h2>
+        <Stats items={[['Wagering completion (demo)', customer.bonus_wr_rate + '%']]} />
         {activity.stats.map(s => <div className="currency-stats" key={s.currency}><h3>{s.currency} · recorded demo activity</h3><Stats items={[
           ['Bonuses granted', amountText(s.granted, s.currency)], ['Bonus wagering', amountText(s.wagered, s.currency)],
           ['Bonuses cancelled', amountText(s.cancelled, s.currency)], ['Bonus activity events', s.bonusEvents]
@@ -264,6 +325,8 @@ function CustomerInfo() {
       </section>
     </div>
     {editing && <CustomerEdit customer={customer} onClose={() => setEditing(false)} onSave={saved => { setCustomer(saved); setEditing(false); setMessage('Customer updated successfully.'); }} />}
+    {segmentWidget && <SegmentWidget state={segmentState} customers={segmentCustomers} customer={customer} onClose={() => setSegmentWidget(false)} />}
+    {viewParameters && <SegmentParameters customer={customer} parameters={segmentState.parameters} onClose={() => setViewParameters(false)} />}
   </>;
 }
 

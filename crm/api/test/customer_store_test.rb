@@ -28,7 +28,7 @@ class CustomerStoreTest < Minitest::Test
     assert_equal CUSTOMER_OBJECTS, @store.list
     assert_equal 'luna.play', @store.find('CU-1001')['name']
     assert_equal 0700, File.stat(@dir).mode & 0777
-    %w[profiles.json credentials.json].each { |name| assert_equal 0600, File.stat(File.join(@dir, name)).mode & 0777 }
+    %w[profiles.json credentials.json segments.json].each { |name| assert_equal 0600, File.stat(File.join(@dir, name)).mode & 0777 }
     assert_equal({}, JSON.parse(File.read(File.join(@dir, 'credentials.json'))))
     refute @store.list.any? { |c| c.keys.any? { |k| k.include?('password') } }
   end
@@ -62,7 +62,7 @@ class CustomerStoreTest < Minitest::Test
   def test_existing_profiles_receive_new_metadata_without_losing_edits
     saved, = @store.update('CU-1001', { 'name' => 'Saved customer' })
     profiles = JSON.parse(File.read(File.join(@dir, 'profiles.json')))
-    profiles.each_value { |profile| %w[funnel_status activity risk_indicators].each { |key| profile.delete(key) } }
+    profiles.each_value { |profile| %w[funnel_status activity risk_indicators gender devices sessions_per_week bonus_wr_rate].each { |key| profile.delete(key) } }
     File.write(File.join(@dir, 'profiles.json'), JSON.generate(profiles))
     restored = CustomerStore.new.find('CU-1001')
     assert_equal 'Saved customer', restored['name']
@@ -70,6 +70,8 @@ class CustomerStoreTest < Minitest::Test
     assert_equal CUSTOMER_OBJECTS.first['funnel_status'], restored['funnel_status']
     assert_equal CUSTOMER_OBJECTS.first['activity'], restored['activity']
     assert_equal CUSTOMER_OBJECTS.first['risk_indicators'], restored['risk_indicators']
+    assert_equal CUSTOMER_OBJECTS.first['gender'], restored['gender']
+    assert_equal CUSTOMER_OBJECTS.first['devices'], restored['devices']
   end
 
   def test_validation_is_atomic
@@ -80,7 +82,8 @@ class CustomerStoreTest < Minitest::Test
       { 'name' => '' }, { 'external_id' => 'PLAYER-5002' }, { 'info' => 'x' * 4001 },
       { 'mfa_type' => 'FAKE' }, { 'country' => nil }, { 'currency' => 'FAKE' },
       { 'id' => 'CU-9999' }, { 'created_at' => 'now' }, { 'updated_at' => 'now' },
-      { 'password' => SecureRandom.hex(16) }, { 'activity' => {} }, { 'risk_indicators' => [] }
+      { 'password' => SecureRandom.hex(16) }, { 'activity' => {} }, { 'risk_indicators' => [] },
+      { 'gender' => 'Invalid' }, { 'devices' => ['Mobile'] }, { 'sessions_per_week' => 5 }, { 'bonus_wr_rate' => 100 }
     ].each do |body|
       saved, errors = @store.update('CU-1001', body)
       assert_nil saved
@@ -109,5 +112,85 @@ class CustomerStoreTest < Minitest::Test
   def test_refuses_storage_under_document_root
     ENV['CRM_CUSTOMER_DATA_DIR'] = File.join(ROOT, 'crm')
     assert_raises(RuntimeError) { CustomerStore.new }
+  end
+
+  def test_segment_parameter_catalog_and_allowed_operators
+    assert_equal 36, CustomerSegments::PARAMETERS.length
+    assert_equal 36, CustomerSegments::BY_KEY.length
+    CustomerSegments::PARAMETERS.each do |parameter|
+      value = case parameter['type']
+              when 'list' then [parameter['options'].first]
+              when 'boolean' then true
+              when 'number' then 500
+              when 'date' then '2026-08-01'
+              end
+      CustomerSegments::OPERATORS[parameter['type']].each do |operator|
+        rule = { 'kind' => 'rule', 'field' => parameter['key'], 'operator' => operator, 'value' => value, 'not' => false }
+        rule['currency'] = 'EUR' if parameter['money']
+        rule['days'] = 30 if parameter['key'] == 'net_cash_flow'
+        clean, errors = CustomerSegments.validate({ 'name' => 'test', 'rules' => rule })
+        assert_empty errors, "#{parameter['key']} #{operator}"
+        assert_equal operator == '<=' ? '=<' : operator, clean['rules']['operator']
+      end
+    end
+  end
+
+  def test_segments_persist_and_duplicate_names_and_invalid_rules_are_atomic
+    body = JSON.parse(JSON.generate(CustomerSegments::SEEDS.last)).slice('name', 'rules')
+    body['name'] = 'My saved segment'
+    saved, errors = @store.save_segment(nil, body)
+    assert_empty errors
+    assert_equal 'SG-1005', saved['id']
+    assert_equal saved, CustomerStore.new.segment(saved['id'])
+    edited, errors = @store.save_segment(saved['id'], body.merge('name' => 'Edited segment'))
+    assert_empty errors
+    assert_equal saved['created_at'], edited['created_at']
+    assert_equal edited, CustomerStore.new.segment(saved['id'])
+    duplicate, errors = @store.save_segment(nil, body.merge('name' => 'edited SEGMENT'))
+    assert_nil duplicate
+    assert errors.key?('name')
+    before = JSON.generate(@store.segments)
+    invalid_rules = [
+      nil, { 'kind' => 'group', 'operator' => 'AND', 'not' => false, 'children' => [] },
+      { 'kind' => 'group', 'operator' => 'XOR', 'not' => false, 'children' => [body['rules']['children'].first] },
+      { 'kind' => 'rule', 'field' => 'unknown', 'operator' => 'IS', 'value' => true, 'not' => false }
+    ]
+    base = body['rules']['children']
+    invalid_rules += [
+      base[0].merge('value' => []), base[0].merge('value' => %w[DE DE]),
+      base[0].merge('value' => ['FAKE']), base[0].merge('operator' => '>'),
+      base[0].merge('not' => 'false'), base[0].merge('untrusted' => 'x'),
+      base[1].merge('value' => '500'), base[1].merge('currency' => 'FAKE'),
+      base[1].reject { |key, _| key == 'currency' },
+      base[2].merge('value' => 'true'),
+      { 'kind' => 'rule', 'field' => 'registration_date', 'operator' => '=', 'value' => '2026-02-30', 'not' => false },
+      { 'kind' => 'rule', 'field' => 'net_cash_flow', 'operator' => '>', 'value' => 0, 'currency' => 'EUR', 'days' => 0, 'not' => false }
+    ]
+    invalid_rules.each do |rules|
+      saved, errors = @store.save_segment(edited['id'], { 'name' => 'Should not save', 'rules' => rules })
+      assert_nil saved
+      refute_empty errors
+      assert_equal before, JSON.generate(@store.segments)
+    end
+  end
+
+  def test_segment_depth_and_size_limits
+    rule = CustomerSegments::SEEDS.first['rules']['children'].first
+    group = ->(children) { { 'kind' => 'group', 'operator' => 'AND', 'not' => false, 'children' => children } }
+    root = group.call(Array.new(99) { rule })
+    assert_empty CustomerSegments.validate({ 'name' => 'max', 'rules' => root })[1]
+    root['children'] << rule
+    refute_empty CustomerSegments.validate({ 'name' => 'oversized', 'rules' => root })[1]
+    root = rule
+    5.times { root = group.call([root]) }
+    assert_empty CustomerSegments.validate({ 'name' => 'depth', 'rules' => root })[1]
+    refute_empty CustomerSegments.validate({ 'name' => 'deep', 'rules' => group.call([root]) })[1]
+  end
+
+  def test_gender_is_editable_and_saved
+    saved, errors = @store.update('CU-1001', { 'gender' => 'Undisclosed' })
+    assert_empty errors
+    assert_equal 'Undisclosed', CustomerStore.new.find('CU-1001')['gender']
+    assert_equal 'Undisclosed', saved['gender']
   end
 end

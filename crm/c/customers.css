@@ -63,6 +63,12 @@ main{max-width:1500px}
 .stat-list b{text-align:right;white-space:nowrap}
 .currency-stats+.currency-stats{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
 .currency-stats h3{font-size:12px;color:var(--muted);margin-bottom:8px}
+.gaming-favourites{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:16px}
+.gaming-favourites h3{font-size:12px;color:var(--muted);margin:12px 0 8px}
+.gaming-favourites ol{list-style-position:inside;font-size:12px}
+.gaming-favourites li{display:flex;justify-content:space-between;gap:12px;padding:5px 0}
+.gaming-favourites li span{overflow-wrap:anywhere}
+.gaming-favourites li b{white-space:nowrap;font-weight:600;color:var(--brand)}
 .loyalty-grid{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
 .loyalty-grid strong{font-size:26px;color:var(--brand);display:block}
 .loyalty-grid small{color:var(--muted);font-size:12px}
@@ -74,5 +80,52 @@ main{max-width:1500px}
 .customer-actions{display:flex;justify-content:flex-end;gap:12px;padding-top:12px;border-top:1px solid var(--line)}
 .notice{padding:10px 12px;border-radius:6px;background:#eef5fc;color:var(--brand);font-size:12px;margin:12px 0}
 .notice.ok{background:#e6f5ec;color:#1f6b3a}
+.customer-segments{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;margin:14px 0}
+.customer-segments h2{display:flex;align-items:center;gap:12px;font-size:14px;margin-bottom:10px}
+.segment-tags{display:flex;flex-wrap:wrap;gap:6px}
+.segment-tag{display:inline-flex;align-items:center;gap:6px;max-width:100%;overflow-wrap:anywhere;border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700;background:#fff3d6;color:#8a5a00;border:1px solid #f5b942;text-transform:uppercase}
+.segment-tag button{border:0;background:none;color:inherit;font-size:16px;cursor:pointer;padding:0 2px}
+.customer-table .segment-tags{min-width:140px;max-width:240px}
+.profile-segments{margin:0 0 18px}
+.profile-segment-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:10px}
+.profile-segment-actions .btn{white-space:normal}
+.parameter-days{max-width:220px}
+.parameter-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:16px 0}
+.parameter-group{min-width:0;border:1px solid var(--line);border-radius:8px;padding:14px}
+.parameter-group h3{font-size:14px;color:var(--brand);margin-bottom:14px}
+.parameter-group dl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;font-size:12px}
+.parameter-group dt,.parameter-group dd{overflow-wrap:anywhere}
+.parameter-group dt{color:var(--muted)}
+.parameter-group dt small{display:block;font-size:10px;margin-top:4px;line-height:1.4}
+.parameter-group dd div+div{margin-top:4px}
+@media(max-width:600px){.parameter-groups{grid-template-columns:minmax(0,1fr)}}
+.segment-overlay{position:fixed;inset:0;background:#0006;display:grid;place-items:center;padding:16px;z-index:110}
+.segment-overlay .segment-overlay{z-index:120}
+.segment-overlay .segment-overlay .segment-overlay{z-index:130}
+.segment-dialog{width:min(640px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:10px;padding:20px;box-shadow:0 10px 40px #0005}
+.segment-dialog.wide{width:min(1120px,100%)}
+.segment-dialog h2{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:18px;margin-bottom:16px}
+.segment-widget-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.segment-widget-tools .field{flex:1;min-width:180px}
+.segment-library{display:flex;flex-direction:column;gap:12px;margin:16px 0}
+.segment-library-item{display:flex;align-items:start;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:8px;padding:12px}
+.segment-library-item>div{min-width:0;flex:1}
+.segment-preview{font-size:12px;color:var(--muted);overflow-wrap:anywhere;margin:10px 0}
+.segment-options{display:flex;flex-wrap:wrap;gap:8px;max-height:45vh;overflow:auto;margin:16px 0}
+.segment-choice{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;max-width:100%}
+.segment-choice.on{background:#eef5fc;border-color:var(--brand)}
+.segment-rule-group{min-width:0;border:1px solid #9bbde6;border-radius:8px;padding:12px;margin:12px 0;background:#f7fbff}
+.segment-rule-group legend,.segment-rule legend{font-size:12px;font-weight:700;color:var(--brand);padding:0 6px}
+.segment-rule-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.segment-rule-toolbar .field{margin:0;min-width:120px}
+.segment-not,.segment-boolean{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
+.segment-rule{min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:12px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:12px;margin:10px 0}
+.segment-rule .field{min-width:100px;flex:1;margin:0}
+.segment-rule .field:has(select[aria-label="Segmentation parameter"]){flex:2;min-width:190px}
+.segment-rule .field select,.segment-rule .field input{width:100%}
+.segment-value{justify-content:space-between;width:100%;white-space:normal;text-align:left;min-height:36px}
+.segment-rule-hint{flex-basis:100%;margin:0}
+.segment-join{font-size:11px;font-weight:700;color:var(--brand);padding-left:12px}
+@media(max-width:600px){.segment-overlay{padding:8px}.segment-dialog{padding:14px}.segment-rule-group{padding:8px}.segment-rule .field{flex-basis:100%;min-width:0!important}.segment-library-item{flex-wrap:wrap}.segment-library-item>div{flex-basis:100%}}
 @media(max-width:1050px){.customer-sat{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"center center" "risk wallets" "gaming bonus" "loyalty loyalty"}}
 @media(max-width:600px){main{padding:16px}.subbar{flex-wrap:wrap;padding:10px 16px}.customer-sat{grid-template-columns:minmax(0,1fr);grid-template-areas:"center" "risk" "wallets" "gaming" "bonus" "loyalty"}.edit-grid{grid-template-columns:minmax(0,1fr)}.customer-tools .field{width:100%}.customer-modal{padding:16px}.stat-list{font-size:12px}.customer-identity{grid-template-columns:minmax(0,1fr) 56px auto;gap:8px}.customer-identity .avatar{width:56px;height:56px;font-size:22px}.customer-center{padding:20px 14px}}

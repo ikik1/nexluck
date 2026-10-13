@@ -189,6 +189,14 @@ const txLogs = (t) => {
 const rndFlag = (t) => (parseInt(t.id.slice(3), 10) % 2) === 0;
 const WALLET_TYPES = ['Real', 'Bonus'];
 const WALLET_TX_TYPES = ['Deposit', 'Withdrawal', 'Bet', 'Win', 'Bonus granted', 'Bonus wagering', 'Bonus cancelled', 'Adjustment'];
+const DEMO_GAME_CATALOG = [
+  { name: 'Gates of Olympus', category: 'Slots', provider: 'Pragmatic Play' },
+  { name: 'Sweet Bonanza', category: 'Slots', provider: 'Pragmatic Play' },
+  { name: 'Book of Dead', category: 'Slots', provider: "Play'n GO" },
+  { name: 'European Roulette', category: 'Table games', provider: 'NetEnt' },
+  { name: 'Aviator', category: 'Crash', provider: 'Spribe' },
+  { name: 'Live Blackjack', category: 'Live casino', provider: 'Evolution' }
+];
 const PLAYERS = [
   { name: 'luna.play', country: 'DE', currency: 'EUR', segments: ['REGISTERED', 'KYC_VERIFIED'] },
   { name: 'max_rider', country: 'SE', currency: 'EUR', segments: ['REGISTERED', 'FIRST_DEP'] },
@@ -208,7 +216,7 @@ const { WALLETS, WALLET_TX } = (() => {
   const rnd = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
   const pick = (a) => a[Math.floor(rnd() * a.length)];
   const scale = { EUR: 1, USD: 1.1, GBP: 0.85, CAD: 1.5, INR: 90, BRL: 6, THB: 38, NGN: 1700 };
-  const games = ['Gates of Olympus', 'Sweet Bonanza', 'Book of Dead', 'European Roulette', 'Aviator', 'Live Blackjack'];
+  const games = DEMO_GAME_CATALOG.map(game => game.name);
   const now = Date.parse('2026-10-12T17:00:00');
   const wallets = [], txs = [];
   [0, 1].flatMap(ci => PLAYERS.map((pl, pi) => ({ pl, pi, ci }))).forEach(({ pl, pi, ci }) => {

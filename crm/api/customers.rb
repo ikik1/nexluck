@@ -15,6 +15,9 @@ CUSTOMER_OBJECTS = %w[luna.play max_rider k.novak sofia88 jhon_d anita.s tigerki
     'updated_at' => '2026-10-01T12:00:00Z', 'risk_score' => (i * 13 + 8) % 101,
     'kyc_status' => %w[NOT_STARTED PENDING VERIFIED REJECTED][i % 4], 'birthday' => "#{1985 + i}-05-12",
     'aml_status' => %w[CLEAR REVIEW BLOCKED][i % 3], 'info' => 'Demo customer profile.',
+    'gender' => %w[Female Male Non-binary Undisclosed][i % 4],
+    'devices' => [i.even? ? 'Desktop' : 'Mobile'].freeze,
+    'sessions_per_week' => 2 + i % 6, 'bonus_wr_rate' => 40 + i * 5,
     'funnel_status' => CUSTOMER_FUNNEL_STATUSES[i % 6],
     'activity' => {
       'last_login_at' => (Time.now.utc - (i + 1) * 86400).iso8601.freeze,
@@ -25,12 +28,13 @@ CUSTOMER_OBJECTS = %w[luna.play max_rider k.novak sofia88 jhon_d anita.s tigerki
 end.freeze
 
 class CustomerStore
-  FIELDS = %w[external_id name DocumentINo country currency lang addr1 addr12 mfa_type risk_score kyc_status birthday aml_status info funnel_status].freeze
+  FIELDS = %w[external_id name DocumentINo country currency lang addr1 addr12 mfa_type risk_score kyc_status birthday aml_status info funnel_status gender].freeze
   OPTIONS = {
     'mfa_type' => %w[NONE TOTP SMS EMAIL],
     'kyc_status' => %w[NOT_STARTED PENDING VERIFIED REJECTED],
     'aml_status' => %w[CLEAR REVIEW BLOCKED],
-    'funnel_status' => CUSTOMER_FUNNEL_STATUSES
+    'funnel_status' => CUSTOMER_FUNNEL_STATUSES,
+    'gender' => %w[Female Male Non-binary Undisclosed]
   }.freeze
   COUNTRIES = %w[CA US BR MX AR CL PE DE FR ES IT NL PL SE GB IE AT FI RU KZ UA UZ AZ AE SA TR EG MA NG ZA KE GH TH VN ID PH MY IN JP KR AU NZ BD].freeze
   CURRENCIES = %w[EUR USD GBP CAD INR BRL MXN TRY AED NGN KES ZAR THB VND IDR PHP JPY AUD RUB KZT USDT BTC].freeze
@@ -49,12 +53,37 @@ class CustomerStore
     # Upgrade existing profiles without overwriting saved fields or timestamps.
     defaults = seed
     @profiles = @profiles.map do |id, profile|
-      additions = defaults.fetch(id).select { |key, _| %w[funnel_status activity risk_indicators].include?(key) }
+      additions = defaults.fetch(id).select { |key, _| %w[funnel_status activity risk_indicators gender devices sessions_per_week bonus_wr_rate].include?(key) }
       [id, additions.merge(profile)]
     end.to_h
     @credentials = load_file('credentials.json') || {}
     write_file('profiles.json', @profiles)
     write_file('credentials.json', @credentials)
+    @segments = load_file('segments.json') || CustomerSegments::SEEDS.map { |s| [s['id'], s] }.to_h
+    write_file('segments.json', @segments)
+  end
+
+  def segments
+    @segments.values.sort_by { |s| s['id'] }
+  end
+
+  def segment(id)
+    @segments[id]
+  end
+
+  def save_segment(id, body)
+    clean, errors = CustomerSegments.validate(body)
+    if clean && @segments.values.any? { |s| s['id'] != id && s['name'].downcase == clean['name'].downcase }
+      errors['name'] = 'Segment name is already in use'
+    end
+    return [nil, errors] unless errors.empty?
+    id ||= "SG-#{(@segments.keys.map { |key| key.delete_prefix('SG-').to_i }.max || 1000) + 1}"
+    now = Time.now.utc.iso8601
+    saved = clean.merge('id' => id, 'created_at' => @segments.dig(id, 'created_at') || now, 'updated_at' => now)
+    updated = @segments.merge(id => saved)
+    write_file('segments.json', updated)
+    @segments = updated
+    [saved, {}]
   end
 
   def list
@@ -137,3 +166,5 @@ class CustomerStore
     CUSTOMER_OBJECTS.map { |customer| [customer['id'], customer.dup] }.to_h
   end
 end
+
+require_relative 'segments'
