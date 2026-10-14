@@ -26,11 +26,11 @@ main{max-width:1500px}
 .count,.hint{font-size:12px;color:var(--muted);margin:8px 0}
 .empty{padding:24px;text-align:center;color:var(--muted)}
 .pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:14px;font-size:13px}
-.customer-sat{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) minmax(0,1fr);grid-template-areas:"risk center wallets" "gaming center bonus" "loyalty loyalty loyalty";gap:16px;margin-top:16px;align-items:start}
-.customer-card{min-width:0;background:#fff;border:1px solid var(--line);border-top:4px solid var(--c,var(--brand));border-radius:10px;padding:16px}
-.customer-card h2{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px;color:var(--c,var(--brand));margin-bottom:14px}
-.customer-center{grid-area:center;align-self:stretch;border-top-width:6px;box-shadow:0 6px 24px #0b5cab26;text-align:center;padding:24px 18px}
-.customer-center h2{display:block;font-size:18px;overflow-wrap:anywhere;margin:12px 0 6px}
+.customer-sat{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr) minmax(0,1fr);grid-template-areas:"risk center wallets" "gaming center bonus" "loyalty loyalty loyalty";gap:16px;margin-top:16px;align-items:stretch;padding:8px 0 24px}
+.customer-card{min-width:0;background:#fff;border:1px solid var(--line);border-top:4px solid var(--c,var(--brand));border-radius:10px;padding:14px 16px}
+.customer-card h2{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--c,var(--brand));margin-bottom:10px}
+.customer-center{grid-area:center;align-self:stretch;border-top-width:6px;box-shadow:0 6px 24px #0b5cab26;text-align:center;padding:18px 20px}
+.customer-center h2{display:block;font-size:15px;overflow-wrap:anywhere;margin:12px 0 6px}
 .avatar{display:grid;place-items:center;width:72px;height:72px;border-radius:50%;background:#eaf1fb;color:var(--brand);font-size:28px;font-weight:700;margin:0 auto}
 .customer-id{font-size:12px;color:var(--muted);margin-bottom:16px}
 .customer-identity{display:grid;grid-template-columns:minmax(0,1fr) 72px auto;align-items:start;gap:12px}
@@ -90,7 +90,7 @@ main{max-width:1500px}
 .profile-segment-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:10px}
 .profile-segment-actions .btn{white-space:normal}
 .parameter-days{max-width:220px}
-.parameter-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:16px 0}
+.parameter-groups{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin:16px 0}
 .parameter-group{min-width:0;border:1px solid var(--line);border-radius:8px;padding:14px}
 .parameter-group h3{font-size:14px;color:var(--brand);margin-bottom:14px}
 .parameter-group dl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;font-size:12px}
@@ -98,7 +98,6 @@ main{max-width:1500px}
 .parameter-group dt{color:var(--muted)}
 .parameter-group dt small{display:block;font-size:10px;margin-top:4px;line-height:1.4}
 .parameter-group dd div+div{margin-top:4px}
-@media(max-width:600px){.parameter-groups{grid-template-columns:minmax(0,1fr)}}
 .segment-overlay{position:fixed;inset:0;background:#0006;display:grid;place-items:center;padding:16px;z-index:110}
 .segment-overlay .segment-overlay{z-index:120}
 .segment-overlay .segment-overlay .segment-overlay{z-index:130}

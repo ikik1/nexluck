@@ -184,6 +184,60 @@ async def check_browser(base):
         await edit.get_by_role("button", name="Save segment", exact=True).click()
         await library.get_by_role("button", name="Done", exact=True).click()
         await page.get_by_role("link", name="max_rider", exact=True).click()
+        await page.locator(".customer-center h2").wait_for()
+        for width in [1440, 1000, 600, 414, 320]:
+            await page.set_viewport_size({"width": width, "height": 896})
+            await page.evaluate("""() => {
+              const grid = document.querySelector('.customer-sat');
+              const cards = [...grid.children];
+              const rects = Object.fromEntries(cards.map(card => [
+                getComputedStyle(card).gridArea.split(' / ')[0], card.getBoundingClientRect()
+              ]));
+              const near = (a,b) => {
+                if(Math.abs(a-b) > 1) throw Error(`Tile alignment: ${a} != ${b}`);
+              };
+              const gap = (a,b) => near(a,b+16);
+              if(cards.length !== 6) throw Error('Missing customer tiles');
+              if(document.documentElement.scrollWidth > innerWidth) throw Error('Profile overflow');
+              if(getComputedStyle(grid).gap !== '16px') throw Error('Unequal tile gaps');
+              for(const card of cards) {
+                const style = getComputedStyle(card);
+                if(style.borderRadius !== '10px' ||
+                   getComputedStyle(card.querySelector('h2')).textTransform !== 'uppercase')
+                  throw Error('Customer tile style differs from bonus editor');
+              }
+              if(innerWidth > 1050) {
+                near(rects.risk.top,rects.wallets.top);
+                near(rects.risk.bottom,rects.wallets.bottom);
+                near(rects.gaming.top,rects.bonus.top);
+                near(rects.gaming.bottom,rects.bonus.bottom);
+                near(rects.center.top,rects.risk.top);
+                near(rects.center.bottom,rects.gaming.bottom);
+                gap(rects.center.left,rects.risk.right);
+                gap(rects.wallets.left,rects.center.right);
+                gap(rects.gaming.top,rects.risk.bottom);
+                gap(rects.bonus.top,rects.wallets.bottom);
+                gap(rects.loyalty.top,rects.center.bottom);
+              } else if(innerWidth > 600) {
+                near(rects.risk.top,rects.wallets.top);
+                near(rects.risk.bottom,rects.wallets.bottom);
+                near(rects.gaming.top,rects.bonus.top);
+                near(rects.gaming.bottom,rects.bonus.bottom);
+                gap(rects.risk.top,rects.center.bottom);
+                gap(rects.wallets.left,rects.risk.right);
+                gap(rects.gaming.top,rects.risk.bottom);
+                gap(rects.bonus.top,rects.wallets.bottom);
+                gap(rects.loyalty.top,rects.gaming.bottom);
+              } else {
+                const ordered = ['center','risk','wallets','gaming','bonus','loyalty'];
+                for(let i=1;i<ordered.length;i++) {
+                  gap(rects[ordered[i]].top,rects[ordered[i-1]].bottom);
+                  near(rects[ordered[i]].left,rects.center.left);
+                  near(rects[ordered[i]].right,rects.center.right);
+                }
+              }
+            }""")
+        await page.set_viewport_size({"width": 1440, "height": 1000})
         await page.get_by_role("button", name="View customer segments", exact=True).click()
         profile = page.get_by_role("dialog", name="max_rider segments", exact=True)
         await profile.locator(".segment-tag").filter(has_text="DE_SE_TEST").wait_for()
@@ -216,6 +270,16 @@ async def check_browser(base):
         for width in [320, 414, 1440]:
             await page.set_viewport_size({"width": width, "height": 896})
             assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            await values.evaluate("""dialog => {
+              const groups = [...dialog.querySelectorAll('.parameter-group')];
+              const rects = groups.map(group => group.getBoundingClientRect());
+              for(let i=1;i<rects.length;i++) {
+                if(Math.abs(rects[i].left-rects[0].left)>1 ||
+                   Math.abs(rects[i].width-rects[0].width)>1 ||
+                   Math.abs(rects[i].top-rects[i-1].bottom-16)>1)
+                  throw Error('Parameter groups must form one evenly spaced vertical list');
+              }
+            }""")
         await page.keyboard.press("Escape")
         assert await values.count() == 0
         await page.get_by_role("button", name="View customer segments", exact=True).click()

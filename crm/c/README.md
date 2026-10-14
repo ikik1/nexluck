@@ -1,8 +1,11 @@
 # Customers
 
 - `/crm/c/list/`: searchable customer list, with country, KYC and AML filters.
-- `/crm/c/i/?id=CU-1001`: center customer tile and Customer info, Wallets,
+- `/crm/c/i/?id=CU-1001`: center customer tile and Risk indicators, Wallets,
   Gaming, Bonus activity and Loyalty points satellites.
+- Profile tiles match the bonus editor's borders, padding and uppercase headings.
+  Tiles stretch to aligned row edges with consistent 16px horizontal and vertical
+  gaps; the tablet layout uses two columns and mobile stacks all tiles.
 - The Customers tile and CRM navigation both open the customer list.
 - The center profile contains all distinct customer fields and the Edit button;
   there is no duplicate Customer info satellite. Creation/update timestamps sit
@@ -108,7 +111,8 @@ using AND. Row tags and the profile's View customer segments widget use the
 same current rule evaluation. Profile widgets show matching segments only.
 New/edited rules update membership immediately; tags are not manual assignments.
 The profile's View segment parameters button displays all current rule
-parameters and values in the same catalog groups. Monetary values are shown
+parameters and values in one vertical list, preserving the catalog group headings
+at every screen width. Monetary values are shown
 separately for each wallet currency. Net cash flow days is adjustable in the
 viewer; this only changes the displayed window, not saved segment rules.
 
