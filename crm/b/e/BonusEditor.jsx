@@ -840,7 +840,7 @@ function Editor() {
         selected={get(form, modal.path) || []} extraNames={[...(modal.path === 'availability.includeSegments' ? INCLUDE : EXCLUDE), ...(get(form, modal.path) || [])]}
         onClose={() => setModal(null)} onSelect={({ name }) => {
           const values = get(form, modal.path) || [];
-          if (!values.includes(name)) set(modal.path, [...values, name]);
+          set(modal.path, values.includes(name) ? values.filter(value => value !== name) : [...values, name]);
         }} />}
       {modal && modal.t === 'cat' && <CategoryModal value={form.category} onPick={(c) => set('category', c)} onClose={() => setModal(null)} />}
       {modal && modal.t === 'promo' && <PromoModal initial={banner} segments={form.availability.includeSegments || []} onClose={() => setModal(null)} onSave={async (b) => {

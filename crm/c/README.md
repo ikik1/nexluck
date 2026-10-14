@@ -115,14 +115,15 @@ shared Segments popup from the customer list, including New/Edit rule actions.
 The reusable control and its API helper live in `Segments.jsx`, with scoped
 styles in `segments.css`; it needs no customer-page components in selection mode.
 Rows highlight on hover/focus and selected rows have an accent indicator.
-Double-click a list entry to add it;
+Double-click a list entry to toggle it selected/unselected; selection is
+indicated by the row highlight, without a separate "Selected" label.
 double-click an Availability tag to remove it. Keyboard users can add with
 Enter/Space and remove with Delete/Backspace. Selections are saved with the
 bonus, not when closing the picker. Both lists offer saved customer segments
 alongside their existing legacy options. Bonus API selections remain name
 strings for compatibility; a renamed segment's previous name remains valid
 on bonuses already using it, without silently replacing that selection.
-Payment connection New/Edit dialogs use the same Segments popup and double-click
+Payment connection New/Edit dialogs use the same toggling Segments popup and double-click
 tag removal, preserving legacy Finance segments. Apply selections with Save
 connection; Cancel discards them. Payment connections retain their existing
 in-memory demo storage (not server persistence).

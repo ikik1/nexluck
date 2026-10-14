@@ -140,7 +140,10 @@ async def check_browser(base):
         vip_row = library.get_by_label("Select segment VIP", exact=True)
         await vip_row.locator(".segment-tag").dblclick()
         assert await vip_row.get_by_role("checkbox").is_checked()
-        await vip_row.get_by_role("checkbox").uncheck()
+        assert "selected" in (await vip_row.get_attribute("class")).split()
+        await vip_row.locator(".segment-tag").dblclick()
+        assert not await vip_row.get_by_role("checkbox").is_checked()
+        assert "selected" not in (await vip_row.get_attribute("class")).split()
         await library.get_by_role("button", name="Edit segment API_EDITED", exact=True).click()
         api_editor = page.get_by_role("dialog", name="Edit segment", exact=True)
         await api_editor.get_by_role("button", name="+ Add rule", exact=True).click()
@@ -313,6 +316,10 @@ async def check_browser(base):
             await option.hover()
             assert await option.evaluate("row => getComputedStyle(row).outlineStyle") == "solid"
             await option.dblclick()
+            assert "selected" in (await option.get_attribute("class")).split()
+            assert await option.get_by_text("Selected", exact=True).count() == 0
+            await option.dblclick()
+            assert "selected" not in (await option.get_attribute("class")).split()
             await option.dblclick()
             assert "selected" in (await option.get_attribute("class")).split()
             await picker.get_by_role("button", name="Edit segment RENAMED_SEGMENT", exact=True).click()
@@ -368,6 +375,10 @@ async def check_browser(base):
         await row.hover()
         assert await row.evaluate("r => getComputedStyle(r).outlineStyle") == "solid"
         await row.dblclick()
+        assert "selected" in (await row.get_attribute("class")).split()
+        assert await row.get_by_text("Selected", exact=True).count() == 0
+        await row.dblclick()
+        assert "selected" not in (await row.get_attribute("class")).split()
         await row.dblclick()
         assert "selected" in (await row.get_attribute("class")).split()
         await picker.get_by_role("button", name="Edit segment BONUS_SHARED_SEGMENT", exact=True).click()

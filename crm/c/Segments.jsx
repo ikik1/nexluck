@@ -343,7 +343,7 @@ function SegmentWidget({ state, customers = null, customer = null, selected = []
     <div className="segment-widget-tools"><label className="field">Search segments<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label><button type="button" className="btn pri" disabled={state.loading || Boolean(state.error)} onClick={() => setEditor({ segment: null })}>+ New segment</button></div>
     {state.loading && <p role="status" className="hint">Loading segments...</p>}
     {state.error && <p role="alert" className="error">{state.error} <button type="button" className="btn" onClick={state.load}>Retry</button></p>}
-    {onSelect && <p className="hint">Double-click a row to select it. Keyboard: focus a row and press Enter or Space. Selections are saved with the {selectionOwner}.</p>}
+    {onSelect && <p className="hint">Double-click a row to toggle selection. Keyboard: focus a row and press Enter or Space. Selections are saved with the {selectionOwner}.</p>}
     {customer && <p className="hint">Only segments currently matching this customer are shown. Membership is calculated, not manually assigned.</p>}
     <div className="segment-library">{!state.loading && !state.error && shown.map(segment => <div className={'segment-library-item' + (isSelected(segment) ? ' selected' : '')} key={segment.id}
       tabIndex={onSelect || onToggle ? 0 : undefined} aria-label={'Select segment ' + segment.name}
@@ -352,7 +352,6 @@ function SegmentWidget({ state, customers = null, customer = null, selected = []
       <div>{onToggle ? <label className="segment-choice"><input type="checkbox" checked={selected.includes(segment.id)} onChange={() => onToggle(segment.id)} /><SegmentTags segments={[segment]} /></label> : <SegmentTags segments={[segment]} />}
         {segment.rules ? <p className="segment-preview">{segmentRuleText(segment.rules, state.parameters)}</p> : <p className="segment-preview">Existing {selectionOwner} segment</p>}
         {segment.members && <p className="hint">{segment.members.length} matching {segment.members.length === 1 ? 'customer' : 'customers'}</p>}
-        {onSelect && isSelected(segment) && <p className="hint">Selected</p>}
       </div>
       {segment.rules && <button type="button" className="btn" onClick={() => setEditor({ segment })} aria-label={'Edit segment ' + segment.name}>Edit</button>}
     </div>)}</div>

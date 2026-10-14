@@ -310,7 +310,7 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
         {showSegments && <SegmentWidget state={segmentState} selected={data.segments}
           extraNames={[...ALL_SEGMENTS, ...data.segments]} selectionOwner="payment connection"
           onClose={() => setShowSegments(false)} onSelect={({ name }) =>
-            setData(d => d.segments.includes(name) ? d : { ...d, segments: [...d.segments, name] })} />}
+            setData(d => ({ ...d, segments: d.segments.includes(name) ? d.segments.filter(value => value !== name) : [...d.segments, name] }))} />}
       </div>
     </div>
   );
