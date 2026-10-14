@@ -989,10 +989,12 @@ components:
         endTime: { type: string, example: "2026-12-31T23:59", description: "Must be after startTime" }
         includeSegments:
           type: array
-          items: { type: string, enum: [registered, no_deposit, kyc_verified] }
+          description: "Customer segment names from GET /segments, or legacy registered, no_deposit, kyc_verified. Existing selections remain valid if a segment is renamed."
+          items: { type: string }
         excludeSegments:
           type: array
-          items: { type: string, enum: [restricted_countries, restricted_currencies] }
+          description: "Customer segment names from GET /segments, or legacy restricted_countries, restricted_currencies. Existing selections remain valid if a segment is renamed."
+          items: { type: string }
     Triggers:
       type: object
       properties:

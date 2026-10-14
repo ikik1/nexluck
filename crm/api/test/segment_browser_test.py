@@ -137,6 +137,10 @@ async def check_browser(base):
 
         await page.get_by_role("button", name="Segments", exact=True).click()
         library = page.get_by_role("dialog", name="Segments", exact=True)
+        vip_row = library.get_by_label("Select segment VIP", exact=True)
+        await vip_row.locator(".segment-tag").dblclick()
+        assert await vip_row.get_by_role("checkbox").is_checked()
+        await vip_row.get_by_role("checkbox").uncheck()
         await library.get_by_role("button", name="Edit segment API_EDITED", exact=True).click()
         api_editor = page.get_by_role("dialog", name="Edit segment", exact=True)
         await api_editor.get_by_role("button", name="+ Add rule", exact=True).click()
@@ -295,6 +299,110 @@ async def check_browser(base):
         assert await edit.count() == 0 and await profile.count() == 1
         await page.keyboard.press("Escape")
         assert await profile.count() == 0
+        await page.set_viewport_size({"width": 1440, "height": 1000})
+        await page.goto(base + "/crm/b/e/?id=BN-1001")
+        await page.get_by_role("button", name="Edit include segments", exact=True).wait_for()
+        for kind in ["include", "exclude"]:
+            await page.get_by_role("button", name="Edit " + kind + " segments", exact=True).click()
+            picker = page.get_by_role("dialog", name="Segments", exact=True)
+            await picker.get_by_role("searchbox").fill("RENAMED_SEGMENT")
+            option = picker.locator(".segment-library-item").filter(has_text="RENAMED_SEGMENT")
+            await option.wait_for()
+            await option.click()
+            assert "selected" not in (await option.get_attribute("class")).split()
+            await option.hover()
+            assert await option.evaluate("row => getComputedStyle(row).outlineStyle") == "solid"
+            await option.dblclick()
+            await option.dblclick()
+            assert "selected" in (await option.get_attribute("class")).split()
+            await picker.get_by_role("button", name="Edit segment RENAMED_SEGMENT", exact=True).click()
+            await page.get_by_role("dialog", name="Edit segment", exact=True).wait_for()
+            await page.keyboard.press("Escape")
+            assert await picker.count() == 1
+            for width in [320, 414, 1440]:
+                await page.set_viewport_size({"width": width, "height": 896})
+                assert await picker.evaluate("dialog => dialog.getBoundingClientRect().right <= innerWidth && dialog.scrollWidth <= dialog.clientWidth")
+            await picker.get_by_role("button", name="Done", exact=True).click()
+            tag = page.get_by_role("button", name="Remove RENAMED_SEGMENT from " + kind + " segments", exact=True)
+            assert await tag.count() == 1
+            await tag.click()
+            assert await tag.count() == 1
+        await page.get_by_role("button", name="Save changes", exact=True).click()
+        await page.get_by_text("Saved", exact=True).wait_for()
+        await page.reload()
+        for kind in ["include", "exclude"]:
+            tag = page.get_by_role("button", name="Remove RENAMED_SEGMENT from " + kind + " segments", exact=True)
+            await tag.wait_for()
+            await tag.dblclick()
+            assert await tag.count() == 0
+        await page.get_by_role("button", name="Save changes", exact=True).click()
+        await page.get_by_text("Saved", exact=True).wait_for()
+        await page.reload()
+        await page.get_by_role("button", name="Edit include segments", exact=True).wait_for()
+        assert await page.get_by_role("button", name="Remove RENAMED_SEGMENT from include segments", exact=True).count() == 0
+        await page.get_by_role("button", name="Edit include segments", exact=True).click()
+        picker = page.get_by_role("dialog", name="Segments", exact=True)
+        await picker.get_by_role("searchbox").fill("VIP")
+        await picker.get_by_label("Select segment VIP", exact=True).press("Enter")
+        await picker.get_by_role("button", name="+ New segment", exact=True).click()
+        new_editor = page.get_by_role("dialog", name="New segment", exact=True)
+        await new_editor.get_by_label("Segmentation parameter", exact=True).select_option("risk_bonus_abuse")
+        await new_editor.get_by_label("Segment name", exact=True).fill("BONUS_SHARED_SEGMENT")
+        await new_editor.get_by_role("button", name="Save segment", exact=True).click()
+        await picker.get_by_role("searchbox").fill("BONUS_SHARED_SEGMENT")
+        await picker.get_by_label("Select segment BONUS_SHARED_SEGMENT", exact=True).dblclick()
+        await page.keyboard.press("Escape")
+        await page.get_by_role("button", name="Remove VIP from include segments", exact=True).press("Delete")
+        assert await page.get_by_role("button", name="Remove VIP from include segments", exact=True).count() == 0
+        assert await page.get_by_role("button", name="Remove BONUS_SHARED_SEGMENT from include segments", exact=True).count() == 1
+        await page.goto(base + "/crm/f/")
+        await page.get_by_role("button", name="+ New connection", exact=True).click()
+        connection = page.get_by_role("dialog", name="New payment connection", exact=True)
+        await connection.get_by_label("Connection name", exact=True).fill("Shared segment connection")
+        await connection.get_by_role("button", name="Edit connection segments", exact=True).click()
+        picker = page.get_by_role("dialog", name="Segments", exact=True)
+        await picker.get_by_role("searchbox").fill("BONUS_SHARED_SEGMENT")
+        row = picker.get_by_label("Select segment BONUS_SHARED_SEGMENT", exact=True)
+        await row.click()
+        assert "selected" not in (await row.get_attribute("class")).split()
+        await row.hover()
+        assert await row.evaluate("r => getComputedStyle(r).outlineStyle") == "solid"
+        await row.dblclick()
+        await row.dblclick()
+        assert "selected" in (await row.get_attribute("class")).split()
+        await picker.get_by_role("button", name="Edit segment BONUS_SHARED_SEGMENT", exact=True).click()
+        await page.get_by_role("dialog", name="Edit segment", exact=True).wait_for()
+        await page.keyboard.press("Escape")
+        assert await picker.count() == 1 and await connection.count() == 1
+        for width in [320, 414, 1440]:
+            await page.set_viewport_size({"width": width, "height": 896})
+            assert await picker.evaluate("d => d.getBoundingClientRect().right <= innerWidth && d.scrollWidth <= d.clientWidth")
+        await page.keyboard.press("Escape")
+        assert await picker.count() == 0 and await connection.count() == 1
+        assert await connection.get_by_role("button", name="Remove segment BONUS_SHARED_SEGMENT", exact=True).count() == 1
+        await connection.get_by_role("button", name="Save connection", exact=True).click()
+        connectivity = page.get_by_role("button", name="Shared segment connection connectivity:", exact=False)
+        await connectivity.click()
+        connection = page.get_by_role("dialog", name="Edit payment connection", exact=True)
+        tag = connection.get_by_role("button", name="Remove segment BONUS_SHARED_SEGMENT", exact=True)
+        await tag.click()
+        assert await tag.count() == 1
+        await tag.dblclick()
+        assert await tag.count() == 0
+        await connection.get_by_role("button", name="Cancel", exact=True).click()
+        await connectivity.click()
+        assert await tag.count() == 1
+        await tag.press("Delete")
+        await connection.get_by_role("button", name="Save connection", exact=True).click()
+        await connectivity.click()
+        assert await tag.count() == 0
+        await connection.get_by_role("button", name="Edit connection segments", exact=True).click()
+        await picker.get_by_role("searchbox").fill("VIP")
+        await picker.get_by_label("Select segment VIP", exact=True).press("Enter")
+        await page.keyboard.press("Escape")
+        assert await connection.get_by_role("button", name="Remove segment VIP", exact=True).count() == 1
+        await connection.get_by_role("button", name="Save connection", exact=True).click()
+        assert await page.locator("tbody tr").filter(has_text="Shared segment connection").locator(".tag").filter(has_text="VIP").count() == 1
         assert not errors, errors
         await browser.close()
         print("Segment editor, search pickers, tags, filtering, nested rules, profile membership, gender and mobile passed")
@@ -324,6 +432,22 @@ def main():
             assert request(base, "/crm/api/v1/segments/" + saved["id"], "PATCH",
                            dict(body, name="API_EDITED"), write)[0] == 200
             assert request(base, "/crm/ui-api/v1/segments", "POST", dict(body, name="api_edited"))[0] == 422
+            bonus_path = "/crm/ui-api/v1/bonuses/BN-1002"
+            assert request(base, bonus_path, "PATCH", {"availability": {"includeSegments": ["API_EDITED"], "excludeSegments": ["VIP"]}})[0] == 200
+            assert request(base, bonus_path, "PATCH", {"availability": {"includeSegments": ["DOES_NOT_EXIST"]}})[0] == 422
+            assert request(base, "/crm/ui-api/v1/segments/" + saved["id"], "PATCH", dict(body, name="API_RENAMED"))[0] == 200
+            assert request(base, bonus_path, "PATCH", {"description": "Keep previously selected segment names"})[0] == 200
+            assert request(base, bonus_path)[1]["availability"]["includeSegments"] == ["API_EDITED"]
+            assert request(base, "/crm/ui-api/v1/bonuses/BN-1003", "PATCH", {"availability": {"includeSegments": ["API_EDITED"]}})[0] == 422
+            assert request(base, "/crm/ui-api/v1/segments/" + saved["id"], "PATCH", dict(body, name="API_EDITED"))[0] == 200
+            new_bonus = request(base, "/crm/ui-api/v1/bonuses/BN-1004")[1]
+            new_bonus["name"] = "Segment selection test bonus"
+            new_bonus["availability"]["includeSegments"] = ["API_EDITED"]
+            new_bonus["availability"]["excludeSegments"] = ["VIP"]
+            status, created = request(base, "/crm/ui-api/v1/bonuses", "POST", new_bonus)
+            assert status == 201
+            assert created["availability"]["includeSegments"] == ["API_EDITED"]
+            assert created["availability"]["excludeSegments"] == ["VIP"]
             asyncio.run(check_browser(base))
         finally:
             server.terminate()

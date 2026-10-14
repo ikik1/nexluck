@@ -1,0 +1,40 @@
+.segment-overlay{position:fixed;inset:0;background:#0006;display:grid;place-items:center;padding:16px;z-index:110}
+.segment-overlay .segment-overlay{z-index:120}
+.segment-overlay .segment-overlay .segment-overlay{z-index:130}
+.segment-dialog{width:min(640px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:10px;padding:20px;box-shadow:0 10px 40px #0005}
+.segment-dialog.wide{width:min(1120px,100%)}
+.segment-dialog h2{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:18px;margin-bottom:16px}
+.segment-dialog .field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;font-size:12px;font-weight:600;color:var(--muted)}
+.segment-dialog .field input,.segment-dialog .field select{width:100%;min-width:0;border:1px solid var(--line);border-radius:6px;background:#fff;padding:8px 10px;font-size:14px;font-family:inherit;color:var(--text)}
+.segment-dialog .field input:focus,.segment-dialog .field select:focus{outline:2px solid #0b5cab55;border-color:var(--brand)}
+.segment-dialog .hint{display:block;width:auto;height:auto;border:0;border-radius:0;background:none;font-size:12px;font-weight:400;color:var(--muted);margin:8px 0;cursor:default}
+.segment-dialog .error{color:var(--red);font-size:13px}
+.segment-dialog .notice{padding:10px 12px;border-radius:6px;background:#eef5fc;color:var(--brand);font-size:12px;margin:12px 0}
+.segment-dialog .customer-actions{display:flex;justify-content:flex-end;gap:12px;padding-top:12px;border-top:1px solid var(--line)}
+.segment-dialog .segment-tags{display:flex;flex-wrap:wrap;gap:6px}
+.segment-dialog .segment-tag{display:inline-flex;align-items:center;gap:6px;max-width:100%;overflow-wrap:anywhere;border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700;background:#fff3d6;color:#8a5a00;border:1px solid #f5b942;text-transform:uppercase}
+.segment-widget-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.segment-widget-tools .field{flex:1;min-width:180px}
+.segment-library{display:flex;flex-direction:column;gap:12px;margin:16px 0}
+.segment-library-item{display:flex;align-items:start;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:8px;padding:12px}
+.segment-library-item>div{min-width:0;flex:1}
+.segment-library-item:hover,.segment-library-item:focus-visible{background:#eef5fc;border-color:var(--brand);outline:2px solid #0b5cab44;outline-offset:1px}
+.segment-library-item.selected{border-color:#f5b942;box-shadow:inset 4px 0 #f5b942}
+.segment-library-item[tabindex]{cursor:pointer}
+.segment-preview{font-size:12px;color:var(--muted);overflow-wrap:anywhere;margin:10px 0}
+.segment-options{display:flex;flex-wrap:wrap;gap:8px;max-height:45vh;overflow:auto;margin:16px 0}
+.segment-choice{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;max-width:100%}
+.segment-choice.on{background:#eef5fc;border-color:var(--brand)}
+.segment-rule-group{min-width:0;border:1px solid #9bbde6;border-radius:8px;padding:12px;margin:12px 0;background:#f7fbff}
+.segment-rule-group legend,.segment-rule legend{font-size:12px;font-weight:700;color:var(--brand);padding:0 6px}
+.segment-rule-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.segment-dialog .segment-rule-toolbar .field{margin:0;min-width:120px}
+.segment-not,.segment-boolean{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
+.segment-rule{min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:12px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:12px;margin:10px 0}
+.segment-dialog .segment-rule .field{min-width:100px;flex:1;margin:0}
+.segment-rule .field:has(select[aria-label="Segmentation parameter"]){flex:2;min-width:190px}
+.segment-rule .field select,.segment-rule .field input{width:100%}
+.segment-value{justify-content:space-between;width:100%;white-space:normal;text-align:left;min-height:36px}
+.segment-rule-hint{flex-basis:100%;margin:0}
+.segment-join{font-size:11px;font-weight:700;color:var(--brand);padding-left:12px}
+@media(max-width:600px){.segment-overlay{padding:8px}.segment-dialog{padding:14px}.segment-rule-group{padding:8px}.segment-dialog .segment-rule .field{flex-basis:100%;min-width:0!important}.segment-library-item{flex-wrap:wrap}.segment-library-item>div{flex-basis:100%}}

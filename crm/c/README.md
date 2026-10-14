@@ -110,6 +110,22 @@ buttons. Selected segments filter with OR and combine with existing filters
 using AND. Row tags and the profile's View customer segments widget use the
 same current rule evaluation. Profile widgets show matching segments only.
 New/edited rules update membership immediately; tags are not manual assignments.
+Bonus Availability uses `...` buttons for Include/Exclude segments to open a
+shared Segments popup from the customer list, including New/Edit rule actions.
+The reusable control and its API helper live in `Segments.jsx`, with scoped
+styles in `segments.css`; it needs no customer-page components in selection mode.
+Rows highlight on hover/focus and selected rows have an accent indicator.
+Double-click a list entry to add it;
+double-click an Availability tag to remove it. Keyboard users can add with
+Enter/Space and remove with Delete/Backspace. Selections are saved with the
+bonus, not when closing the picker. Both lists offer saved customer segments
+alongside their existing legacy options. Bonus API selections remain name
+strings for compatibility; a renamed segment's previous name remains valid
+on bonuses already using it, without silently replacing that selection.
+Payment connection New/Edit dialogs use the same Segments popup and double-click
+tag removal, preserving legacy Finance segments. Apply selections with Save
+connection; Cancel discards them. Payment connections retain their existing
+in-memory demo storage (not server persistence).
 The profile's View segment parameters button displays all current rule
 parameters and values in one vertical list, preserving the catalog group headings
 at every screen width. Monetary values are shown

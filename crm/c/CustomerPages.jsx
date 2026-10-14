@@ -34,20 +34,6 @@ async function customerRequest(path = '', options = {}) {
   return apiRequest(CUSTOMER_API + path, options);
 }
 
-async function apiRequest(url, options = {}) {
-  const response = await fetch(url, options);
-  if (!response.headers.get('Content-Type')?.includes('application/json')) {
-    throw new Error(`CRM API unavailable (HTTP ${response.status}). Start or update the CRM API server.`);
-  }
-  const body = await response.json();
-  if (!response.ok) {
-    const error = new Error(body.error || `Request failed (${response.status})`);
-    error.fields = body.fields || {};
-    throw error;
-  }
-  return body;
-}
-
 function CustomerStatus({ value }) {
   if (['NOT_STARTED', 'CLEAR'].includes(value)) return <span className="hint" aria-label="No alert">—</span>;
   const tone = ['VERIFIED', 'CLEAR'].includes(value) ? 'good' : ['REJECTED', 'BLOCKED'].includes(value) ? 'bad' : 'warn';

@@ -335,7 +335,7 @@ rescue ArgumentError
 end
 
 # Returns [cleaned_hash, errors]; errors maps a dotted field path to a message.
-def validate_bonus(m)
+def validate_bonus(m, existing = {})
   err = {}
   h = ->(v) { v.is_a?(Hash) ? v : {} }
   num = lambda do |path, v, min, max, int|
@@ -406,14 +406,16 @@ def validate_bonus(m)
     mba = num.('reward.maxBonusAmount', rw['maxBonusAmount'], 0, 1_000_000, false)
   end
 
+  segment_names = CUSTOMER_STORE.segments.map { |segment| segment['name'] }
+  old_availability = h.(existing['availability'])
   out = {
     'name' => name, 'description' => desc,
     'status' => enum.('status', m['status'], %w[active inactive]),
     'bonusType' => enum.('bonusType', m['bonusType'], BONUS_TYPES),
     'category' => enum.('category', m['category'], CATEGORIES),
     'availability' => { 'startTime' => av['startTime'], 'endTime' => av['endTime'],
-                        'includeSegments' => subset.('availability.includeSegments', av['includeSegments'], INCLUDE_SEGMENTS),
-                        'excludeSegments' => subset.('availability.excludeSegments', av['excludeSegments'], EXCLUDE_SEGMENTS) },
+                        'includeSegments' => subset.('availability.includeSegments', av['includeSegments'], INCLUDE_SEGMENTS + segment_names + (old_availability['includeSegments'] || [])),
+                        'excludeSegments' => subset.('availability.excludeSegments', av['excludeSegments'], EXCLUDE_SEGMENTS + segment_names + (old_availability['excludeSegments'] || [])) },
     'triggers' => { 'event' => enum.('triggers.event', tr['event'], TRIGGER_EVENTS), 'minDeposit' => min_dep, 'maxDeposit' => max_dep,
                     'depositNumber' => num.('triggers.depositNumber', tr['depositNumber'], 0, 1000, true),
                     'minDepositCount' => min_cnt, 'maxDepositCount' => max_cnt },
@@ -667,7 +669,7 @@ handler = lambda do |req, res, rest, secured|
       next json(res, 200, bonus) if m == 'GET'
       body = read_json(req, res)
       next unless body
-      clean, errors = validate_bonus(deep_merge(editable(bonus), body))
+      clean, errors = validate_bonus(deep_merge(editable(bonus), body), bonus)
       next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
       update_bonus(bonus, clean, actor)
       json(res, 200, bonus)

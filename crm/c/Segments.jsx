@@ -1,4 +1,17 @@
 const SEGMENT_API = '/crm/ui-api/v1/segments';
+async function apiRequest(url, options = {}) {
+  const response = await fetch(url, options);
+  if (!response.headers.get('Content-Type')?.includes('application/json')) {
+    throw new Error(`CRM API unavailable (HTTP ${response.status}). Start or update the CRM API server.`);
+  }
+  const body = await response.json();
+  if (!response.ok) {
+    const error = new Error(body.error || `Request failed (${response.status})`);
+    error.fields = body.fields || {};
+    throw error;
+  }
+  return body;
+}
 const SEGMENT_OPS = { list: ['IS', '=', '!='], boolean: ['IS', '=', '!='], number: ['IS', '<', '>', '!=', '=', '>=', '=<'], date: ['IS', '<', '>', '!=', '=', '>=', '=<'] };
 
 function segmentFacts(customer, now = Date.now()) {
@@ -286,7 +299,7 @@ function SegmentEditor({ segment, parameters, customers, onSave, onClose }) {
   const generated = segmentAutoName(rules).slice(0, 200);
   const currentName = manualName ? name : generated;
   const validation = segmentDraftError(rules, parameters);
-  const matching = validation ? null : customers.filter(customer => evaluateSegment(rules, segmentFacts(customer), parameters) === true);
+  const matching = validation || !customers ? null : customers.filter(customer => evaluateSegment(rules, segmentFacts(customer), parameters) === true);
   const save = async e => {
     e.preventDefault();
     if (validation) { setError(validation); return; }
@@ -306,7 +319,7 @@ function SegmentEditor({ segment, parameters, customers, onSave, onClose }) {
       <p className="notice">Membership is calculated from current demo customer and wallet data. Money rules use their selected currency. Missing data does not match, including under NOT.</p>
       <SegmentRuleNode node={rules} parameters={parameters} onChange={setRules} busy={busy} onPick={(parameter, initial, apply) => setPicker({ parameter, initial, apply })} />
       <p className="segment-preview">{segmentRuleText(rules, parameters)}</p>
-      <p role="status" className="hint">{validation || `${matching.length} of ${customers.length} customers match`}</p>
+      {(validation || matching) && <p role="status" className="hint">{validation || `${matching.length} of ${customers.length} customers match`}</p>}
       {error && <p role="alert" className="error">{error}</p>}
       <div className="customer-actions"><button type="button" className="btn" disabled={busy} onClick={onClose}>Cancel</button><button className="btn pri" disabled={busy || Boolean(validation)}>{busy ? 'Saving…' : 'Save segment'}</button></div>
     </form>
@@ -314,24 +327,36 @@ function SegmentEditor({ segment, parameters, customers, onSave, onClose }) {
   </SegmentDialog>;
 }
 
-function SegmentWidget({ state, customers, customer = null, selected = [], onToggle, onClose }) {
+function SegmentWidget({ state, customers = null, customer = null, selected = [], onToggle, onSelect, extraNames = [], selectionOwner = 'bonus', onClose }) {
   const [query, setQuery] = React.useState('');
   const [editor, setEditor] = React.useState(null);
   const memberships = state.segments.map(segment => ({ ...segment,
-    members: customers.filter(c => evaluateSegment(segment.rules, segmentFacts(c), state.parameters) === true)
+    members: customers ? customers.filter(c => evaluateSegment(segment.rules, segmentFacts(c), state.parameters) === true) : null
   }));
-  const shown = memberships.filter(s => (!customer || customerSegmentIds(customer, [s], state.parameters).length) &&
-    (s.name + ' ' + segmentRuleText(s.rules, state.parameters)).toLowerCase().includes(query.toLowerCase().trim()));
+  const entries = [...memberships, ...[...new Set(extraNames)].filter(name => !memberships.some(s => s.name === name))
+    .map(name => ({ id: 'legacy:' + name, name, rules: null, members: null }))];
+  const shown = entries.filter(s => (!customer || customerSegmentIds(customer, [s], state.parameters).length) &&
+    (s.name + ' ' + (s.rules ? segmentRuleText(s.rules, state.parameters) : '')).toLowerCase().includes(query.toLowerCase().trim()));
+  const isSelected = segment => selected.includes(onSelect ? segment.name : segment.id);
+  const select = segment => onSelect ? onSelect(segment) : onToggle?.(segment.id);
   return <SegmentDialog title={customer ? customer.name + ' segments' : 'Segments'} wide onClose={onClose}>
-    <div className="segment-widget-tools"><label className="field">Search segments<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label><button type="button" className="btn pri" onClick={() => setEditor({ segment: null })}>+ New segment</button></div>
+    <div className="segment-widget-tools"><label className="field">Search segments<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label><button type="button" className="btn pri" disabled={state.loading || Boolean(state.error)} onClick={() => setEditor({ segment: null })}>+ New segment</button></div>
+    {state.loading && <p role="status" className="hint">Loading segments...</p>}
+    {state.error && <p role="alert" className="error">{state.error} <button type="button" className="btn" onClick={state.load}>Retry</button></p>}
+    {onSelect && <p className="hint">Double-click a row to select it. Keyboard: focus a row and press Enter or Space. Selections are saved with the {selectionOwner}.</p>}
     {customer && <p className="hint">Only segments currently matching this customer are shown. Membership is calculated, not manually assigned.</p>}
-    <div className="segment-library">{shown.map(segment => <div className="segment-library-item" key={segment.id}>
+    <div className="segment-library">{!state.loading && !state.error && shown.map(segment => <div className={'segment-library-item' + (isSelected(segment) ? ' selected' : '')} key={segment.id}
+      tabIndex={onSelect || onToggle ? 0 : undefined} aria-label={'Select segment ' + segment.name}
+      onDoubleClick={e => { if (!e.target.closest('button')) select(segment); }}
+      onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); select(segment); } }}>
       <div>{onToggle ? <label className="segment-choice"><input type="checkbox" checked={selected.includes(segment.id)} onChange={() => onToggle(segment.id)} /><SegmentTags segments={[segment]} /></label> : <SegmentTags segments={[segment]} />}
-        <p className="segment-preview">{segmentRuleText(segment.rules, state.parameters)}</p><p className="hint">{segment.members.length} matching {segment.members.length === 1 ? 'customer' : 'customers'}</p>
+        {segment.rules ? <p className="segment-preview">{segmentRuleText(segment.rules, state.parameters)}</p> : <p className="segment-preview">Existing {selectionOwner} segment</p>}
+        {segment.members && <p className="hint">{segment.members.length} matching {segment.members.length === 1 ? 'customer' : 'customers'}</p>}
+        {onSelect && isSelected(segment) && <p className="hint">Selected</p>}
       </div>
-      <button type="button" className="btn" onClick={() => setEditor({ segment })} aria-label={'Edit segment ' + segment.name}>Edit</button>
+      {segment.rules && <button type="button" className="btn" onClick={() => setEditor({ segment })} aria-label={'Edit segment ' + segment.name}>Edit</button>}
     </div>)}</div>
-    {!shown.length && <p className="hint">No matching segments.</p>}
+    {!state.loading && !state.error && !shown.length && <p className="hint">No matching segments.</p>}
     <div className="customer-actions"><button type="button" className="btn" onClick={onClose}>Done</button></div>
     {editor && <SegmentEditor segment={editor.segment} parameters={state.parameters} customers={customers}
       onClose={() => setEditor(null)} onSave={segment => { state.saved(segment); setEditor(null); }} />}

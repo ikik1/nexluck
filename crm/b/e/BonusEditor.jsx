@@ -95,6 +95,23 @@ function Field({ label, hint, error, children }) {
   );
 }
 
+function AvailabilitySegments({ label, path, form, set, errors, onOpen }) {
+  const values = get(form, path) || [];
+  const remove = value => set(path, values.filter(v => v !== value));
+  return <Field label={label} error={errors[path]}>
+    <div className="availability-segments">
+      {values.map(value => <button type="button" className="availability-tag" key={value}
+        title="Double-click to remove; press Delete or Backspace to remove"
+        aria-label={'Remove ' + value + ' from ' + label.toLowerCase()}
+        onDoubleClick={() => remove(value)} onKeyDown={e => {
+          if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); remove(value); }
+        }}>{value}</button>)}
+      <button type="button" className="btn segment-more" aria-label={'Edit ' + label.toLowerCase()}
+        onClick={() => onOpen({ path, label })}>...</button>
+    </div>
+  </Field>;
+}
+
 function Modal({ title, onClose, children, actions, className = '' }) {
   useEffect(() => {
     const h = (e) => e.key === 'Escape' && onClose();
@@ -526,6 +543,7 @@ function PromoModal({ initial, segments, onSave, onClose }) {
 }
 
 function Editor() {
+  const segmentState = useCustomerSegments();
   const [orig, setOrig] = useState(null);
   const [form, setForm] = useState(null);
   const [errors, setErrors] = useState({});
@@ -687,8 +705,8 @@ function Editor() {
           <h3>Availability</h3>
           <Field label="Start time" error={errors['availability.startTime']}><DateTime value={form.availability.startTime} onChange={(v) => set('availability.startTime', v)} /></Field>
           <Field label="End time" error={errors['availability.endTime']}><DateTime value={form.availability.endTime} onChange={(v) => set('availability.endTime', v)} /></Field>
-          <Multi label="Include segments" path="availability.includeSegments" options={INCLUDE} {...p} />
-          <Multi label="Exclude segments" path="availability.excludeSegments" options={EXCLUDE} {...p} />
+          <AvailabilitySegments label="Include segments" path="availability.includeSegments" {...p} onOpen={selection => setModal({ t: 'segments', ...selection })} />
+          <AvailabilitySegments label="Exclude segments" path="availability.excludeSegments" {...p} onOpen={selection => setModal({ t: 'segments', ...selection })} />
         </section>
 
         <section className={'card' + (highlighted === 'tr' ? ' map-highlight' : '')} style={{ gridArea: 'tr', '--c': '#c9780a' }} ref={refs.tr} tabIndex="-1">
@@ -818,6 +836,12 @@ function Editor() {
       </div>
 
       {modal && modal.t === 'rates' && <RatesModal amount={modal.amount} onClose={() => setModal(null)} />}
+      {modal && modal.t === 'segments' && <SegmentWidget state={segmentState}
+        selected={get(form, modal.path) || []} extraNames={[...(modal.path === 'availability.includeSegments' ? INCLUDE : EXCLUDE), ...(get(form, modal.path) || [])]}
+        onClose={() => setModal(null)} onSelect={({ name }) => {
+          const values = get(form, modal.path) || [];
+          if (!values.includes(name)) set(modal.path, [...values, name]);
+        }} />}
       {modal && modal.t === 'cat' && <CategoryModal value={form.category} onPick={(c) => set('category', c)} onClose={() => setModal(null)} />}
       {modal && modal.t === 'promo' && <PromoModal initial={banner} segments={form.availability.includeSegments || []} onClose={() => setModal(null)} onSave={async (b) => {
         if (creating) { setBanner(b); setBannerDirty(true); }

@@ -75,11 +75,15 @@ table.bt{min-width:1000px;border-collapse:collapse;width:100%;font-size:13px}
 .tag-chk:hover{border-color:#f5b942;color:#8a5a00;background:#fffdf7}
 .tag-chk input[type=checkbox]{margin:0;cursor:pointer;accent-color:#c67d00;width:13px;height:13px}
 .tag-chk.on{background:#fff3d6;color:#8a5a00;border-color:#f5b942;font-weight:700;box-shadow:0 1px 3px rgba(245,185,66,.2)}
+.segs .tag-chk{max-width:100%;overflow-wrap:anywhere;font-family:inherit}
+.segs .tag-chk:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.segment-dialog .btn{background:#fff;border:1px solid var(--line);color:var(--brand);padding:8px 12px;border-radius:6px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer}
+.segment-dialog .btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.segment-dialog .btn:disabled{opacity:.5;cursor:not-allowed}
 .dfoot{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);position:sticky;bottom:0;background:#fff;z-index:5;flex-wrap:wrap}
 .dfoot .btn-left{margin-right:auto}
 .test-msg{margin-top:12px;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px}
 .test-msg.ok{background:#eaf8ef;color:#1f6b3a;border:1px solid #a2e2b9}
 .test-msg.fail{background:#fff0f1;color:#ba0517;border:1px solid #f5b5b9}
 .err{color:var(--red);font-size:12px;margin:6px 0}
-
 

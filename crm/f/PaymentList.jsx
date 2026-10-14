@@ -98,6 +98,8 @@ function BrandSearchPicker({ value, onChange }) {
 }
 
 function ConnectionModal({ conn, isNew, onSave, onClose }) {
+  const segmentState = useCustomerSegments();
+  const [showSegments, setShowSegments] = useState(false);
   const [data, setData] = useState(() => {
     const initialBrand = conn.brand || 'Stripe';
     const brandGw = GATEWAYS.find(g => g.brand === initialBrand);
@@ -138,12 +140,7 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
     }));
   };
 
-  const toggleSegment = seg => {
-    setData(d => ({
-      ...d,
-      segments: d.segments.includes(seg) ? d.segments.filter(s => s !== seg) : [...d.segments, seg],
-    }));
-  };
+  const removeSegment = seg => setData(d => ({ ...d, segments: d.segments.filter(s => s !== seg) }));
 
   const toggleCountry = code => {
     setData(d => ({
@@ -263,16 +260,12 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
         <div className="fld" style={{ marginTop: 8 }}>
           <label>Segments <small style={{ color: 'var(--muted)', fontWeight: 'normal' }}>(Player groups eligible for this connection)</small></label>
           <div className="segs">
-            {ALL_SEGMENTS.map(s => (
-              <label key={s} className={'tag-chk' + (data.segments.includes(s) ? ' on' : '')}>
-                <input
-                  type="checkbox"
-                  checked={data.segments.includes(s)}
-                  onChange={() => toggleSegment(s)}
-                />
-                <span>{s}</span>
-              </label>
-            ))}
+            {data.segments.map(s => <button type="button" key={s} className="tag-chk on"
+              aria-label={'Remove segment ' + s} title="Double-click to remove; press Delete or Backspace to remove"
+              onDoubleClick={() => removeSegment(s)} onKeyDown={e => {
+                if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSegment(s); }
+              }}>{s}</button>)}
+            <button type="button" className="new-btn" aria-label="Edit connection segments" onClick={() => setShowSegments(true)}>...</button>
           </div>
         </div>
 
@@ -314,6 +307,10 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
           <button type="button" className="new-btn" onClick={onClose}>Cancel</button>
           <button type="button" className="new-btn pri" onClick={handleSave}>Save connection</button>
         </div>
+        {showSegments && <SegmentWidget state={segmentState} selected={data.segments}
+          extraNames={[...ALL_SEGMENTS, ...data.segments]} selectionOwner="payment connection"
+          onClose={() => setShowSegments(false)} onSelect={({ name }) =>
+            setData(d => d.segments.includes(name) ? d : { ...d, segments: [...d.segments, name] })} />}
       </div>
     </div>
   );
