@@ -63,6 +63,18 @@ async def check_browser(base):
         page.set_default_timeout(10000)
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
+        for path in ["/crm/", "/crm/section.html?s=analytics", "/crm/b/",
+                     "/crm/b/e/?id=BN-1001", "/crm/b/e/?new=1", "/crm/c/list/",
+                     "/crm/c/i/?id=CU-1001", "/crm/f/", "/crm/f/cascades/",
+                     "/crm/f/wallets/", "/crm/f/transactions/", "/crm/api-docs/"]:
+            await page.goto(base + path)
+            if "/api-docs/" not in path:
+                await page.locator("#hdr .brand").wait_for()
+                assert await page.locator("#hdr .brand").inner_text() == "N\nNexLuck"
+                assert "Powered by NexLuck" in await page.locator("#ftr").inner_text()
+            if "/b/e/" in path:
+                await page.get_by_role("button", name="Edit include segments", exact=True).wait_for()
+            assert (await page.title()).startswith("NexLuck CRM"), path
         await page.goto(base + "/crm/c/list/")
         await page.get_by_role("link", name="luna.play", exact=True).wait_for()
         await page.get_by_role("button", name="Segments", exact=True).wait_for()

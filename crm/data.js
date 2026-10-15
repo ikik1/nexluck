@@ -11,7 +11,7 @@ const SECTIONS=[
 ];
 const USER={name:'v.kovalevskiy',device:'MacBook · Chrome 126',last:'02 Oct 2026, 09:41',plan:'Enterprise · active'};
 function chrome(crumb){
-document.getElementById('hdr').innerHTML=`<a class="brand" href="/crm/"><div class="logo">N</div>NextLuck</a>
+document.getElementById('hdr').innerHTML=`<a class="brand" href="/crm/"><div class="logo">N</div>NexLuck</a>
 <div class="right"><div class="meta"><span>User <b>${USER.name}</b></span><i class="sep"></i><span>Device <b>${USER.device}</b></span><i class="sep"></i><span>Last login <b>${USER.last}</b></span><i class="sep"></i><span>Subscription <b class="badge">${USER.plan}</b></span></div>
 <button class="gear" title="Settings" aria-label="Settings">⚙️</button></div>`;
 document.getElementById('sub').innerHTML=`<label for="nav">Navigate to</label><select id="nav"><option value="/crm/">🏠 Home</option>${SECTIONS.map(s=>`<option value="${s.href||'/crm/section.html?s='+s.k}">${s.i} ${s.n}</option>`).join('')}</select>${crumb||''}`;
@@ -21,5 +21,5 @@ else if(location.pathname.startsWith('/crm/b'))sel.value='/crm/b/';
 else if(location.pathname.startsWith('/crm/f'))sel.value='/crm/f/';
 else if(location.pathname.startsWith('/crm/c/'))sel.value='/crm/c/list/';
 sel.onchange=()=>location.href=sel.value;
-document.getElementById('ftr').innerHTML=`<span>Powered by NextLuck</span>|<a href="#">Terms of Services</a>|<a href="#">Privacy Policy</a>`;
+document.getElementById('ftr').innerHTML=`<span>Powered by NexLuck</span>|<a href="#">Terms of Services</a>|<a href="#">Privacy Policy</a>`;
 }

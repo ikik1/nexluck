@@ -572,7 +572,7 @@ function Editor() {
     api('/bonuses/' + b.id + '/promo-banner').then(setBanner).catch(() => {});
   }).catch((e) => setStatus({ bad: true, text: e.message }));
   useEffect(() => {
-    document.title = NEW ? 'NextLuck CRM — New bonus' : 'NextLuck CRM — Edit bonus';
+    document.title = NEW ? 'NexLuck CRM — New bonus' : 'NexLuck CRM — Edit bonus';
     api('/games').then((r) => setGames(r.items)).catch(() => {});
     if (ID) load();
     else if (NEW) { setOrig(null); setForm(emptyBonus()); }
