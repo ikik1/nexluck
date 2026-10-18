@@ -42,7 +42,8 @@ Custom dropdown triggers use the `dropdown-control` class for the same spacing.
 ## Persistence and credentials
 
 Start the existing server with `ruby crm/api/server.rb 8080`. It now also loads
-`crm/api/customers.rb` and `crm/api/segments.rb`. Deploy all three Ruby files together.
+`crm/api/customers.rb`, `crm/api/segments.rb`, and `crm/api/game_catalog.rb`.
+Deploy all four Ruby files together.
 Restart the running Ruby process after updating API code; an older process
 does not load new routes automatically. For the local server on port 8086, use
 `ruby crm/api/server.rb 8086`. Swagger at `/crm/api-docs/` lists the customer

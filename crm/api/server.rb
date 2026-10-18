@@ -202,7 +202,7 @@ end
 ISSUER = 'nexluck-crm'
 AUDIENCE = 'nexluck-crm-api'
 TOKEN_TTL = 900
-SCOPES = %w[bonuses:read bonuses:write customers:read customers:write customers:credentials segments:read segments:write]
+SCOPES = %w[bonuses:read bonuses:write customers:read customers:write customers:credentials segments:read segments:write games:read games:write]
 JWT_KEY = ENV['CRM_JWT_SECRET'] || SecureRandom.hex(32)
 CLIENT_SECRET = ENV['CRM_CLIENT_SECRET'] || SecureRandom.hex(24)
 CLIENTS = {
@@ -269,9 +269,9 @@ def authorize(req, res, scope)
   end
   claims = verify_token(m[1])
   return bearer_error(res, 401, 'invalid_token', 'Token is invalid or expired') && false unless claims
-  unless claims['scope'].to_s.split.include?(scope)
-    res['WWW-Authenticate'] = %(Bearer realm="nexluck-crm-api", error="insufficient_scope", scope="#{scope}")
-    json(res, 403, { error: 'insufficient_scope', error_description: "Scope '#{scope}' required" })
+  unless (claims['scope'].to_s.split & Array(scope)).any?
+    res['WWW-Authenticate'] = %(Bearer realm="nexluck-crm-api", error="insufficient_scope", scope="#{Array(scope).first}")
+    json(res, 403, { error: 'insufficient_scope', error_description: "Scope '#{Array(scope).join(' or ')}' required" })
     return false
   end
   req.attributes['client'] = claims['sub']
@@ -484,11 +484,46 @@ end
 # The UI route (secured = false) is the backend-for-frontend of the CRM web app; in production it must sit
 # behind the signed-in user's session and CSRF protection, and `actor` should be that user.
 require_relative 'customers'
+require_relative 'game_catalog'
+CustomerStore.include(GameCatalog)
 CUSTOMER_STORE = CustomerStore.new
+CUSTOMER_STORE.initialize_game_catalog(GAMES)
 
 handler = lambda do |req, res, rest, secured|
   LOCK.synchronize do
     m = req.request_method
+    if rest == 'games' || rest.start_with?('games/')
+      match = rest.match(%r{\Agames(?:/(categories|publishers|[\w-]+)(?:/([\w-]+))?)?\z})
+      next json(res, 404, { error: 'Not found' }) unless match
+      resource, category_id = match.captures
+      next json(res, 404, { error: 'Not found' }) if category_id && resource != 'categories'
+      methods = resource == 'categories' ? (category_id ? %w[PATCH] : %w[GET POST]) : resource.nil? || resource == 'publishers' ? %w[GET] : %w[GET PATCH]
+      next json(res, 405, { error: 'Method not allowed' }) unless methods.include?(m)
+      # Existing bonus integrations retain read access to the expanded game list.
+      scope = m == 'GET' && resource.nil? ? %w[games:read bonuses:read] : m == 'GET' ? 'games:read' : 'games:write'
+      next if secured && !authorize(req, res, scope)
+      if resource == 'publishers'
+        next json(res, 200, { items: GameCatalog::PUBLISHERS })
+      elsif resource == 'categories'
+        next json(res, 200, { items: CUSTOMER_STORE.game_categories }) if m == 'GET'
+        next json(res, 404, { error: 'Category not found' }) if category_id && !CUSTOMER_STORE.game_categories.any? { |c| c['id'] == category_id }
+        body = read_json(req, res)
+        next unless body
+        saved, errors = CUSTOMER_STORE.save_game_category(category_id, body)
+        next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
+        next json(res, m == 'POST' ? 201 : 200, saved)
+      end
+      games = CUSTOMER_STORE.catalog_games
+      next json(res, 200, { items: games, total: games.length }) unless resource
+      game = games.find { |g| g['id'] == resource }
+      next json(res, 404, { error: 'Game not found' }) unless game
+      next json(res, 200, game) if m == 'GET'
+      body = read_json(req, res)
+      next unless body
+      saved, errors = CUSTOMER_STORE.save_game(resource, body)
+      next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
+      next json(res, 200, saved)
+    end
     if rest == 'segments' || rest.start_with?('segments/')
       match = rest.match(%r{\Asegments(?:/(parameters|SG-\d+))?\z})
       next json(res, 404, { error: 'Not found' }) unless match
@@ -539,7 +574,6 @@ handler = lambda do |req, res, rest, secured|
     end
     route = case rest
             when 'bonuses' then [:list, %w[GET POST]]
-            when 'games' then [:games, %w[GET]]
             when %r{\Abonuses/([\w-]+)/promo-codes/([A-Z0-9_-]+)\z} then [:promo_code, %w[DELETE PATCH], Regexp.last_match(1), Regexp.last_match(2)]
             when %r{\Abonuses/([\w-]+)/promo-banner\z} then [:promo_banner, %w[GET PUT], Regexp.last_match(1)]
             when %r{\Abonuses/([\w-]+)/promo-codes\z} then [:promo_codes, %w[GET POST], Regexp.last_match(1)]
@@ -639,8 +673,6 @@ handler = lambda do |req, res, rest, secured|
         CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Generated promo code #{code}", 'changes' => [] })
         json(res, 201, item)
       end
-    when :games
-      json(res, 200, { items: GAMES })
     when :promo_code
       codes = PROMO_CODES[bonus['id']]
       item = codes.find { |x| x['code'] == promo_code }

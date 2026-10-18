@@ -22,6 +22,7 @@ tags:
   - name: Exchange rates
   - name: Customers
   - name: Segments
+  - name: Games
 paths:
   /segments:
     servers:
@@ -738,15 +739,87 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
   /games:
+    servers:
+      - url: /crm/ui-api/v1
+        description: CRM prototype UI API
+      - url: /crm/api/v1
+        description: Secured server-to-server API
     get:
-      tags: [Bonuses]
-      summary: Game catalog that a bonus can be linked to
+      tags: [Games]
+      summary: Persisted game catalog, also used by the bonus editor
       operationId: listGames
       security:
         - oauth2: ["bonuses:read"]
+        - oauth2: ["games:read"]
       responses:
         '200':
-          description: Games with their categories
+          description: Full catalog. Filter and publisher grouping are performed by the CRM UI.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer }
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/CatalogGame' }
+        '401': { description: Missing or invalid token on secured API }
+        '403': { description: Missing games read or legacy bonuses read scope }
+  /games/{id}:
+    servers:
+      - url: /crm/ui-api/v1
+      - url: /crm/api/v1
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Games]
+      operationId: getCatalogGame
+      summary: Get a game
+      security: [{ oauth2: ["games:read"] }]
+      responses:
+        '200':
+          description: Game
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CatalogGame' }
+        '404': { description: Game not found }
+        '401': { description: Missing or invalid token }
+        '403': { description: Missing games read scope }
+    patch:
+      tags: [Games]
+      operationId: updateCatalogGame
+      summary: Edit game properties or toggle enabled status
+      security: [{ oauth2: ["games:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CatalogGameWrite' }
+      responses:
+        '200':
+          description: Saved game
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CatalogGame' }
+        '404': { description: Game not found }
+        '422': { description: Invalid values or read-only fields }
+        '401': { description: Missing or invalid token }
+        '403': { description: Missing games write scope }
+  /games/publishers:
+    servers:
+      - url: /crm/ui-api/v1
+      - url: /crm/api/v1
+    get:
+      tags: [Games]
+      operationId: listGamePublishers
+      summary: List publishers and local demo logo marks
+      security: [{ oauth2: ["games:read"] }]
+      responses:
+        '200':
+          description: Publishers
           content:
             application/json:
               schema:
@@ -757,9 +830,73 @@ paths:
                     items:
                       type: object
                       properties:
-                        id: { type: string, example: gates-of-olympus }
-                        name: { type: string, example: Gates of Olympus }
-                        category: { type: string, enum: [SLOTS, TABLE_GAMES, LIVE_CASINO, CRASH] }
+                        id: { type: string }
+                        name: { type: string }
+                        mark: { type: string }
+                        color: { type: string }
+                        logo: { type: string, description: Local SVG mark path, not an official publisher logo }
+  /games/categories:
+    servers:
+      - url: /crm/ui-api/v1
+      - url: /crm/api/v1
+    get:
+      tags: [Games]
+      operationId: listGameCategories
+      summary: List game categories
+      security: [{ oauth2: ["games:read"] }]
+      responses:
+        '200':
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/GameCategory' } }
+    post:
+      tags: [Games]
+      operationId: createGameCategory
+      summary: Create a category with a unique name
+      security: [{ oauth2: ["games:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GameCategoryWrite' }
+      responses:
+        '201':
+          description: Saved category
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameCategory' }
+        '422': { description: Invalid or duplicate name }
+  /games/categories/{categoryId}:
+    servers:
+      - url: /crm/ui-api/v1
+      - url: /crm/api/v1
+    parameters:
+      - in: path
+        name: categoryId
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Games]
+      operationId: updateGameCategory
+      summary: Rename a category without changing game references
+      security: [{ oauth2: ["games:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GameCategoryWrite' }
+      responses:
+        '200':
+          description: Saved category
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameCategory' }
+        '404': { description: Category not found }
+        '422': { description: Invalid or duplicate name }
   /exchange-rates:
     get:
       tags: [Exchange rates]
@@ -842,11 +979,59 @@ components:
             customers:credentials: Set customer passwords (secured API only)
             segments:read: Read customer segments and parameter catalog
             segments:write: Create and edit customer segments
+            games:read: Read game catalog, publishers and categories
+            games:write: Edit games and manage game categories
     basicAuth:
       type: http
       scheme: basic
       description: client_id and client_secret, used only at the token endpoint.
   schemas:
+    GameCategoryWrite:
+      type: object
+      description: Supply only name; unknown fields are rejected.
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+    GameCategory:
+      allOf:
+        - $ref: '#/components/schemas/GameCategoryWrite'
+        - type: object
+          properties:
+            id: { type: string, readOnly: true }
+    CatalogGameWrite:
+      type: object
+      description: Partial update; omitted fields retain their values. Unknown and read-only fields are rejected.
+      properties:
+        external_id: { type: string, minLength: 1, maxLength: 120, description: Unique user-friendly external identifier }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        enabled: { type: boolean }
+        category: { type: string, description: ID from the game category catalog }
+        segments:
+          type: array
+          maxItems: 100
+          items: { type: string }
+          description: Saved customer segment names; existing names remain valid after segment renames.
+        tags: { type: array, maxItems: 100, items: { type: string, minLength: 1, maxLength: 200 } }
+        deposit_currencies:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { type: string, enum: [EUR, USD, GBP, CAD, INR, BRL, MXN, TRY, AED, NGN, KES, ZAR, THB, VND, IDR, PHP, JPY, AUD, RUB, KZT, USDT, BTC] }
+        rtp: { type: number, minimum: 0, maximum: 100 }
+        bonus_contribution: { type: number, nullable: true, minimum: 0, maximum: 100, description: Override percentage; null inherits the provider default }
+        multiplier: { type: number, minimum: 0, maximum: 1000000000 }
+        variance: { type: string, enum: [low, medium, high] }
+        attributes: { type: array, maxItems: 100, items: { type: string, enum: [jackpot, free_spins, desktop, mobile] } }
+    CatalogGame:
+      allOf:
+        - $ref: '#/components/schemas/CatalogGameWrite'
+        - type: object
+          properties:
+            id: { type: string, readOnly: true }
+            publisher_id: { type: string, readOnly: true }
+            created_at: { type: string, format: date-time, readOnly: true }
+            updated_at: { type: string, format: date-time, readOnly: true }
+            provider_bonus_contribution: { type: number, readOnly: true, minimum: 0, maximum: 100 }
     CustomerSegmentWrite:
       type: object
       additionalProperties: false
