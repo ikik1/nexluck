@@ -15,6 +15,18 @@ pages; no fictitious standalone routes are generated.
 Type to see destinations, use Up/Down to highlight, Tab to fill the highlighted
 suggestion, Enter/Go to navigate, and Escape to dismiss suggestions. Clicking a
 suggestion navigates directly. Unmatched phrases show an explicit message.
+The navigation section starts hidden unless pinned. It starts sliding up
+immediately when the pointer leaves the navigation area, without a timeout.
+Revealing and hiding use a 240ms slide-down/up animation. Reduced-motion
+preferences skip the animation. Moving back into the area reverses a closing
+slide without waiting for it to finish.
+Move the pointer above the page title (header/subbar) to reveal it. Hovering
+the subbar or focusing navigation controls keeps it open. An AI navigation
+menu icon (three lines and a sparkle) remains available for keyboard and touch
+users, with an accessible label and tooltip; breadcrumbs stay visible.
+The pin icon beside Navigate to disables auto-hide while pressed. This preference
+persists in this browser across pages and reloads. Unpinning restores immediate
+slide-up once the pointer and keyboard focus leave navigation.
 
 The eight most recent successful navigation requests are stored only in this
 browser's localStorage and shown as tags beside Navigate to. Clicking a tag

@@ -140,14 +140,76 @@ function mountCRMNavigation() {
   document.addEventListener('click', e => { if (!form.contains(e.target)) close(); });
   form.addEventListener('focusout', e => { if (!form.contains(e.relatedTarget)) close(); });
   renderRecent();
+  const navigation = document.querySelector('.crm-navigation');
+  const subbar = document.getElementById('sub');
+  const reveal = document.getElementById('crm-nav-reveal');
+  const pin = document.getElementById('crm-nav-pin');
+  const pinKey = 'nexluck.crm.navigation.pinned.v1';
+  let pinned = false;
+  try { pinned = localStorage.getItem(pinKey) === 'true'; }
+  catch (error) { notify('Navigation pin preference could not be loaded.'); }
+  const renderPin = () => {
+    pin.setAttribute('aria-pressed', String(pinned));
+    pin.setAttribute('aria-label', pinned ? 'Unpin navigation' : 'Pin navigation');
+    pin.title = pinned ? 'Unpin navigation to restore auto-hide' : 'Pin navigation to keep it visible';
+  };
+  renderPin();
+  let slide;
+  let expanded = pinned;
+  navigation.hidden = !pinned;
+  reveal.setAttribute('aria-expanded', String(pinned));
+  const slideNavigation = show => {
+    if (expanded === show) return;
+    expanded = show;
+    const height = navigation.getBoundingClientRect().height;
+    const opacity = getComputedStyle(navigation).opacity;
+    if (slide) { slide.cancel(); slide = null; }
+    navigation.hidden = false;
+    reveal.setAttribute('aria-expanded', String(show));
+    if (!show) close();
+    const finish = () => {
+      navigation.hidden = !show;
+      navigation.style.overflow = '';
+      slide = null;
+    };
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { finish(); return; }
+    navigation.style.overflow = 'hidden';
+    slide = navigation.animate([
+      { height: height + 'px', opacity },
+      { height: show ? navigation.scrollHeight + 'px' : '0px', opacity: show ? 1 : 0 }
+    ], { duration: 240, easing: 'ease-in-out' });
+    slide.onfinish = finish;
+  };
+  const hideNavigation = () => {
+    if (pinned || navigation.contains(document.activeElement) || subbar.matches(':hover')) return;
+    slideNavigation(false);
+  };
+  const showNavigation = () => {
+    slideNavigation(true);
+  };
+  subbar.addEventListener('pointerenter', showNavigation);
+  subbar.addEventListener('pointermove', showNavigation);
+  subbar.addEventListener('pointerleave', hideNavigation);
+  document.getElementById('hdr').addEventListener('pointermove', showNavigation);
+  document.getElementById('hdr').addEventListener('pointerleave', hideNavigation);
+  navigation.addEventListener('focusin', showNavigation);
+  navigation.addEventListener('focusout', () => queueMicrotask(hideNavigation));
+  reveal.addEventListener('click', () => { showNavigation(); input.focus(); });
+  pin.addEventListener('click', () => {
+    pinned = !pinned;
+    renderPin();
+    try { localStorage.setItem(pinKey, String(pinned)); }
+    catch (error) { notify('Navigation pin changed, but the preference could not be saved.'); }
+    showNavigation();
+  });
 }
 
 function chrome(crumb){
 document.getElementById('hdr').innerHTML=`<a class="brand" href="/crm/"><div class="logo">N</div>NexLuck</a>
 <div class="right"><div class="meta"><span>User <b>${USER.name}</b></span><i class="sep"></i><span>Device <b>${USER.device}</b></span><i class="sep"></i><span>Last login <b>${USER.last}</b></span><i class="sep"></i><span>Subscription <b class="badge">${USER.plan}</b></span></div>
 <button class="gear" title="Settings" aria-label="Settings">⚙️</button></div>`;
-document.getElementById('sub').innerHTML=`<div class="crm-navigation">
-<div class="crm-nav-caption"><label for="nav">Navigate to</label><div id="crm-nav-recent" aria-label="Recent navigation requests"></div></div>
+document.getElementById('sub').innerHTML=`<button id="crm-nav-reveal" type="button" aria-label="AI navigation" title="AI navigation" aria-controls="crm-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h12M3 12h9M3 19h12M18 8l1.2 2.8L22 12l-2.8 1.2L18 16l-1.2-2.8L14 12l2.8-1.2L18 8Z"/></svg></button><div class="crm-navigation" id="crm-navigation" hidden>
+<div class="crm-nav-caption"><label for="nav">Navigate to</label><button id="crm-nav-pin" type="button" aria-label="Pin navigation" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3 6 0-1 6 4 4v2H6v-2l4-4-1-6ZM12 15v7"/></svg></button><div id="crm-nav-recent" aria-label="Recent navigation requests"></div></div>
 <form id="crm-nav-form" role="search" aria-label="Conversational CRM navigation">
 <div class="crm-nav-input"><input id="nav" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="crm-nav-options" aria-describedby="crm-nav-status" autocomplete="off" maxlength="200" placeholder="Show me list of games, or list of customers...">
 <ul id="crm-nav-options" role="listbox" aria-label="CRM destinations" hidden></ul></div><button type="submit">Go</button></form>
