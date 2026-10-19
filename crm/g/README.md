@@ -59,6 +59,15 @@ nonnegative (up to 1 billion). Empty contribution override inherits the provider
 default. The table shows the effective value followed by the gray provider value.
 Tags are comma-separated in the editor. Segments use the shared Segments popup
 with double-click toggles. "Jackpot" is the attribute label.
+The title's Enabled/Disabled switch controls frontend availability only; disabled
+games remain editable. Segments sit alongside Variance. The contribution override
+shows the actual read-only provider percentage beside the input; blank still
+inherits. All checkbox list frames and their legends have inner spacing.
+Categories are a read-only preview with a "Click to edit" hover/focus overlay.
+Opening it shows the category manager with the first checked category highlighted;
+its checkboxes change this game's category memberships immediately. Other game
+fields remain draft until Save game, and Cancel does not undo category changes
+already saved in the manager.
 
 `crm/api/game_catalog.rb` extends the existing private CustomerStore with game
 catalog persistence in `games.json`, using its atomic writes and 0600 permissions.

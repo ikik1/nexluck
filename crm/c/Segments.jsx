@@ -174,7 +174,7 @@ function SegmentParameters({ customer, parameters, onClose }) {
   </SegmentDialog>;
 }
 
-function SegmentDialog({ title, children, onClose, busy = false, wide = false }) {
+function SegmentDialog({ title, titleActions, children, onClose, busy = false, wide = false }) {
   const ref = React.useRef(null);
   React.useEffect(() => {
     const previous = document.activeElement, overflow = document.body.style.overflow;
@@ -196,7 +196,7 @@ function SegmentDialog({ title, children, onClose, busy = false, wide = false })
     return () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', keyboard); previous?.focus(); };
   }, [busy]);
   return <div className="segment-overlay"><section className={'segment-dialog' + (wide ? ' wide' : '')} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
-    <h2>{title}<button className="btn" type="button" aria-label={'Close ' + title} disabled={busy} onClick={onClose}>×</button></h2>{children}
+    <h2>{title}{titleActions}<button className="btn" type="button" aria-label={'Close ' + title} disabled={busy} onClick={onClose}>×</button></h2>{children}
   </section></div>;
 }
 

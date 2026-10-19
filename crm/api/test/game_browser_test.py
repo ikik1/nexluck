@@ -232,7 +232,28 @@ async def browser_checks(base):
         await editor.get_by_label("ExternalID", exact=True).fill("friendly-gates")
         assert await editor.get_by_role("group", name="Categories", exact=True).get_by_role("checkbox", name="Featured", exact=True).is_checked()
         assert await editor.get_by_role("group", name="Categories", exact=True).get_by_role("checkbox", name="Slots", exact=True).is_checked()
-        await editor.get_by_role("group", name="Categories", exact=True).get_by_role("checkbox", name="Table Games", exact=True).check()
+        assert await editor.get_by_role("group", name="Categories", exact=True).get_by_role("checkbox", name="Slots", exact=True).is_disabled()
+        await editor.get_by_role("button", name="Edit game categories", exact=True).hover()
+        assert await editor.get_by_text("Click to edit", exact=True).evaluate("e => getComputedStyle(e).opacity === '1'")
+        await editor.get_by_role("button", name="Edit game categories", exact=True).click()
+        nested_categories = page.get_by_role("dialog", name="Game categories", exact=True)
+        assert await nested_categories.locator(".game-category-row.active").get_by_role("checkbox", name="Slots", exact=True).count() == 1
+        await nested_categories.get_by_role("checkbox", name="Table Games", exact=True).click()
+        await page.wait_for_function("document.querySelector('.game-category-row input[aria-label=\"Table Games\"]').checked")
+        await nested_categories.get_by_role("button", name="Done", exact=True).click()
+        assert await editor.get_by_role("group", name="Categories", exact=True).get_by_role("checkbox", name="Table Games", exact=True).is_checked()
+        switch = editor.get_by_role("switch", name="Game enabled", exact=True)
+        assert await editor.locator("h2").get_by_role("switch").count() == 1
+        await switch.uncheck()
+        assert await editor.get_by_label("Name", exact=True).is_enabled()
+        assert await editor.get_by_role("button", name="Edit game segments", exact=True).is_enabled()
+        await switch.check()
+        assert await editor.get_by_text("100% from the provider", exact=True).count() == 1
+        assert await editor.evaluate("""e => {
+          const variance = e.querySelector('[aria-label="Variance"]').closest('label');
+          const segments = e.querySelector('[aria-label="Edit game segments"]').closest('.field');
+          return Math.abs(variance.getBoundingClientRect().top - segments.getBoundingClientRect().top) < 1;
+        }""")
         await editor.get_by_label("Tags (comma separated)", exact=True).fill("featured, tested")
         await editor.get_by_label("RTP %", exact=True).fill("97.25")
         await editor.get_by_label("Bonus contribution override %", exact=True).fill("7.5")
@@ -257,9 +278,11 @@ async def browser_checks(base):
         assert await editor.get_by_label("Multiplier", exact=True).input_value() == "123.45"
         assert await editor.get_by_role("button", name="Remove segment VIP", exact=True).count() == 1
         await editor.get_by_label("Bonus contribution override %", exact=True).fill("")
+        await editor.get_by_role("switch", name="Game enabled", exact=True).uncheck()
         await editor.get_by_role("button", name="Save game", exact=True).click()
         await editor.wait_for(state="hidden")
         await page.get_by_role("button", name="Modify Gates catalog edited", exact=True).wait_for()
+        assert "Disabled" in await row.inner_text()
         assert "100%(100%)" in (await row.inner_text()).replace(" ", "").replace("\t", "").replace("\n", "")
         await page.goto(base + "/g/")
         await page.wait_for_url("**/crm/g/")

@@ -30,6 +30,24 @@ main{max-width:1800px}
 .game-menu button:hover,.game-menu button:focus{background:#eef5fc}
 .game-checks{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 14px}
 .game-checks label{display:flex;align-items:center;gap:6px;font-size:12px}
+.game-list-box{min-width:0;padding:14px 18px 10px;margin:16px 0;border:1px solid var(--line);border-radius:6px}
+.game-list-box>legend{padding:0 10px}
+.game-enabled-toggle{display:flex;align-items:center;gap:8px;margin-left:auto;font-size:12px;cursor:pointer;position:relative;white-space:nowrap}
+.game-enabled-toggle input{position:absolute;opacity:0;width:36px;height:20px;margin:0}
+.game-switch-track{width:36px;height:20px;border-radius:12px;background:#888;position:relative;pointer-events:none}
+.game-switch-track:after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:white;transition:transform 150ms}
+.game-enabled-toggle input:checked+.game-switch-track{background:var(--green)}
+.game-enabled-toggle input:checked+.game-switch-track:after{transform:translateX(16px)}
+.game-enabled-toggle input:focus-visible+.game-switch-track{outline:2px solid var(--brand);outline-offset:3px}
+.game-contribution{display:flex;align-items:center;gap:10px}
+.game-contribution input{flex:1;min-width:0}
+.game-contribution>span{font-size:12px;font-weight:400;flex:1;color:var(--muted)}
+.game-categories-preview{position:relative}
+.game-categories-preview .game-list-box{color:var(--muted);background:#f7f7f7}
+.game-categories-edit{position:absolute;inset:0;width:100%;border:0;border-radius:6px;background:transparent;cursor:pointer}
+.game-categories-edit span{opacity:0;display:inline-block;padding:8px 14px;background:white;color:var(--brand);border:1px solid var(--line);border-radius:6px}
+.game-categories-edit:hover,.game-categories-edit:focus-visible{background:#ffffff99}
+.game-categories-edit:hover span,.game-categories-edit:focus-visible span{opacity:1}
 .segment-dialog[aria-label="Game categories"]{display:flex;flex-direction:column;height:min(820px,90vh);box-sizing:border-box;overflow:hidden}
 .segment-dialog[aria-label="Game categories"]>h2,.segment-dialog[aria-label="Game categories"]>.customer-actions{flex-shrink:0}
 .game-category-layout{display:grid;grid-template-columns:minmax(240px,1fr) minmax(0,1.5fr);gap:20px;flex:1;min-height:0}

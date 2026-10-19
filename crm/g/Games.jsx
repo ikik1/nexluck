@@ -4,23 +4,25 @@ const CATEGORY_SORTS = [['popularity', 'Popularity'], ['new', 'New'], ['most_pla
 const gameDate = value => new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', timeZone: 'UTC' });
 const toggleGameValue = (values, value) => values.includes(value) ? values.filter(v => v !== value) : [...values, value];
 
-function GameChecks({ label, options, values, onChange }) {
-  return <fieldset><legend>{label}</legend><div className="game-checks">
+function GameChecks({ label, options, values, onChange, disabled = false }) {
+  return <fieldset className="game-list-box" disabled={disabled}><legend>{label}</legend><div className="game-checks">
     {options.map(([value, name]) => <label key={value}><input type="checkbox" checked={values.includes(value)} onChange={() => onChange(toggleGameValue(values, value))} />{name}</label>)}
   </div></fieldset>;
 }
 
-function GameEditor({ game, categories, onSave, onClose }) {
+function GameEditor({ game, categories, games, publishers, onCategorySaved, onSave, onClose }) {
   const [draft, setDraft] = React.useState(() => ({ ...game, tagsText: game.tags.join(', ') }));
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
   const [fields, setFields] = React.useState({});
   const [segmentsOpen, setSegmentsOpen] = React.useState(false);
+  const [categoriesOpen, setCategoriesOpen] = React.useState(false);
+  const categoryIds = categories.filter(c => c.kind === 'static' && c.game_ids.includes(game.id)).map(c => c.id);
   const segmentState = useCustomerSegments();
   const set = (key, value) => setDraft(old => ({ ...old, [key]: value }));
   const save = async e => {
     e.preventDefault(); setBusy(true); setError(''); setFields({});
-    const keys = ['external_id', 'name', 'enabled', 'segments', 'category_ids', 'deposit_currencies', 'rtp', 'bonus_contribution', 'multiplier', 'variance', 'attributes'];
+    const keys = ['external_id', 'name', 'enabled', 'segments', 'deposit_currencies', 'rtp', 'bonus_contribution', 'multiplier', 'variance', 'attributes'];
     const body = Object.fromEntries(keys.map(key => [key, draft[key]]));
     body.tags = [...new Set(draft.tagsText.split(',').map(tag => tag.trim()).filter(Boolean))];
     try {
@@ -29,8 +31,9 @@ function GameEditor({ game, categories, onSave, onClose }) {
     } catch (e) { setError(e.message); setFields(e.fields || {}); }
     finally { setBusy(false); }
   };
-  return <SegmentDialog title={'Edit game: ' + game.name} wide busy={busy} onClose={onClose}>
-    <form onSubmit={save}>
+  return <SegmentDialog title={'Edit game: ' + game.name} wide busy={busy} onClose={onClose}
+    titleActions={<label className="game-enabled-toggle"><input type="checkbox" role="switch" aria-label="Game enabled" checked={draft.enabled} disabled={busy} onChange={e => set('enabled', e.target.checked)} /><span className="game-switch-track" aria-hidden="true" /><span>{draft.enabled ? 'Enabled' : 'Disabled'}</span></label>}>
+    <form className="game-editor-form" onSubmit={save}>
       <div className="edit-grid">
         <label className="field">ID<input readOnly value={game.id} /></label>
         <label className="field">ExternalID<input required maxLength={120} value={draft.external_id} onChange={e => set('external_id', e.target.value)} /></label>
@@ -38,16 +41,18 @@ function GameEditor({ game, categories, onSave, onClose }) {
         <label className="field">Created_at<input readOnly value={game.created_at} /></label>
         <label className="field">Tags (comma separated)<input value={draft.tagsText} onChange={e => set('tagsText', e.target.value)} /></label>
         <label className="field">RTP %<input required type="number" min="0" max="100" step="any" value={draft.rtp} onChange={e => set('rtp', e.target.value === '' ? '' : Number(e.target.value))} /></label>
-        <label className="field">Bonus contribution override %<input aria-label="Bonus contribution override %" type="number" min="0" max="100" step="any" placeholder="Use provider default" value={draft.bonus_contribution ?? ''} onChange={e => set('bonus_contribution', e.target.value === '' ? null : Number(e.target.value))} /><small>Provider default: {game.provider_bonus_contribution}% (read-only). Leave empty to inherit.</small></label>
+        <label className="field">Bonus contribution override %<div className="game-contribution"><input aria-label="Bonus contribution override %" type="number" min="0" max="100" step="any" placeholder="Use provider default" value={draft.bonus_contribution ?? ''} onChange={e => set('bonus_contribution', e.target.value === '' ? null : Number(e.target.value))} /><span>{game.provider_bonus_contribution}% from the provider</span></div><small>Leave empty to inherit the provider contribution.</small></label>
         <label className="field">Multiplier<input required type="number" min="0" max="1000000000" step="any" value={draft.multiplier} onChange={e => set('multiplier', e.target.value === '' ? '' : Number(e.target.value))} /></label>
         <label className="field">Variance<select aria-label="Variance" value={draft.variance} onChange={e => set('variance', e.target.value)}>{['low', 'medium', 'high'].map(v => <option key={v}>{v}</option>)}</select></label>
-      </div>
-      <GameChecks label="Categories" options={categories.filter(c => c.kind === 'static').map(c => [c.id, c.name])} values={draft.category_ids} onChange={v => set('category_ids', v)} />
-      <label className="segment-boolean"><input type="checkbox" checked={draft.enabled} onChange={e => set('enabled', e.target.checked)} />Enabled</label>
       <div className="field">Segments<div className="segment-tags">{draft.segments.map(name => <button key={name} type="button" className="segment-tag" aria-label={'Remove segment ' + name}
         onDoubleClick={() => set('segments', draft.segments.filter(v => v !== name))} onKeyDown={e => {
           if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); set('segments', draft.segments.filter(v => v !== name)); }
         }}>{name}</button>)}<button type="button" className="btn" aria-label="Edit game segments" onClick={() => setSegmentsOpen(true)}>...</button></div></div>
+      </div>
+      <div className="game-categories-preview">
+        <GameChecks label="Categories" options={categories.filter(c => c.kind === 'static').map(c => [c.id, c.name])} values={categoryIds} disabled />
+        <button type="button" className="game-categories-edit" aria-label="Edit game categories" disabled={busy} onClick={() => setCategoriesOpen(true)}><span>Click to edit</span></button>
+      </div>
       <GameChecks label="Deposit currencies" options={CURRENCIES.map(c => [c, c])} values={draft.deposit_currencies} onChange={v => set('deposit_currencies', v)} />
       <GameChecks label="Game attributes" options={GAME_ATTRIBUTES} values={draft.attributes} onChange={v => set('attributes', v)} />
       {error && <div role="alert" className="error">{error}<ul>{Object.entries(fields).map(([key, message]) => <li key={key}>{key}: {message}</li>)}</ul></div>}
@@ -55,6 +60,12 @@ function GameEditor({ game, categories, onSave, onClose }) {
     </form>
     {segmentsOpen && <SegmentWidget state={segmentState} selected={draft.segments} extraNames={draft.segments} selectionOwner="game"
       onSelect={({ name }) => set('segments', toggleGameValue(draft.segments, name))} onClose={() => setSegmentsOpen(false)} />}
+    {categoriesOpen && <GameCategories categories={categories} games={games} publishers={publishers} selected={categoryIds}
+      initialCategoryId={categoryIds[0]} onToggle={async id => {
+        const category = categories.find(c => c.id === id);
+        onCategorySaved(await apiRequest(GAME_API + '/categories/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ game_ids: toggleGameValue(category.game_ids, game.id) }) }));
+      }} onSaved={onCategorySaved} onClose={() => setCategoriesOpen(false)} />}
   </SegmentDialog>;
 }
 
@@ -153,10 +164,10 @@ function CategoryGamePicker({ games, publishers, included, busy, error, onAdd, o
   </div>;
 }
 
-function GameCategories({ categories, games, publishers, selected, onToggle, onSaved, onClose }) {
+function GameCategories({ categories, games, publishers, selected, onToggle, onSaved, onClose, initialCategoryId }) {
   const [query, setQuery] = React.useState('');
   const [editing, setEditing] = React.useState(null);
-  const [activeId, setActiveId] = React.useState(categories[0]?.id);
+  const [activeId, setActiveId] = React.useState(initialCategoryId || categories[0]?.id);
   const [sort, setSort] = React.useState('popularity');
   const [dragged, setDragged] = React.useState(null);
   const [busy, setBusy] = React.useState(false);
@@ -187,7 +198,12 @@ function GameCategories({ categories, games, publishers, selected, onToggle, onS
         <div className="game-category-scroll" role="region" aria-label="Category list" tabIndex={0}>
         {categories.filter(c => (c.name + ' ' + c.cms_identifier).toLowerCase().includes(query.trim().toLowerCase())).map(c => <div key={c.id}
           className={'game-category-row' + (activeId === c.id ? ' active' : '') + (c.kind === 'dynamic' ? ' dynamic dynamic-' + c.dynamic_kind : '')}>
-          <input type="checkbox" aria-label={c.name} disabled={busy || c.kind === 'dynamic'} checked={selected.includes(c.id)} onChange={() => onToggle(c.id)} />
+          <input type="checkbox" aria-label={c.name} disabled={busy || c.kind === 'dynamic'} checked={selected.includes(c.id)} onChange={async () => {
+            setBusy(true); setError('');
+            try { await onToggle(c.id); }
+            catch (e) { setError(e.message); }
+            finally { setBusy(false); }
+          }} />
           <div className="category-row-badges" aria-label={'Segments and tags for ' + c.name}>
             {c.segments.map(s => <span key={'segment-' + s} className="segment-tag" title={'Segment: ' + s}>{s}</span>)}
             {c.tags.map(t => <span key={'tag-' + t} className="game-tag" title={'Tag: ' + t}>{t}</span>)}
@@ -371,7 +387,9 @@ function GamesPage() {
     {categoryOpen && <GameCategories categories={categories} games={games} publishers={publishers} selected={selectedCategories}
       onToggle={id => setSelectedCategories(old => toggleGameValue(old, id))} onClose={() => setCategoryOpen(false)}
       onSaved={saved => setCategories(old => old.some(c => c.id === saved.id) ? old.map(c => c.id === saved.id ? saved : c) : [...old, saved])} />}
-    {editing && <GameEditor game={editing} categories={categories} onClose={() => setEditing(null)} onSave={saved => { updateGame(saved); setEditing(null); load(); }} />}
+    {editing && <GameEditor game={editing} categories={categories} games={games} publishers={publishers}
+      onCategorySaved={saved => setCategories(old => old.some(c => c.id === saved.id) ? old.map(c => c.id === saved.id ? saved : c) : [...old, saved])}
+      onClose={() => setEditing(null)} onSave={saved => { updateGame(saved); setEditing(null); load(); }} />}
     {menu && <GameContextMenu menu={menu} onClose={closeMenu} onToggle={toggleStatus} />}
   </>;
 }
