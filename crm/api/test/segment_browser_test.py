@@ -74,6 +74,12 @@ async def check_browser(base):
                 assert "Powered by NexLuck" in await page.locator("#ftr").inner_text()
             if "/b/e/" in path:
                 await page.get_by_role("button", name="Edit include segments", exact=True).wait_for()
+                wagering = page.locator("section.card").filter(
+                    has=page.get_by_role("heading", name="Wagering", exact=True))
+                anti_bonus_hunter = page.locator("section.card").filter(
+                    has=page.get_by_role("heading", name="Anti-bonus-hunter", exact=True))
+                assert await wagering.get_by_text("Max bet per round", exact=True).count() == 0
+                assert await anti_bonus_hunter.get_by_text("Max bet per round", exact=True).count() == 1
             assert (await page.title()).startswith("NexLuck CRM"), path
         await page.goto(base + "/crm/c/list/")
         await page.get_by_role("link", name="luna.play", exact=True).wait_for()

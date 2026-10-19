@@ -856,7 +856,7 @@ paths:
     post:
       tags: [Games]
       operationId: createGameCategory
-      summary: Create a category with a unique name
+      summary: Create a category with unique name and CMS identifier
       security: [{ oauth2: ["games:write"] }]
       requestBody:
         required: true
@@ -869,7 +869,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/GameCategory' }
-        '422': { description: Invalid or duplicate name }
+        '422': { description: Invalid fields or duplicate name/CMS identifier }
   /games/categories/{categoryId}:
     servers:
       - url: /crm/ui-api/v1
@@ -882,7 +882,7 @@ paths:
     patch:
       tags: [Games]
       operationId: updateGameCategory
-      summary: Rename a category without changing game references
+      summary: Update category properties, game membership or game order
       security: [{ oauth2: ["games:write"] }]
       requestBody:
         required: true
@@ -896,7 +896,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/GameCategory' }
         '404': { description: Category not found }
-        '422': { description: Invalid or duplicate name }
+        '422': { description: Invalid fields or duplicate name/CMS identifier }
   /exchange-rates:
     get:
       tags: [Exchange rates]
@@ -988,16 +988,24 @@ components:
   schemas:
     GameCategoryWrite:
       type: object
-      description: Supply only name; unknown fields are rejected.
-      required: [name]
+      description: Partial update; creation requires name. Copy sources add existing game references once on save (deduplicated), never duplicate game records or sync future changes. Dynamic categories cannot have fixed games, copy sources or automatic sorting. Unknown fields are rejected.
       properties:
         name: { type: string, minLength: 1, maxLength: 80 }
+        cms_identifier: { type: string, pattern: '^[a-z][a-z0-9_-]{0,79}$', description: Unique CMS key. Defaults to a slug of the name on creation; preserved on rename. }
+        game_ids: { type: array, uniqueItems: true, items: { type: string }, description: Ordered game references. Games can belong to many static categories. Empty for dynamic categories. }
+        segments: { type: array, maxItems: 100, items: { type: string }, description: Saved customer segment names; existing names remain valid after renames. }
+        tags: { type: array, maxItems: 100, items: { type: string, minLength: 1, maxLength: 200 } }
+        sort_mode: { type: string, enum: [manual, popularity, new, most_played], description: Manual preserves submitted order; other modes sort descending by demo popularity, creation date or demo play count. Ties use name then ID. }
+        copy_provider_ids: { type: array, maxItems: 100, items: { type: string }, writeOnly: true }
+        copy_category_ids: { type: array, maxItems: 100, items: { type: string }, writeOnly: true, description: Static categories other than this category. }
     GameCategory:
       allOf:
         - $ref: '#/components/schemas/GameCategoryWrite'
         - type: object
           properties:
             id: { type: string, readOnly: true }
+            kind: { type: string, enum: [static, dynamic], readOnly: true }
+            dynamic_kind: { type: string, enum: [recent, favourites], readOnly: true, description: Present only for customer-specific dynamic definitions; no per-customer resolution in this catalog. }
     CatalogGameWrite:
       type: object
       description: Partial update; omitted fields retain their values. Unknown and read-only fields are rejected.
@@ -1005,7 +1013,8 @@ components:
         external_id: { type: string, minLength: 1, maxLength: 120, description: Unique user-friendly external identifier }
         name: { type: string, minLength: 1, maxLength: 120 }
         enabled: { type: boolean }
-        category: { type: string, description: ID from the game category catalog }
+        category: { type: string, description: Legacy primary category; writing this alone replaces category membership with that one static category. Read value is empty if no memberships exist. }
+        category_ids: { type: array, maxItems: 100, items: { type: string }, description: Static category IDs. Replaces all memberships for this game; does not reorder other games in the categories. }
         segments:
           type: array
           maxItems: 100
@@ -1032,6 +1041,9 @@ components:
             created_at: { type: string, format: date-time, readOnly: true }
             updated_at: { type: string, format: date-time, readOnly: true }
             provider_bonus_contribution: { type: number, readOnly: true, minimum: 0, maximum: 100 }
+            popularity: { type: integer, readOnly: true, minimum: 0, maximum: 100, description: Persisted demo popularity score }
+            play_count: { type: integer, readOnly: true, minimum: 0, description: Persisted demo play count, not live analytics }
+            statistics_source: { type: string, enum: [demo], readOnly: true }
     CustomerSegmentWrite:
       type: object
       additionalProperties: false

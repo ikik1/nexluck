@@ -33,7 +33,7 @@ const SATELLITE_INFO = {
   tr: 'What awards the bonus: registration or a deposit, with the deposit amount and deposit-count conditions.',
   rw: 'What the player receives: a deposit-match bonus amount, or a Free Spins package and how it is spread over days.',
   gm: 'Where the bonus can be played: one or several game categories, or a single game.',
-  wg: 'Playthrough rules: wagering multiplier, time limit, maximum bet and the withdrawal cap.',
+  wg: 'Playthrough rules: wagering multiplier, time limit and the withdrawal cap.',
   wl: 'Which wallet is charged first and which receives winnings, and whether the player may cancel or withdraw before wagering is done.',
   ab: 'Abuse protection: claim limits per IP and device, VPN and payment-method blocks, KYC level and betting restrictions.',
   pc: 'Codes a player enters to claim the bonus, each with its own validity period. Codes can be edited here.',
@@ -765,8 +765,8 @@ function Editor() {
             <Field label="Game" error={errors['games.game']}>
               <select value={form.games.game ?? ''} onChange={(e) => set('games.game', e.target.value)}>
                 <option value="">Select a game…</option>
-                {CATEGORIES.map(([cat]) => games.some((g) => g.category === cat) && (
-                  <optgroup key={cat} label={cat}>{games.filter((g) => g.category === cat).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</optgroup>
+                {[...new Set(games.map(g => g.category))].map(cat => (
+                  <optgroup key={cat} label={cat || 'Uncategorized'}>{games.filter((g) => g.category === cat).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</optgroup>
                 ))}
               </select>
             </Field>
@@ -782,7 +782,6 @@ function Editor() {
           <h3>Wagering</h3>
           <Num label="Multiplier" path="wagering.multiplier" {...p} />
           <Num label="Time to complete (days)" path="wagering.timeToCompleteDays" int {...p} />
-          <Money label="Max bet per round" path="wagering.maxBetPerRound" {...p} />
           <Select label="Applies to" hint={APPLIES_HINT} path="wagering.appliesTo" options={APPLIES} {...p} />
           <Field label="Max withdraw cap" error={errors['wagering.maxWithdrawCap.type']}>
             <div className="two">
