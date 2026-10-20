@@ -12,6 +12,12 @@ AI-assisted bonus creation have separate entries. Inline actions such as game
 categories and payment connection editing are reached through their parent
 pages; no fictitious standalone routes are generated.
 
+Analytics now opens `/crm/a/` from the home tile and requests such as
+"analytics", "management reports", "financial performance" or "retention".
+`/a/` and the previous Analytics section URL lead to the same dashboard.
+The report data is explicitly synthetic; its specifications and sources are
+in [Analytics report specifications](a/REPORTS.md).
+
 Type to see destinations, use Up/Down to highlight, Tab to fill the highlighted
 suggestion, Enter/Go to navigate, and Escape to dismiss suggestions. Clicking a
 suggestion navigates directly. Unmatched phrases show an explicit message.

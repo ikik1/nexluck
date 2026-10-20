@@ -102,7 +102,7 @@ async def check(base):
         assert len(section_keys) == 9
         for key, phrase, destination in [
             ("home", "home", "/crm/"),
-            ("analytics", "show me analytics", "/crm/section.html?s=analytics"),
+            ("analytics", "show me analytics", "/crm/a/"),
             ("casinos", "my casinos", "/crm/section.html?s=casinos"),
             ("loyalty", "loyalty", "/crm/section.html?s=loyalty"),
             ("compliance", "compliance", "/crm/section.html?s=compliance"),

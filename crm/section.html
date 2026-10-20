@@ -1,9 +1,10 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NexLuck CRM</title><link rel="stylesheet" href="/crm/crm.css?v=202610181450"></head>
 <body><header id="hdr"></header><div class="subbar" id="sub"></div>
 <main id="m"></main><footer id="ftr"></footer>
-<script src="/crm/data.js?v=202610181500a"></script>
+<script src="/crm/data.js?v=202610201200"></script>
 <script>
 const s=SECTIONS.find(x=>x.k===new URLSearchParams(location.search).get('s'))||SECTIONS[0];
+if (s.k === 'analytics') location.replace('/crm/a/');
 chrome(`<span class="crumb"><a href="/crm/">Home</a> / ${s.n}</span>`);document.title='NexLuck CRM — '+s.n;
 document.getElementById('m').innerHTML=`<h1>${s.i} ${s.n}</h1><p class="lead">Section details (prototype placeholder).</p>
 <div class="tiles">${[[s.big[1],s.big[0],'']].concat(s.kv.map(x=>[x[0],x[1],x[2]])).map(x=>`<div class="tile" style="--c:${s.c}"><div class="kv"><div>${x[0]}<b class="big ${x[2]}">${x[1]}</b></div></div></div>`).join('')}</div>

@@ -1,5 +1,5 @@
 const SECTIONS=[
-{k:'analytics',n:'Analytics',i:'📈',c:'#0b5cab',big:['€482.3k','GGR (7d)'],kv:[['NGR','€391.8k','up'],['Active players','18,742','up'],['ARPU','€25.7','up'],['Retention D30','21.4%','down']]},
+{k:'analytics',href:'/crm/a/',n:'Analytics',i:'📈',c:'#0b5cab',big:['€482.3k','GGR (7d)'],kv:[['NGR','€391.8k','up'],['Active players','18,742','up'],['ARPU','€25.7','up'],['Retention D30','21.4%','down']]},
 {k:'casinos',n:'My casinos',i:'🏛️',c:'#7f3fbf',big:['6','Brands live'],kv:[['Jurisdictions','4',''],['Uptime','99.98%','up'],['Licences active','5 / 6',''],['Open incidents','1','down']]},
 {k:'customers',href:'/crm/c/list/',n:'Customers',i:'👥',c:'#2e844a',big:['126,480','Total players'],kv:[['New (7d)','1,356','up'],['VIP','842',''],['Pending KYC','87','down'],['Self-excluded','312','']]},
 {k:'games',href:'/crm/g/',n:'Games',i:'🎰',c:'#e8590c',big:['3,214','Games live'],kv:[['Providers','48',''],['Avg RTP','96.2%',''],['Top game','Gates of Olympus',''],['New this month','37','up']]},
@@ -16,7 +16,7 @@ const CRM_PAGE_INDEX = [
   ...SECTIONS.filter(s => s.k !== 'games').map(s => ({
     key: s.k, name: s.k === 'customers' ? 'List of customers' : s.k === 'bonuses' ? 'List of bonuses' : s.k === 'finance' ? 'Payment connections' : s.n,
     href: s.href || '/crm/section.html?s=' + s.k,
-    aliases: [s.n, s.k, ...(s.k === 'finance' ? ['finance', 'payment methods', 'payment systems', 'connection editor'] : [])]
+    aliases: [s.n, s.k, ...(s.k === 'analytics' ? ['reports', 'management reports', 'casino dashboard', 'financial performance', 'retention', 'acquisition', 'risk reports'] : []), ...(s.k === 'finance' ? ['finance', 'payment methods', 'payment systems', 'connection editor'] : [])]
   })),
   { key: 'new-bonus', name: 'New bonus', href: '/crm/b/e/?new=1', aliases: ['create bonus', 'add bonus', 'empty bonus'] },
   { key: 'ai-bonus', name: 'New bonus with AI agent', href: '/crm/b/e/?new=1&ai=1', aliases: ['ai bonus', 'generate bonus'] },
