@@ -1,0 +1,4 @@
+{% extends "cms/base.html" %}{% load static %}
+{% block title %}CMS modules API{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'docs.css' %}">{% endblock %}
+{% block content %}<main class="cms-main"><h1>Frontend modules REST API</h1><p>Staff session required. Public pages consume only their published widget configuration.</p><div id="swagger-ui"></div></main><script type="module" src="{% static 'docs.js' %}"></script>{% endblock %}

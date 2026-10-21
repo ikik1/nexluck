@@ -1,0 +1,8 @@
+Django>=5.2.12,<5.3
+djangorestframework==3.16.1
+psycopg[binary]>=3.2.13,<3.3
+django-redis==5.4.0
+gunicorn==23.0.0
+httpx==0.28.1
+whitenoise==6.9.0
+bleach==6.2.0

@@ -103,7 +103,7 @@ async def check(base):
         for key, phrase, destination in [
             ("home", "home", "/crm/"),
             ("analytics", "show me analytics", "/crm/a/"),
-            ("casinos", "my casinos", "/crm/section.html?s=casinos"),
+            ("casinos", "my casinos", "/crm/c/l/"),
             ("loyalty", "loyalty", "/crm/section.html?s=loyalty"),
             ("compliance", "compliance", "/crm/section.html?s=compliance"),
             ("audit", "audit", "/crm/section.html?s=audit"),

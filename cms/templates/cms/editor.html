@@ -1,0 +1,4 @@
+{% extends "cms/base.html" %}{% load static %}{% block content %}
+<main class="cms-main"><div id="cms-editor"><p role="status">Loading visual editor...</p></div>
+<noscript>JavaScript is required to edit. Published pages render without JavaScript.</noscript></main>
+<script type="module" src="{% static 'editor.js' %}"></script>{% endblock %}

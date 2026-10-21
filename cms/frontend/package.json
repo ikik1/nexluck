@@ -1,0 +1,9 @@
+{
+  "name": "nexluck-cms",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "build": "vite build" },
+  "dependencies": { "react": "19.1.1", "react-dom": "19.1.1", "swagger-ui-dist": "5.32.6" },
+  "devDependencies": { "vite": "6.4.5" }
+}

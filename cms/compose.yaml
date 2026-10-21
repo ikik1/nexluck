@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: [postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  pool:
+    build: deploy/pgbouncer
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      db: {condition: service_healthy}
+  redis:
+    image: redis:7.4-bookworm
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    volumes: [redis:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  web:
+    build:
+      context: ..
+      dockerfile: cms/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CMS_ENV: production
+      POSTGRES_HOST: pool
+      CMS_REDIS_URL: redis://redis:6379/0
+    ports: ["127.0.0.1:8090:8090"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      pool: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8090/cms/health/', headers={'Host':'localhost','X-Forwarded-Proto':'https'}), timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+volumes:
+  postgres:
+  redis:

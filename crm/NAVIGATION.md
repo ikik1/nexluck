@@ -18,6 +18,10 @@ Analytics now opens `/crm/a/` from the home tile and requests such as
 The report data is explicitly synthetic; its specifications and sources are
 in [Analytics report specifications](a/REPORTS.md).
 
+My Casinos opens `/crm/c/l/` from Home, the legacy casinos section, and
+requests such as "my casinos", "casino websites" or "CMS".
+See [website configuration](c/l/README.md) for settings and status behavior.
+
 Type to see destinations, use Up/Down to highlight, Tab to fill the highlighted
 suggestion, Enter/Go to navigate, and Escape to dismiss suggestions. Clicking a
 suggestion navigates directly. Unmatched phrases show an explicit message.

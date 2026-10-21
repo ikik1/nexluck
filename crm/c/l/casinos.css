@@ -1,0 +1,31 @@
+.casino-tools{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:20px 0}
+.casino-tools p{margin:0;flex:1;min-width:200px}
+.casino-table{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:8px}
+.casino-table table{min-width:850px;width:100%}
+.casino-table caption{text-align:left;padding:14px;font-weight:600}
+.casino-table th{background:#f3f3f3;font-size:12px;white-space:nowrap}
+.casino-table td{vertical-align:middle}
+.casino-table td a{color:var(--brand);overflow-wrap:anywhere}
+.casino-table tr:focus{outline:2px solid var(--brand);outline-offset:-2px}
+.casino-disabled{background:#f3f3f3;color:#68717b}
+.casino-disabled strong,.casino-disabled td a{color:#68717b}
+.casino-status{display:block;font-size:11px;margin-top:4px}
+.casino-status.enabled{color:#287948}
+.casino-table svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6}
+.casino-form{border:0;padding:0;margin:0;min-width:0}
+.casino-skin{border:1px solid #b7c7de;border-radius:8px;background:#eef3fb;color:#233f65;overflow:hidden;margin:16px 0}
+.casino-skin-header{display:flex;justify-content:space-between;gap:12px;padding:14px;background:#173e6d;color:white;font-weight:700}
+.casino-skin-header>span{font-size:11px;font-weight:400}
+.casino-skin-content{padding:20px}
+.casino-skin-content>div{display:flex;gap:12px;margin-top:14px}
+.casino-skin-content>div>span{display:block;flex:1;height:55px;background:#d3dff0;border-radius:6px}
+.skin-modern{background:#effaf5;color:#205a48;border-color:#b2d8c8}
+.skin-modern .casino-skin-header{background:#28765e}
+.skin-modern .casino-skin-content>div>span{background:#c6e8da;border-radius:16px}
+.skin-dark{background:#20202e;color:#eee8ff;border-color:#49445e}
+.skin-dark .casino-skin-header{background:#11111e;color:#d3b6ff}
+.skin-dark .casino-skin-content>div>span{background:#433652}
+.casino-menu{position:fixed;z-index:1000;min-width:160px;padding:5px;background:#fff;border:1px solid var(--line);border-radius:7px;box-shadow:0 6px 22px #0003}
+.casino-menu button{display:block;width:100%;text-align:left;border:0;background:#fff;padding:10px 14px;color:var(--text);font:inherit;cursor:pointer;border-radius:4px}
+.casino-menu button:hover,.casino-menu button:focus{background:#edf3fa}
+@media(max-width:600px){.casino-tools{align-items:stretch;flex-direction:column}.casino-skin-header{flex-direction:column}}

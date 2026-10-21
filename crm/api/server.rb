@@ -8,6 +8,7 @@ require 'time'
 require 'openssl'
 require 'base64'
 require 'securerandom'
+require 'net/http'
 
 ROOT = File.expand_path('../../..', __FILE__)
 PORT = (ARGV[0] || 8080).to_i
@@ -202,7 +203,7 @@ end
 ISSUER = 'nexluck-crm'
 AUDIENCE = 'nexluck-crm-api'
 TOKEN_TTL = 900
-SCOPES = %w[bonuses:read bonuses:write customers:read customers:write customers:credentials segments:read segments:write games:read games:write]
+SCOPES = %w[bonuses:read bonuses:write customers:read customers:write customers:credentials segments:read segments:write games:read games:write casinos:read casinos:write]
 JWT_KEY = ENV['CRM_JWT_SECRET'] || SecureRandom.hex(32)
 CLIENT_SECRET = ENV['CRM_CLIENT_SECRET'] || SecureRandom.hex(24)
 CLIENTS = {
@@ -485,13 +486,33 @@ end
 # behind the signed-in user's session and CSRF protection, and `actor` should be that user.
 require_relative 'customers'
 require_relative 'game_catalog'
+require_relative 'casino_websites'
 CustomerStore.include(GameCatalog)
+CustomerStore.include(CasinoWebsites)
 CUSTOMER_STORE = CustomerStore.new
 CUSTOMER_STORE.initialize_game_catalog(GAMES)
+CUSTOMER_STORE.initialize_casino_websites
 
 handler = lambda do |req, res, rest, secured|
   LOCK.synchronize do
     m = req.request_method
+    if rest == 'casinos' || rest.start_with?('casinos/')
+      match = rest.match(%r{\Acasinos(?:/(CS-[a-f0-9]{16}))?\z})
+      next json(res, 404, { error: 'Not found' }) unless match
+      id = match[1]
+      next json(res, 405, { error: 'Method not allowed' }) unless (id ? %w[GET PATCH] : %w[GET POST]).include?(m)
+      next if secured && !authorize(req, res, m == 'GET' ? 'casinos:read' : 'casinos:write')
+      website = id && CUSTOMER_STORE.casino_websites.find { |site| site['id'] == id }
+      next json(res, 404, { error: 'Website not found' }) if id && !website
+      if m == 'GET'
+        next json(res, 200, id ? website : { items: CUSTOMER_STORE.casino_websites, total: CUSTOMER_STORE.casino_websites.length })
+      end
+      body = read_json(req, res)
+      next unless body
+      saved, errors = CUSTOMER_STORE.save_casino_website(id, body)
+      next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
+      next json(res, m == 'POST' ? 201 : 200, saved)
+    end
     if rest == 'games' || rest.start_with?('games/')
       match = rest.match(%r{\Agames(?:/(categories|publishers|[\w-]+)(?:/([\w-]+))?)?\z})
       next json(res, 404, { error: 'Not found' }) unless match
@@ -745,6 +766,41 @@ WEBrick::HTTPServlet::ProcHandler.class_eval { alias_method :do_DELETE, :do_GET 
 
 srv.mount_proc('/crm/api/v1') { |req, res| handler.call(req, res, req.path.sub(%r{\A/crm/api/v1/?}, ''), true) }
 srv.mount_proc('/crm/ui-api/v1') { |req, res| handler.call(req, res, req.path.sub(%r{\A/crm/ui-api/v1/?}, ''), false) }
+
+srv.mount_proc('/cms') do |req, res|
+  if req.path == '/cms'
+    res.status = 302
+    res['Location'] = '/cms/'
+    next
+  end
+  begin
+    uri = URI(ENV.fetch('CMS_UPSTREAM', 'http://127.0.0.1:8090') + req.request_uri.request_uri)
+    upstream = Net::HTTP.new(uri.host, uri.port, nil)
+    upstream.open_timeout = 3
+    upstream.read_timeout = 30
+    headers = {}
+    %w[accept content-type cookie origin referer x-csrftoken if-none-match].each do |key|
+      headers[key] = req[key] if req[key]
+    end
+    headers['Host'] = req['host']
+    headers['Accept-Encoding'] = 'identity'
+    # Local development proxy only. Production uses cms/deploy/nginx.conf.
+    proxy = Net::HTTPGenericRequest.new(req.request_method, !!req.body, req.request_method != 'HEAD', uri.request_uri, headers)
+    proxy.body = req.body if req.body
+    response = upstream.request(proxy)
+    res.status = response.code.to_i
+    response.each_header do |key, value|
+      res[key] = value unless %w[connection transfer-encoding content-length set-cookie].include?(key)
+    end
+    response.get_fields('set-cookie').to_a.each { |cookie| res.cookies << WEBrick::Cookie.parse_set_cookie(cookie) }
+    res.body = response.body || ''
+  rescue IOError, SystemCallError, Timeout::Error => e
+    warn "CMS upstream unavailable: #{e.class}"
+    res.status = 503
+    res['Content-Type'] = 'text/plain; charset=utf-8'
+    res.body = 'CMS is unavailable. Start the Django CMS service on port 8090.'
+  end
+end
 
 trap('INT') { srv.shutdown }
 trap('TERM') { srv.shutdown }

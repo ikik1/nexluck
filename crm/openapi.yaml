@@ -23,7 +23,97 @@ tags:
   - name: Customers
   - name: Segments
   - name: Games
+  - name: Casinos
 paths:
+  /casinos:
+    servers:
+      - url: /crm/ui-api/v1
+        description: CRM browser UI prototype (no bearer token)
+      - url: /crm/api/v1
+        description: Secured server-to-server API
+    get:
+      tags: [Casinos]
+      operationId: listCasinoWebsites
+      summary: List persisted casino website configurations
+      security: [{ oauth2: ["casinos:read"] }]
+      responses:
+        '200':
+          description: Website configurations, not live availability
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  total: { type: integer }
+                  items: { type: array, items: { $ref: '#/components/schemas/CasinoWebsite' } }
+        '401': { description: Missing or invalid token on secured API }
+        '403': { description: Missing casinos read scope }
+    post:
+      tags: [Casinos]
+      operationId: createCasinoWebsite
+      summary: Save a website configuration (does not deploy a website)
+      security: [{ oauth2: ["casinos:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/CasinoWebsiteWrite' }
+                - { required: [name, url, theme] }
+      responses:
+        '201':
+          description: Persisted website
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CasinoWebsite' }
+        '422': { description: Validation failed with field errors }
+        '401': { description: Missing or invalid token on secured API }
+        '403': { description: Missing casinos write scope }
+  /casinos/{id}:
+    servers:
+      - url: /crm/ui-api/v1
+      - url: /crm/api/v1
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, pattern: '^CS-[a-f0-9]{16}$' }
+    get:
+      tags: [Casinos]
+      operationId: getCasinoWebsite
+      summary: Get a website configuration
+      security: [{ oauth2: ["casinos:read"] }]
+      responses:
+        '200':
+          description: Website
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CasinoWebsite' }
+        '404': { description: Website not found }
+        '401': { description: Missing or invalid token on secured API }
+        '403': { description: Missing casinos read scope }
+    patch:
+      tags: [Casinos]
+      operationId: updateCasinoWebsite
+      summary: Edit settings or enable/disable stored configuration
+      security: [{ oauth2: ["casinos:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CasinoWebsiteWrite' }
+      responses:
+        '200':
+          description: Persisted website
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CasinoWebsite' }
+        '404': { description: Website not found }
+        '422': { description: Validation failed with field errors }
+        '401': { description: Missing or invalid token on secured API }
+        '403': { description: Missing casinos write scope }
   /segments:
     servers:
       - url: /crm/ui-api/v1
@@ -981,11 +1071,32 @@ components:
             segments:write: Create and edit customer segments
             games:read: Read game catalog, publishers and categories
             games:write: Edit games and manage game categories
+            casinos:read: Read casino website configurations
+            casinos:write: Create and edit casino website configurations
     basicAuth:
       type: http
       scheme: basic
       description: client_id and client_secret, used only at the token endpoint.
   schemas:
+    CasinoWebsiteWrite:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        url: { type: string, format: uri, maxLength: 2048, description: Absolute HTTP(S) URL without credentials }
+        theme: { type: string, enum: [classic, modern, dark] }
+        enabled: { type: boolean, default: true, description: Stored configuration status only }
+    CasinoWebsite:
+      type: object
+      required: [id, name, url, theme, enabled, created_at, updated_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        url: { type: string, format: uri }
+        theme: { type: string, enum: [classic, modern, dark] }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
     GameCategoryWrite:
       type: object
       description: Partial update; creation requires name. Copy sources add existing game references once on save (deduplicated), never duplicate game records or sync future changes. Dynamic categories cannot have fixed games, copy sources or automatic sorting. Unknown fields are rejected.

@@ -327,6 +327,7 @@ function SegmentEditor({ segment, parameters, customers, onSave, onClose }) {
   </SegmentDialog>;
 }
 
+const SegmentSelection = globalThis.createSegmentSelection(React);
 function SegmentWidget({ state, customers = null, customer = null, selected = [], onToggle, onSelect, extraNames = [], selectionOwner = 'bonus', onClose }) {
   const [query, setQuery] = React.useState('');
   const [editor, setEditor] = React.useState(null);
@@ -345,16 +346,11 @@ function SegmentWidget({ state, customers = null, customer = null, selected = []
     {state.error && <p role="alert" className="error">{state.error} <button type="button" className="btn" onClick={state.load}>Retry</button></p>}
     {onSelect && <p className="hint">Double-click a row to toggle selection. Keyboard: focus a row and press Enter or Space. Selections are saved with the {selectionOwner}.</p>}
     {customer && <p className="hint">Only segments currently matching this customer are shown. Membership is calculated, not manually assigned.</p>}
-    <div className="segment-library">{!state.loading && !state.error && shown.map(segment => <div className={'segment-library-item' + (isSelected(segment) ? ' selected' : '')} key={segment.id}
-      tabIndex={onSelect || onToggle ? 0 : undefined} aria-label={'Select segment ' + segment.name}
-      onDoubleClick={e => { if (!e.target.closest('button')) select(segment); }}
-      onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); select(segment); } }}>
-      <div>{onToggle ? <label className="segment-choice"><input type="checkbox" checked={selected.includes(segment.id)} onChange={() => onToggle(segment.id)} /><SegmentTags segments={[segment]} /></label> : <SegmentTags segments={[segment]} />}
-        {segment.rules ? <p className="segment-preview">{segmentRuleText(segment.rules, state.parameters)}</p> : <p className="segment-preview">Existing {selectionOwner} segment</p>}
-        {segment.members && <p className="hint">{segment.members.length} matching {segment.members.length === 1 ? 'customer' : 'customers'}</p>}
-      </div>
-      {segment.rules && <button type="button" className="btn" onClick={() => setEditor({ segment })} aria-label={'Edit segment ' + segment.name}>Edit</button>}
-    </div>)}</div>
+    {!state.loading && !state.error && <SegmentSelection entries={shown}
+      selected={shown.filter(isSelected).map(s => s.id)} onSelect={select} checkbox={Boolean(onToggle)}
+      renderDetails={segment => <>{segment.rules ? <p className="segment-preview">{segmentRuleText(segment.rules, state.parameters)}</p> : <p className="segment-preview">Existing {selectionOwner} segment</p>}
+        {segment.members && <p className="hint">{segment.members.length} matching {segment.members.length === 1 ? 'customer' : 'customers'}</p>}</>}
+      renderActions={segment => segment.rules && <button type="button" className="btn" onClick={() => setEditor({ segment })} aria-label={'Edit segment ' + segment.name}>Edit</button>} />}
     {!state.loading && !state.error && !shown.length && <p className="hint">No matching segments.</p>}
     <div className="customer-actions"><button type="button" className="btn" onClick={onClose}>Done</button></div>
     {editor && <SegmentEditor segment={editor.segment} parameters={state.parameters} customers={customers}
