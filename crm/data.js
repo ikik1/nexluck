@@ -206,6 +206,7 @@ function mountCRMNavigation() {
 
 function chrome(crumb){
 document.getElementById('hdr').innerHTML=`<a class="brand" href="/crm/"><div class="logo">N</div>NexLuck</a>
+<div class="crm-context" id="crm-context"></div>
 <div class="right"><div class="meta"><span>User <b>${USER.name}</b></span><i class="sep"></i><span>Device <b>${USER.device}</b></span><i class="sep"></i><span>Last login <b>${USER.last}</b></span><i class="sep"></i><span>Subscription <b class="badge">${USER.plan}</b></span></div>
 <button class="gear" title="Settings" aria-label="Settings">⚙️</button></div>`;
 document.getElementById('sub').innerHTML=`<button id="crm-nav-reveal" type="button" aria-label="AI navigation" title="AI navigation" aria-controls="crm-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h12M3 12h9M3 19h12M18 8l1.2 2.8L22 12l-2.8 1.2L18 16l-1.2-2.8L14 12l2.8-1.2L18 8Z"/></svg></button><div class="crm-navigation" id="crm-navigation" hidden>
@@ -216,4 +217,5 @@ document.getElementById('sub').innerHTML=`<button id="crm-nav-reveal" type="butt
 <p id="crm-nav-status" role="status">Local navigation: type a request, then choose a suggestion. Tab completes.</p></div>${crumb||''}`;
 mountCRMNavigation();
 document.getElementById('ftr').innerHTML=`<span>Powered by NexLuck</span>|<a href="#">Terms of Services</a>|<a href="#">Privacy Policy</a>`;
+CRMContext.attach();
 }

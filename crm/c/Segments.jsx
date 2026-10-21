@@ -1,12 +1,13 @@
 const SEGMENT_API = '/crm/ui-api/v1/segments';
 async function apiRequest(url, options = {}) {
-  const response = await fetch(url, options);
+  const response = await CRMContext.fetch(url, options);
   if (!response.headers.get('Content-Type')?.includes('application/json')) {
     throw new Error(`CRM API unavailable (HTTP ${response.status}). Start or update the CRM API server.`);
   }
   const body = await response.json();
   if (!response.ok) {
     const error = new Error(body.error || `Request failed (${response.status})`);
+    error.status = response.status;
     error.fields = body.fields || {};
     throw error;
   }
@@ -28,6 +29,7 @@ function segmentFacts(customer, now = Date.now()) {
     country: customer.country, geo_zone: COUNTRIES[customer.country]?.[1], currency: customer.currency, lang: customer.lang,
     age: today.getUTCFullYear() - birthday.getUTCFullYear() - Number(birthdayPending), gender: customer.gender,
     funnel_status: customer.funnel_status, registration_date: customer.created_at.slice(0, 10), account_age: daysOld,
+    legacy_group: customer.legacy_groups || [],
     kyc_status: customer.kyc_status,
     days_since_login: customer.activity.last_login_at ? Math.max(0, Math.floor((now - Date.parse(customer.activity.last_login_at)) / 86400000)) : null,
     hours_in_game: customer.activity.overall_game_hours, session_time: customer.activity.last_session_hours,
@@ -285,7 +287,7 @@ function segmentDraftError(node, parameters) {
   return visit(node, 0);
 }
 
-function SegmentEditor({ segment, parameters, customers, onSave, onClose }) {
+function SegmentEditor({ segment, parameters, customers, ownerId, onSave, onClose }) {
   const [rules, setRules] = React.useState(() => {
     if (!segment) return { kind: 'group', operator: 'AND', not: false, children: [newSegmentRule(parameters[0])] };
     const rules = JSON.parse(JSON.stringify(segment.rules));
@@ -305,15 +307,17 @@ function SegmentEditor({ segment, parameters, customers, onSave, onClose }) {
     if (validation) { setError(validation); return; }
     setBusy(true); setError('');
     try {
-      const saved = await apiRequest(SEGMENT_API + (segment ? '/' + segment.id : ''), {
-        method: segment ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: currentName, rules })
+      const saved = await apiRequest(SEGMENT_API + (segment ? '/' + (segment.object_id || segment.id) : ''), {
+        casinoId: ownerId, method: segment ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: currentName, rules })
       });
-      onSave(saved);
+      onSave(CRMContext.reporting ? { ...saved, original_name: saved.name, object_id: saved.id, id: ownerId + ':' + saved.id, casino_id: ownerId,
+        name: saved.name + ' (' + CRMContext.casinos.find(site => site.id === ownerId)?.name + ', ' + ownerId + ')' } : saved);
     } catch (e) { setError(e.fields && Object.keys(e.fields).length ? Object.entries(e.fields).map(([key, value]) => key + ': ' + value).join('; ') : e.message); }
     finally { setBusy(false); }
   };
   return <SegmentDialog title={segment ? 'Edit segment' : 'New segment'} wide busy={busy} onClose={onClose}>
     <form onSubmit={save}>
+      {ownerId && <p className="notice">Owner casino: {CRMContext.casinos.find(site => site.id === ownerId)?.name} ({ownerId}). This saves operational configuration, not report filters.</p>}
       <label className="field">Segment name<input aria-label="Segment name" value={currentName} maxLength={200} required disabled={busy} onChange={e => { setName(e.target.value); setManualName(true); }} /></label>
       <button type="button" className="btn" disabled={busy} onClick={() => setManualName(false)}>Use automatic name</button>
       <p className="notice">Membership is calculated from current demo customer and wallet data. Money rules use their selected currency. Missing data does not match, including under NOT.</p>
@@ -331,6 +335,20 @@ const SegmentSelection = globalThis.createSegmentSelection(React);
 function SegmentWidget({ state, customers = null, customer = null, selected = [], onToggle, onSelect, extraNames = [], selectionOwner = 'bonus', onClose }) {
   const [query, setQuery] = React.useState('');
   const [editor, setEditor] = React.useState(null);
+  const [ownerId, setOwnerId] = React.useState('');
+  const [ownerParameters, setOwnerParameters] = React.useState([]);
+  const [ownerError, setOwnerError] = React.useState('');
+  const [ownerLoading, setOwnerLoading] = React.useState(false);
+  React.useEffect(() => {
+    if (!CRMContext.reporting || !ownerId) return;
+    let current = true;
+    setOwnerLoading(true); setOwnerParameters([]); setOwnerError('');
+    apiRequest(SEGMENT_API + '/parameters', { casinoId: ownerId })
+      .then(result => { if (current) setOwnerParameters(result.items); })
+      .catch(error => { if (current) setOwnerError(error.message); })
+      .finally(() => { if (current) setOwnerLoading(false); });
+    return () => { current = false; };
+  }, [ownerId]);
   const memberships = state.segments.map(segment => ({ ...segment,
     members: customers ? customers.filter(c => evaluateSegment(segment.rules, segmentFacts(c), state.parameters) === true) : null
   }));
@@ -341,7 +359,11 @@ function SegmentWidget({ state, customers = null, customer = null, selected = []
   const isSelected = segment => selected.includes(onSelect ? segment.name : segment.id);
   const select = segment => onSelect ? onSelect(segment) : onToggle?.(segment.id);
   return <SegmentDialog title={customer ? customer.name + ' segments' : 'Segments'} wide onClose={onClose}>
-    <div className="segment-widget-tools"><label className="field">Search segments<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label><button type="button" className="btn pri" disabled={state.loading || Boolean(state.error)} onClick={() => setEditor({ segment: null })}>+ New segment</button></div>
+    {CRMContext.reporting && <label className="field">Owner casino for segment changes<select aria-label="Owner casino for segment changes" value={ownerId} onChange={e => setOwnerId(e.target.value)}>
+      <option value="">Select owner explicitly</option>{CRMContext.casinos.map(site => <option value={site.id} key={site.id}>{site.name} ({site.id})</option>)}
+    </select></label>}
+    {ownerError && <p role="alert" className="error">{ownerError}</p>}
+    <div className="segment-widget-tools"><label className="field">Search segments<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label><button type="button" className="btn pri" disabled={state.loading || Boolean(state.error) || (CRMContext.reporting && (!ownerId || ownerLoading || !ownerParameters.length))} onClick={() => setEditor({ segment: null })}>+ New segment</button></div>
     {state.loading && <p role="status" className="hint">Loading segments...</p>}
     {state.error && <p role="alert" className="error">{state.error} <button type="button" className="btn" onClick={state.load}>Retry</button></p>}
     {onSelect && <p className="hint">Double-click a row to toggle selection. Keyboard: focus a row and press Enter or Space. Selections are saved with the {selectionOwner}.</p>}
@@ -350,10 +372,10 @@ function SegmentWidget({ state, customers = null, customer = null, selected = []
       selected={shown.filter(isSelected).map(s => s.id)} onSelect={select} checkbox={Boolean(onToggle)}
       renderDetails={segment => <>{segment.rules ? <p className="segment-preview">{segmentRuleText(segment.rules, state.parameters)}</p> : <p className="segment-preview">Existing {selectionOwner} segment</p>}
         {segment.members && <p className="hint">{segment.members.length} matching {segment.members.length === 1 ? 'customer' : 'customers'}</p>}</>}
-      renderActions={segment => segment.rules && <button type="button" className="btn" onClick={() => setEditor({ segment })} aria-label={'Edit segment ' + segment.name}>Edit</button>} />}
+      renderActions={segment => segment.rules && <button type="button" className="btn" disabled={CRMContext.reporting && (ownerId !== segment.casino_id || ownerLoading || !ownerParameters.length)} onClick={() => setEditor({ segment })} aria-label={'Edit segment ' + segment.name}>Edit</button>} />}
     {!state.loading && !state.error && !shown.length && <p className="hint">No matching segments.</p>}
     <div className="customer-actions"><button type="button" className="btn" onClick={onClose}>Done</button></div>
-    {editor && <SegmentEditor segment={editor.segment} parameters={state.parameters} customers={customers}
+    {editor && <SegmentEditor segment={editor.segment && CRMContext.reporting ? { ...editor.segment, name: editor.segment.original_name } : editor.segment} ownerId={CRMContext.reporting ? ownerId : undefined} parameters={CRMContext.reporting ? ownerParameters : state.parameters} customers={customers}
       onClose={() => setEditor(null)} onSave={segment => { state.saved(segment); setEditor(null); }} />}
   </SegmentDialog>;
 }

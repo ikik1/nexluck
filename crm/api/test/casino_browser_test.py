@@ -18,9 +18,9 @@ async def check_browser(base):
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         await page.goto(base + "/crm/")
-        await page.locator('a[href="/crm/c/l/"]').click()
+        await page.locator('a[href^="/crm/c/l/"]').click()
         await page.locator("tr[data-website-id]").first.wait_for()
-        assert await page.locator("tr[data-website-id]").count() == 5
+        assert await page.locator("tr[data-website-id]").count() == 6
         assert await page.title() == "NexLuck CRM — My Casinos"
         assert await page.evaluate("crmNavigationMatches('casino websites')[0].href") == "/crm/c/l/"
         await page.get_by_role("button", name="Add new web-site", exact=True).click()
@@ -77,14 +77,14 @@ async def check_browser(base):
             status=422, content_type="application/json", body='{"error":"Validation failed","fields":{"name":"Try another name"}}'))
         await editor.get_by_role("button", name="Add web-site", exact=True).click()
         await editor.get_by_role("alert").filter(has_text="Try another name").wait_for()
-        assert await page.locator("tr[data-website-id]").count() == 6
+        assert await page.locator("tr[data-website-id]").count() == 7
         await page.unroute("**/crm/ui-api/v1/casinos")
         for width in [320, 414, 1440]:
             await page.set_viewport_size({"width": width, "height": 896})
             assert await editor.evaluate("e=>e.scrollWidth<=e.clientWidth && e.getBoundingClientRect().right<=innerWidth")
         await editor.get_by_role("button", name="Add web-site", exact=True).click()
         await editor.wait_for(state="hidden")
-        assert await page.locator("tr[data-website-id]").count() == 7
+        assert await page.locator("tr[data-website-id]").count() == 8
         await page.set_viewport_size({"width": 320, "height": 896})
         assert await page.evaluate("document.documentElement.scrollWidth<=innerWidth")
         await row.get_by_role("button", name="Actions for Aurora Updated", exact=True).click()
@@ -93,14 +93,14 @@ async def check_browser(base):
         await page.route("**/crm/ui-api/v1/casinos", lambda route: route.fulfill(
             status=503, content_type="application/json", body='{"error":"Websites unavailable"}'))
         await page.reload()
-        await page.get_by_role("alert").filter(has_text="Websites unavailable").wait_for()
+        await page.locator("main").get_by_role("alert").filter(has_text="Websites unavailable").wait_for()
         assert await page.get_by_text("No casino websites yet. Add your first web-site.", exact=True).count() == 0
         await page.unroute("**/crm/ui-api/v1/casinos")
         await page.get_by_role("button", name="Retry", exact=True).click()
         await page.locator("tr[data-website-id]").first.wait_for()
-        assert await page.locator("tr[data-website-id]").count() == 7
+        assert await page.locator("tr[data-website-id]").count() == 8
         await page.goto(base + "/crm/section.html?s=casinos")
-        await page.wait_for_url("**/crm/c/l/")
+        await page.wait_for_url("**/crm/c/l/**")
         await page.locator("tr[data-website-id]").first.wait_for()
         assert not errors, errors
         await browser.close()
@@ -161,7 +161,7 @@ def main():
             server = start(port, env)
             asyncio.run(check_browser(base))
             before = request(base, "/crm/ui-api/v1/casinos")
-            assert before[1]["total"] == 7
+            assert before[1]["total"] == 8
             assert Path(storage, "casino_websites.json").stat().st_mode & 0o777 == 0o600
             server.terminate()
             server.wait(timeout=10)

@@ -115,8 +115,8 @@ class CustomerStoreTest < Minitest::Test
   end
 
   def test_segment_parameter_catalog_and_allowed_operators
-    assert_equal 36, CustomerSegments::PARAMETERS.length
-    assert_equal 36, CustomerSegments::BY_KEY.length
+    assert_equal 37, CustomerSegments::PARAMETERS.length
+    assert_equal 37, CustomerSegments::BY_KEY.length
     CustomerSegments::PARAMETERS.each do |parameter|
       value = case parameter['type']
               when 'list' then [parameter['options'].first]

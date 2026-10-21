@@ -22,7 +22,7 @@ async def browser_checks(base):
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         await page.goto(base + "/crm/")
-        await page.locator('a[href="/crm/g/"]').first.click()
+        await page.locator('a[href^="/crm/g/"]').first.click()
         await page.locator("tr[data-game-id]").first.wait_for()
         assert await page.title() == "NexLuck CRM — Games"
         assert await page.get_by_role("combobox", name="Navigate to", exact=True, include_hidden=True).count() == 1

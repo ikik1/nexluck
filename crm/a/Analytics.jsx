@@ -133,7 +133,7 @@ function AnalyticsPage() {
     try {
       const paths = ['games', 'games/categories', 'games/publishers', 'segments/parameters', 'segments'];
       const responses = await Promise.all(paths.map(async path => {
-        const response = await fetch('/crm/ui-api/v1/' + path);
+        const response = await CRMContext.fetch('/crm/ui-api/v1/' + path);
         if (!response.headers.get('Content-Type')?.includes('application/json')) throw new Error('CRM API unavailable. Start or update the CRM API server.');
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || 'Analytics catalog request failed (HTTP ' + response.status + ').');
@@ -233,7 +233,7 @@ function AnalyticsPage() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return <>
-    <div className="analytics-notice"><strong>DEMO ANALYTICS</strong> Synthetic players and event history; not live customer, payment or casino data. Websites are fictional. All money is reported in EUR using fixed demo FX (USD 0.92, GBP 1.18). UTC, through {data.end} (today is partial; generated {data.generatedAt}). <a href="/crm/a/REPORTS.md">Report specifications & sources</a></div>
+    <div className="analytics-notice"><strong>DEMO ANALYTICS</strong> Synthetic players and event history; not live customer, payment or casino data. Websites are fictional and are not mapped to CRM casinos. Owner-qualified catalogs are reporting dimensions; synthetic segment evaluation uses the catalog owner, never the header context. Imported targeting tags have no inferred synthetic membership. All money is reported in EUR using fixed demo FX (USD 0.92, GBP 1.18). UTC, through {data.end} (today is partial; generated {data.generatedAt}). <a href="/crm/a/REPORTS.md">Report specifications & sources</a></div>
     <nav className="analytics-topics" aria-label="Report topics">{ANALYTICS_REPORTS.map(([key, title]) => <a key={key} href={'#' + key}>{title}</a>)}</nav>
     <div className="analytics-external-tools"><span role="link" aria-disabled="true" tabIndex={0} title="External BI URL is not configured">Go to external BI system <small>(not configured)</small></span><button type="button" className="btn pri" onClick={() => setAskOpen(true)}>Ask AI</button></div>
     <section className="analytics-filters" aria-label="Global report filters">
@@ -282,4 +282,4 @@ function AnalyticsPage() {
     {askOpen && <AnalyticsAskDialog data={data} filters={filters} onApply={selected => { setFilters(selected); setAskOpen(false); }} onClose={() => setAskOpen(false)} />}
   </>;
 }
-ReactDOM.createRoot(document.getElementById('root')).render(<AnalyticsPage />);
+CRMContext.mount(() => ReactDOM.createRoot(document.getElementById('root')).render(<AnalyticsPage />));

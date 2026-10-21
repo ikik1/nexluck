@@ -69,6 +69,11 @@ function CascadeEditor({ cascade, onSave, onClose }) {
   const [c, setC] = useState(() => JSON.parse(JSON.stringify(cascade)));
   const [picking, setPicking] = useState(null);
   const [errs, setErrs] = useState([]);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    CRMContext.setDirty('cascade-editor', true);
+    return () => CRMContext.setDirty('cascade-editor', false);
+  }, []);
   useEffect(() => { const k = e => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []);
   const set = (k, v) => setC(x => ({ ...x, [k]: v }));
   const setType = t => setC(x => ({ ...x, type: t, steps: x.steps.map(s => ({ ...s, value: defaultValue(t) })) }));
@@ -79,13 +84,19 @@ function CascadeEditor({ cascade, onSave, onClose }) {
   const removeStep = i => { setC(x => ({ ...x, steps: x.steps.filter((_, j) => j !== i) })); setPicking(null); };
   const move = (i, d) => setC(x => { const a = x.steps.slice(); [a[i], a[i + d]] = [a[i + d], a[i]]; return { ...x, steps: a }; });
   const insertAfter = (i, psp) => { setC(x => { const a = x.steps.slice(); a.splice(i + 1, 0, { psp, value: defaultValue(x.type) }); return { ...x, steps: a }; }); setPicking(null); };
-  const save = () => {
+  const save = async () => {
+    if (saving) return;
     const e = [];
     if (!c.name.trim()) e.push('Enter a cascade name.');
     if (!c.steps.length) e.push('Add at least one payment connection.');
     if (c.type === 'success' && c.steps.some(s => s.value === '' || s.value < 0 || s.value > 100)) e.push('Success rate thresholds must be between 0 and 100.');
     setErrs(e);
-    if (!e.length) onSave({ ...c, name: c.name.trim() });
+    if (!e.length) {
+      setSaving(true);
+      try { await onSave({ ...c, name: c.name.trim() }); }
+      catch (error) { setErrs([error.message || 'Could not save the cascade.']); }
+      finally { setSaving(false); }
+    }
   };
   return (
     <div className="modal" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -116,7 +127,7 @@ function CascadeEditor({ cascade, onSave, onClose }) {
           </div>}
         </div>
         {errs.map(e => <div key={e} className="err" role="alert">{e}</div>)}
-        <div className="dfoot"><button className="new-btn" onClick={onClose}>Cancel</button><button className="new-btn pri" onClick={save}>Save cascade</button></div>
+        <div className="dfoot"><button className="new-btn" onClick={onClose}>Cancel</button><button className="new-btn pri" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save cascade'}</button></div>
       </div>
     </div>
   );
@@ -132,8 +143,13 @@ function Cascades() {
     if (zone && c.zone !== zone && !(c.country && zoneOf(c.country) === zone)) return false;
     return true;
   }), [list, country, zone]);
-  const save = c => {
-    setList(l => c.id ? l.map(x => x.id === c.id ? c : x) : [...l, { ...c, id: Math.max(0, ...l.map(x => x.id)) + 1 }]);
+  const save = async c => {
+    const saved = await saveFinanceRecord('cascades', c);
+    setList(l => {
+      const updated = l.some(x => x.id === saved.id) ? l.map(x => x.id === saved.id ? saved : x) : [...l, saved];
+      CASCADES = updated;
+      return updated;
+    });
     setEdit(null);
   };
   const blank = { id: 0, name: '', type: 'success', country: '', zone: '', segments: [], method: '', currency: '', steps: [] };
@@ -173,4 +189,4 @@ function Cascades() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<Cascades />);
+CRMContext.mount(() => ReactDOM.createRoot(document.getElementById('root')).render(<Cascades />));

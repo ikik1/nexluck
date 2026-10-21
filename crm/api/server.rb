@@ -203,7 +203,7 @@ end
 ISSUER = 'nexluck-crm'
 AUDIENCE = 'nexluck-crm-api'
 TOKEN_TTL = 900
-SCOPES = %w[bonuses:read bonuses:write customers:read customers:write customers:credentials segments:read segments:write games:read games:write casinos:read casinos:write]
+SCOPES = %w[bonuses:read bonuses:write customers:read customers:write customers:credentials segments:read segments:write games:read games:write casinos:read casinos:write finance:read finance:write dashboard:read]
 JWT_KEY = ENV['CRM_JWT_SECRET'] || SecureRandom.hex(32)
 CLIENT_SECRET = ENV['CRM_CLIENT_SECRET'] || SecureRandom.hex(24)
 CLIENTS = {
@@ -384,11 +384,11 @@ def validate_bonus(m, existing = {})
   err['triggers.maxDepositCount'] = 'Must be greater than or equal to min deposit count' if min_cnt && max_cnt && max_cnt < min_cnt
 
   link = gm['linkType'].nil? ? 'categories' : enum.('games.linkType', gm['linkType'], GAME_LINKS)
-  game_cats = subset.('games.categories', gm['categories'].nil? ? [] : gm['categories'], CATEGORIES)
+  game_cats = subset.('games.categories', gm['categories'].nil? ? [] : gm['categories'], customer_store.game_categories.map { |c| c['id'] })
   game_id = nil
   if link == 'game'
     game_id = gm['game']
-    err['games.game'] = 'Select a game' unless GAMES.any? { |g| g['id'] == game_id }
+    err['games.game'] = 'Select a game' unless customer_store.catalog_games.any? { |g| g['id'] == game_id }
     game_cats = []
   end
 
@@ -407,13 +407,13 @@ def validate_bonus(m, existing = {})
     mba = num.('reward.maxBonusAmount', rw['maxBonusAmount'], 0, 1_000_000, false)
   end
 
-  segment_names = CUSTOMER_STORE.segments.map { |segment| segment['name'] }
+  segment_names = customer_store.segments.map { |segment| segment['name'] }
   old_availability = h.(existing['availability'])
   out = {
     'name' => name, 'description' => desc,
     'status' => enum.('status', m['status'], %w[active inactive]),
     'bonusType' => enum.('bonusType', m['bonusType'], BONUS_TYPES),
-    'category' => enum.('category', m['category'], CATEGORIES),
+    'category' => enum.('category', m['category'], customer_store.game_categories.map { |c| c['id'] }),
     'availability' => { 'startTime' => av['startTime'], 'endTime' => av['endTime'],
                         'includeSegments' => subset.('availability.includeSegments', av['includeSegments'], INCLUDE_SEGMENTS + segment_names + (old_availability['includeSegments'] || [])),
                         'excludeSegments' => subset.('availability.excludeSegments', av['excludeSegments'], EXCLUDE_SEGMENTS + segment_names + (old_availability['excludeSegments'] || [])) },
@@ -455,6 +455,10 @@ def read_json(req, res)
     return nil
   end
   body = JSON.parse(req.body.to_s)
+  if body.is_a?(Hash) && body.key?('casino_id')
+    json(res, 422, { error: 'Casino ownership is immutable and is resolved from X-Casino-Id', fields: { casino_id: 'Read-only field' } })
+    return nil
+  end
   return body if body.is_a?(Hash)
   json(res, 400, { error: 'JSON object expected' })
   nil
@@ -477,7 +481,7 @@ def update_bonus(b, clean, actor)
   if prev_event != after['triggers']['event']
     b['event'] = after['triggers']['event'] == 'on_registration' ? 'Registration' : 'Any deposit'
   end
-  CHANGELOG[b['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Updated #{changes.length} field#{changes.length == 1 ? '' : 's'}", 'changes' => changes })
+  tenant_data('changelog')[b['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Updated #{changes.length} field#{changes.length == 1 ? '' : 's'}", 'changes' => changes })
   changes
 end
 
@@ -492,27 +496,17 @@ CustomerStore.include(CasinoWebsites)
 CUSTOMER_STORE = CustomerStore.new
 CUSTOMER_STORE.initialize_game_catalog(GAMES)
 CUSTOMER_STORE.initialize_casino_websites
+require_relative 'casino_context'
+require_relative 'finance'
+CasinoContext::Tenant.include(FinanceStore)
+CASINO_CONTEXT = CasinoContext.new(CUSTOMER_STORE, {
+  'bonuses' => BONUSES, 'changelog' => CHANGELOG, 'promo_codes' => PROMO_CODES,
+  'promo_banners' => PROMO_BANNERS, 'rates' => RATES, 'rates_meta' => RATES_META
+})
 
-handler = lambda do |req, res, rest, secured|
-  LOCK.synchronize do
+scoped_handler = lambda do |req, res, rest, secured|
+  begin
     m = req.request_method
-    if rest == 'casinos' || rest.start_with?('casinos/')
-      match = rest.match(%r{\Acasinos(?:/(CS-[a-f0-9]{16}))?\z})
-      next json(res, 404, { error: 'Not found' }) unless match
-      id = match[1]
-      next json(res, 405, { error: 'Method not allowed' }) unless (id ? %w[GET PATCH] : %w[GET POST]).include?(m)
-      next if secured && !authorize(req, res, m == 'GET' ? 'casinos:read' : 'casinos:write')
-      website = id && CUSTOMER_STORE.casino_websites.find { |site| site['id'] == id }
-      next json(res, 404, { error: 'Website not found' }) if id && !website
-      if m == 'GET'
-        next json(res, 200, id ? website : { items: CUSTOMER_STORE.casino_websites, total: CUSTOMER_STORE.casino_websites.length })
-      end
-      body = read_json(req, res)
-      next unless body
-      saved, errors = CUSTOMER_STORE.save_casino_website(id, body)
-      next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
-      next json(res, m == 'POST' ? 201 : 200, saved)
-    end
     if rest == 'games' || rest.start_with?('games/')
       match = rest.match(%r{\Agames(?:/(categories|publishers|[\w-]+)(?:/([\w-]+))?)?\z})
       next json(res, 404, { error: 'Not found' }) unless match
@@ -524,24 +518,24 @@ handler = lambda do |req, res, rest, secured|
       scope = m == 'GET' && resource.nil? ? %w[games:read bonuses:read] : m == 'GET' ? 'games:read' : 'games:write'
       next if secured && !authorize(req, res, scope)
       if resource == 'publishers'
-        next json(res, 200, { items: GameCatalog::PUBLISHERS })
+        next json(res, 200, { items: customer_store.publishers })
       elsif resource == 'categories'
-        next json(res, 200, { items: CUSTOMER_STORE.game_categories }) if m == 'GET'
-        next json(res, 404, { error: 'Category not found' }) if category_id && !CUSTOMER_STORE.game_categories.any? { |c| c['id'] == category_id }
+        next json(res, 200, { items: customer_store.game_categories }) if m == 'GET'
+        next json(res, 404, { error: 'Category not found' }) if category_id && !customer_store.game_categories.any? { |c| c['id'] == category_id }
         body = read_json(req, res)
         next unless body
-        saved, errors = CUSTOMER_STORE.save_game_category(category_id, body)
+        saved, errors = customer_store.save_game_category(category_id, body)
         next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
         next json(res, m == 'POST' ? 201 : 200, saved)
       end
-      games = CUSTOMER_STORE.catalog_games
+      games = customer_store.catalog_games
       next json(res, 200, { items: games, total: games.length }) unless resource
       game = games.find { |g| g['id'] == resource }
       next json(res, 404, { error: 'Game not found' }) unless game
       next json(res, 200, game) if m == 'GET'
       body = read_json(req, res)
       next unless body
-      saved, errors = CUSTOMER_STORE.save_game(resource, body)
+      saved, errors = customer_store.save_game(resource, body)
       next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
       next json(res, 200, saved)
     end
@@ -552,17 +546,17 @@ handler = lambda do |req, res, rest, secured|
       methods = id == 'parameters' ? %w[GET] : id ? %w[GET PATCH] : %w[GET POST]
       next json(res, 405, { error: 'Method not allowed' }) unless methods.include?(m)
       next if secured && !authorize(req, res, m == 'GET' ? 'segments:read' : 'segments:write')
-      next json(res, 200, { items: CustomerSegments::PARAMETERS }) if id == 'parameters'
-      segment = id && CUSTOMER_STORE.segment(id)
+      next json(res, 200, { items: customer_store.parameters }) if id == 'parameters'
+      segment = id && customer_store.segment(id)
       next json(res, 404, { error: 'Segment not found' }) if id && !segment
       if %w[POST PATCH].include?(m)
         body = read_json(req, res)
         next unless body
-        saved, errors = CUSTOMER_STORE.save_segment(id, body)
+        saved, errors = customer_store.save_segment(id, body)
         next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
         next json(res, m == 'POST' ? 201 : 200, saved)
       end
-      next json(res, 200, id ? segment : { items: CUSTOMER_STORE.segments, total: CUSTOMER_STORE.segments.length })
+      next json(res, 200, id ? segment : { items: customer_store.segments, total: customer_store.segments.length })
     end
     if rest == 'customers' || rest.start_with?('customers/')
       match = rest.match(%r{\Acustomers(?:/(CU-\d+)(/credentials)?)?\z})
@@ -573,7 +567,7 @@ handler = lambda do |req, res, rest, secured|
       scope = credential ? 'customers:credentials' : (m == 'GET' ? 'customers:read' : 'customers:write')
       next json(res, 403, { error: 'Credential updates require the secured API' }) if credential && !secured
       next if secured && !authorize(req, res, scope)
-      customer = customer_id && CUSTOMER_STORE.find(customer_id)
+      customer = customer_id && customer_store.find(customer_id)
       next json(res, 404, { error: 'Customer not found' }) if customer_id && !customer
       if credential
         body = read_json(req, res)
@@ -582,16 +576,16 @@ handler = lambda do |req, res, rest, secured|
         unless body.keys == ['password'] && password.is_a?(String) && password.length.between?(12, 256)
           next json(res, 422, { error: 'Validation failed', fields: { password: 'Supply only a password of 12 to 256 characters' } })
         end
-        CUSTOMER_STORE.set_password(customer_id, password)
+        customer_store.set_password(customer_id, password)
         next json(res, 200, { updated: true })
       elsif m == 'PATCH'
         body = read_json(req, res)
         next unless body
-        saved, errors = CUSTOMER_STORE.update(customer_id, body)
+        saved, errors = customer_store.update(customer_id, body)
         next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
         next json(res, 200, saved)
       end
-      next json(res, 200, customer_id ? customer : { items: CUSTOMER_STORE.list, total: CUSTOMER_STORE.list.length })
+      next json(res, 200, customer_id ? customer : { items: customer_store.list, total: customer_store.list.length })
     end
     route = case rest
             when 'bonuses' then [:list, %w[GET POST]]
@@ -610,7 +604,7 @@ handler = lambda do |req, res, rest, secured|
     actor = secured ? req.attributes['client'].to_s : 'v.kovalevskiy'
     bonus = nil
     if id
-      bonus = BONUSES.find { |x| x['id'] == id }
+      bonus = tenant_data('bonuses').find { |x| x['id'] == id }
       next json(res, 404, { error: 'Bonus not found' }) unless bonus
     end
 
@@ -621,8 +615,7 @@ handler = lambda do |req, res, rest, secured|
         next unless body
         clean, errors = validate_bonus(body)
         next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
-        next_id = BONUSES.map { |b| b['id'][/\d+\z/].to_i }.max + 1
-        id = "BN-#{next_id}"
+        id = customer_store.owned_ids('BN')
         detail = {
           'id' => id, 'name' => clean['name'], 'status' => clean['status'], 'hasPromo' => false,
           'createdAt' => Date.today.to_s, 'dateStart' => clean['availability']['startTime'][0, 10],
@@ -632,9 +625,9 @@ handler = lambda do |req, res, rest, secured|
           'bonusType' => clean['bonusType'], 'groups' => clean['availability']['includeSegments'], 'deleted' => false,
           'createdBy' => actor
         }.merge(clean.reject { |k, _| k == 'status' || k == 'bonusType' })
-        BONUSES << detail
-        CHANGELOG[id] = [{ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => 'Bonus created', 'changes' => [] }]
-        PROMO_CODES[id] = []
+        tenant_data('bonuses') << detail
+        tenant_data('changelog')[id] = [{ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => 'Bonus created', 'changes' => [] }]
+        tenant_data('promo_codes')[id] = []
         next json(res, 201, detail)
       end
       limit = [[(req.query['limit'] || 20).to_i, 1].max, 100].min
@@ -648,7 +641,7 @@ handler = lambda do |req, res, rest, secured|
         selected[group] = vals
       end
       next json(res, 400, { error: bad }) if bad
-      searched = BONUSES.select { |b| ql.empty? || b['name'].downcase.include?(ql) || b['id'].downcase.include?(ql) }
+      searched = tenant_data('bonuses').select { |b| ql.empty? || b['name'].downcase.include?(ql) || b['id'].downcase.include?(ql) }
       matches = lambda do |b, skip|
         selected.all? { |g, vals| g == skip || vals.empty? || vals.any? { |v| FILTERS[g][v].call(b) } }
       end
@@ -662,7 +655,7 @@ handler = lambda do |req, res, rest, secured|
       json(res, 200, { items: (list[offset, limit] || []).map { |b| list_view(b) }, total: list.length, offset: offset, limit: limit, counts: counts })
     when :promo_codes
       if m == 'GET'
-        json(res, 200, { items: PROMO_CODES[bonus['id']] })
+        json(res, 200, { items: tenant_data('promo_codes')[bonus['id']] })
       else
         body = read_json(req, res)
         next unless body
@@ -677,7 +670,7 @@ handler = lambda do |req, res, rest, secured|
         if requested
           if !requested.is_a?(String) || requested !~ /\A[A-Z0-9_-]{4,32}\z/
             errors['code'] = 'Use 4-32 characters: A-Z, 0-9, _ or -'
-          elsif PROMO_CODES.values.flatten.any? { |item| item['code'] == requested }
+          elsif tenant_data('promo_codes').values.flatten.any? { |item| item['code'] == requested }
             errors['code'] = 'Code already exists'
           end
         end
@@ -686,16 +679,16 @@ handler = lambda do |req, res, rest, secured|
         loop do
           break if code
           candidate = "PROMO-#{SecureRandom.alphanumeric(8).upcase}"
-          code = candidate unless PROMO_CODES.values.flatten.any? { |item| item['code'] == candidate }
+          code = candidate unless tenant_data('promo_codes').values.flatten.any? { |item| item['code'] == candidate }
         end
         item = { 'code' => code, 'startTime' => start_time, 'endTime' => end_time,
                  'createdAt' => Time.now.utc.iso8601 }
-        PROMO_CODES[bonus['id']] << item
-        CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Generated promo code #{code}", 'changes' => [] })
+        tenant_data('promo_codes')[bonus['id']] << item
+        tenant_data('changelog')[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Generated promo code #{code}", 'changes' => [] })
         json(res, 201, item)
       end
     when :promo_code
-      codes = PROMO_CODES[bonus['id']]
+      codes = tenant_data('promo_codes')[bonus['id']]
       item = codes.find { |x| x['code'] == promo_code }
       next json(res, 404, { error: 'Promo code not found' }) unless item
       if m == 'PATCH'
@@ -705,18 +698,18 @@ handler = lambda do |req, res, rest, secured|
         errors = {}
         if !requested.is_a?(String) || requested !~ /\A[A-Z0-9_-]{4,32}\z/
           errors['code'] = 'Use 4-32 characters: A-Z, 0-9, _ or -'
-        elsif requested != promo_code && PROMO_CODES.values.flatten.any? { |x| x['code'] == requested }
+        elsif requested != promo_code && tenant_data('promo_codes').values.flatten.any? { |x| x['code'] == requested }
           errors['code'] = 'Code already exists'
         end
         next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
         if requested != promo_code
           item['code'] = requested
-          CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Renamed promo code #{promo_code} to #{requested}", 'changes' => [] })
+          tenant_data('changelog')[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Renamed promo code #{promo_code} to #{requested}", 'changes' => [] })
         end
         next json(res, 200, item)
       end
       codes.delete(item)
-      CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Deleted promo code #{promo_code}", 'changes' => [] })
+      tenant_data('changelog')[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => "Deleted promo code #{promo_code}", 'changes' => [] })
       json(res, 200, { deleted: promo_code })
     when :detail
       next json(res, 200, bonus) if m == 'GET'
@@ -727,22 +720,22 @@ handler = lambda do |req, res, rest, secured|
       update_bonus(bonus, clean, actor)
       json(res, 200, bonus)
     when :changelog
-      json(res, 200, { items: CHANGELOG[bonus['id']] })
+      json(res, 200, { items: tenant_data('changelog')[bonus['id']] })
     when :delete
       bonus['deleted'] = true
-      CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => 'Marked as deleted', 'changes' => [] })
+      tenant_data('changelog')[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => 'Marked as deleted', 'changes' => [] })
       json(res, 200, list_view(bonus))
     when :promo_banner
       if m == 'GET'
-        json(res, 200, PROMO_BANNERS[bonus['id']] || PROMO_BANNER_DEFAULT.call)
+        json(res, 200, (tenant_data('promo_banners')[bonus['id']] || PROMO_BANNER_DEFAULT.call).merge('casino_id' => customer_store.casino_id))
       else
         body = read_json(req, res)
         next unless body
         banner, errors = validate_banner(body)
         next json(res, 422, { error: 'Validation failed', fields: errors }) unless errors.empty?
-        PROMO_BANNERS[bonus['id']] = banner
+        tenant_data('promo_banners')[bonus['id']] = banner
         bonus['hasPromo'] = true
-        CHANGELOG[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => 'Updated promo banner', 'changes' => [] })
+        tenant_data('changelog')[bonus['id']].unshift({ 'at' => Time.now.utc.iso8601, 'by' => actor, 'summary' => 'Updated promo banner', 'changes' => [] })
         json(res, 200, banner)
       end
     when :rates
@@ -750,14 +743,30 @@ handler = lambda do |req, res, rest, secured|
         body = read_json(req, res)
         next unless body
         rates = body['rates']
-        bad = rates.is_a?(Hash) ? rates.reject { |k, v| RATES.key?(k) && v.is_a?(Numeric) && v > 0 && v <= 100_000 } : { 'rates' => 'object expected' }
+        bad = rates.is_a?(Hash) ? rates.reject { |k, v| tenant_data('rates').key?(k) && v.is_a?(Numeric) && v > 0 && v <= 100_000 } : { 'rates' => 'object expected' }
         next json(res, 422, { error: 'Validation failed', fields: bad.transform_values { |v| v.is_a?(String) ? v : 'Must be a number > 0 for a supported currency' } }) unless bad.empty?
-        rates.each { |k, v| RATES[k] = v.to_f }
-        RATES_META.merge!('updatedAt' => Time.now.utc.iso8601, 'updatedBy' => actor)
+        rates.each { |k, v| tenant_data('rates')[k] = v.to_f }
+        tenant_data('rates_meta').merge!('updatedAt' => Time.now.utc.iso8601, 'updatedBy' => actor)
       end
-      json(res, 200, { base: 'EUR', rates: RATES, updatedAt: RATES_META['updatedAt'], updatedBy: RATES_META['updatedBy'] })
+      json(res, 200, { casino_id: customer_store.casino_id, base: 'EUR', rates: tenant_data('rates'), updatedAt: tenant_data('rates_meta')['updatedAt'], updatedBy: tenant_data('rates_meta')['updatedBy'] })
     end
   end
+end
+
+handler = lambda do |req, res, rest, secured|
+  LOCK.synchronize do
+    CASINO_CONTEXT.dispatch(req, res, rest, secured) { scoped_handler.call(req, res, rest, secured) }
+    CASINO_CONTEXT.record_failure(req, res, rest)
+  end
+rescue WEBrick::HTTPStatus::Unauthorized
+  json(res, 401, { error: 'CRM operator authentication required' })
+rescue CasinoContext::InvalidReference => error
+  warn "CRM ownership validation failed: #{error.message}"
+  json(res, 422, { error: error.message })
+  CASINO_CONTEXT.record_failure(req, res, rest)
+rescue JSON::ParserError, KeyError, IOError, SystemCallError => error
+  warn "CRM context request failed: #{error.class}: #{error.message}"
+  json(res, 500, { error: 'CRM storage operation failed. No successful save was confirmed.' })
 end
 
 # WEBrick's proc handler only answers GET/POST by default.

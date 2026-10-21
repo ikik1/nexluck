@@ -6,9 +6,9 @@ const fmt = ts => { const d = new Date(ts); return `${d.getDate()} ${MONTHS[d.ge
 const money = (n, c) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + c;
 const signed = (n, c) => (n >= 0 ? '+' : '−') + money(Math.abs(n), c);
 const PAGE = 25;
-const COUNTRY_LIST = [...new Set(PLAYERS.map(p => p.country))].sort((a, b) => COUNTRIES[a][0].localeCompare(COUNTRIES[b][0]));
 
 function Wallets() {
+  const countryList = [...new Set(WALLETS.map(wallet => wallet.country))].sort((a, b) => (COUNTRIES[a] || [a])[0].localeCompare((COUNTRIES[b] || [b])[0]));
   const empty = { player: '', segment: '', country: '', type: '' };
   const [f, setF] = useState(empty);
   const [tab, setTab] = useState('wallets');
@@ -33,7 +33,7 @@ function Wallets() {
       <div className="ff">
         <label className="fld q">Player<input type="text" placeholder="Search by player name…" value={f.player} onChange={e => set('player', e.target.value)} /></label>
         <label className="fld">Segment<select value={f.segment} onChange={e => set('segment', e.target.value)}><option value="">All segments</option>{ALL_SEGMENTS.map(s => <option key={s}>{s}</option>)}</select></label>
-        <label className="fld">Country<select value={f.country} onChange={e => set('country', e.target.value)}><option value="">All countries</option>{COUNTRY_LIST.map(c => <option key={c} value={c}>{COUNTRIES[c][0]}</option>)}</select></label>
+        <label className="fld">Country<select value={f.country} onChange={e => set('country', e.target.value)}><option value="">All countries</option>{countryList.map(c => <option key={c} value={c}>{(COUNTRIES[c] || [c])[0]}</option>)}</select></label>
         <label className="fld">Wallet type<select value={f.type} onChange={e => set('type', e.target.value)}><option value="">All wallet types</option>{WALLET_TYPES.map(t => <option key={t}>{t}</option>)}</select></label>
         {dirty && <button className="link" style={{ paddingBottom: 10 }} onClick={() => { setF(empty); setShown(PAGE); }}>Clear filters</button>}
       </div>
@@ -103,4 +103,4 @@ function Wallets() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<Wallets />);
+CRMContext.mount(() => ReactDOM.createRoot(document.getElementById('root')).render(<Wallets />));

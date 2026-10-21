@@ -468,3 +468,21 @@ Run `python3 crm/api/test/analytics_browser_test.py` for route, filter, reconcil
 cohort maturity, funnel, CSV, empty/invalid/error recovery and responsive checks.
 Run `python3 crm/api/test/navigation_browser_test.py` for the complete navigation
 index. Static frontend only; no new server routes or private persistence files.
+# Casino ownership and operational context
+
+The CRM header context does not filter, regenerate or reset Analytics. Reporting
+catalog requests use the read-only `/crm/ui-api/v1/reporting/*` boundary and
+independently configured `CRM_REPORTING_CASINOS` permissions. Segment, game,
+category and provider IDs are qualified with casino identity; duplicate names
+are labeled with casino name/ID instead of merging definitions.
+
+The existing fictional website dimension remains fictional: no historical
+facts are relabeled as real casino events. Synthetic players use their selected
+catalog game's owner only when evaluating that owner's rules. Imported legacy
+targeting tags have no inferred synthetic membership. Rules concerning ordinary
+game/category/provider names evaluate against original business names, while
+report labels disambiguate their owners.
+
+Creating/editing a segment requires explicitly selecting its operational owner
+inside the segment dialog. This does not infer an owner from the header or All
+websites; changes use normal owner-authorized operational APIs.

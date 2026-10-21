@@ -123,6 +123,14 @@ module GameCatalog
     @game_catalog['categories']
   end
 
+  def publisher_catalog
+    PUBLISHERS
+  end
+
+  def currency_codes
+    CURRENCIES
+  end
+
   def save_game(id, body)
     original = catalog_games.find { |game| game['id'] == id }
     errors = {}
@@ -151,7 +159,7 @@ module GameCatalog
       errors[key] = "Must be a finite number between #{min} and #{max}" unless value.is_a?(Numeric) && value.finite? && value.between?(min, max)
     end
     allowed_segments = segments.map { |s| s['name'] } + original['segments']
-    { 'segments' => allowed_segments, 'deposit_currencies' => CURRENCIES, 'attributes' => ATTRIBUTES, 'tags' => nil }.each do |key, options|
+    { 'segments' => allowed_segments, 'deposit_currencies' => currency_codes, 'attributes' => ATTRIBUTES, 'tags' => nil }.each do |key, options|
       value = clean[key]
       valid = value.is_a?(Array) && value.length <= 100 && value.all? { |v| v.is_a?(String) && !v.strip.empty? && v.length <= 200 }
       valid &&= (value - options).empty? if options
@@ -190,7 +198,7 @@ module GameCatalog
     errors['cms_identifier'] = 'CMS identifier must be unique' if game_categories.any? { |c| c['id'] != id && c['cms_identifier'] == cms }
     options = {
       'game_ids' => @game_catalog['games'].map { |g| g['id'] },
-      'copy_provider_ids' => PUBLISHERS.map { |p| p['id'] },
+      'copy_provider_ids' => publisher_catalog.map { |p| p['id'] },
       'copy_category_ids' => game_categories.select { |c| c['kind'] == 'static' && c['id'] != id }.map { |c| c['id'] },
       'segments' => (segments.map { |s| s['name'] } + original['segments']),
       'tags' => nil

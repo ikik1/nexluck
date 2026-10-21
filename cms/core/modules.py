@@ -53,13 +53,13 @@ def validate_with(schema):
 
 def promotion_data(site, props):
     from .crm import promotion_bonuses
-    return promotion_bonuses(props)
+    return promotion_bonuses(props, casino_id=site.crm_id)
 
 
 def crm_data(resource):
     def fetch(site, props):
         from .crm import catalog_data
-        return catalog_data(resource, props)
+        return catalog_data(resource, props, casino_id=site.crm_id)
     return fetch
 
 

@@ -6,9 +6,7 @@ const NEW = QUERY.get('new') === '1';
 const AI_MODE = QUERY.get('ai') === '1';
 
 const TYPES = ['dep match', 'no-deposit', 'free spins', 'cashback', 'multiplier'];
-const CATEGORIES = [
-  ['SLOTS', 'Typical contribution - 100%'], ['TABLE_GAMES', ''], ['LIVE_CASINO', ''], ['CRASH', ''],
-];
+let CATEGORIES = [];
 const INCLUDE = ['registered', 'no_deposit', 'kyc_verified'];
 const EXCLUDE = ['restricted_countries', 'restricted_currencies'];
 const APPLIES = ['BONUS_ONLY', 'BONUS_PLUS_DEPOSIT', 'WINNINGS_ONLY'];
@@ -75,7 +73,7 @@ const fmtDate = (v, withTime) => {
 };
 const fmt = (n) => (Math.round(n * 100) / 100).toLocaleString('en-US');
 const api = async (path, opts) => {
-  const r = await fetch(API + path, opts && opts.body ? { ...opts, headers: { 'Content-Type': 'application/json' } } : opts);
+  const r = await CRMContext.fetch(API + path, opts && opts.body ? { ...opts, headers: { 'Content-Type': 'application/json' } } : opts);
   const body = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(body.error || 'Request failed'), { fields: body.fields || {}, status: r.status });
   return body;
@@ -470,7 +468,7 @@ const BANNER_IMAGES = [['web', 'Web'], ['tablet', 'Tablet'], ['mobile', 'Mobile'
 const MAX_IMAGE_BYTES = 2_000_000;
 
 function PromoModal({ initial, segments, onSave, onClose }) {
-  const [b, setB] = useState(initial);
+  const [b, setB] = useState(() => Object.fromEntries(Object.keys(emptyBanner()).map(key => [key, initial[key]])));
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -564,16 +562,21 @@ function Editor() {
   const [lines, setLines] = useState([]);
   const highlightTimer = useRef(null);
   useEffect(() => () => window.clearTimeout(highlightTimer.current), []);
+  const hasUnsavedChanges = Boolean(form && ((!orig && NEW) || JSON.stringify(form) !== JSON.stringify(pick(orig)) || bannerDirty));
+  useEffect(() => {
+    CRMContext.setDirty('bonus-editor', hasUnsavedChanges);
+    return () => CRMContext.setDirty('bonus-editor', false);
+  }, [hasUnsavedChanges]);
 
   const load = () => api('/bonuses/' + ID).then((b) => {
     setOrig(b);
     setForm(pick(b));
     setPromoDates({ startTime: b.availability.startTime, endTime: b.availability.endTime });
-    api('/bonuses/' + b.id + '/promo-banner').then(setBanner).catch(() => {});
+    api('/bonuses/' + b.id + '/promo-banner').then(setBanner).catch(error => setStatus({ bad: true, text: error.message }));
   }).catch((e) => setStatus({ bad: true, text: e.message }));
   useEffect(() => {
     document.title = NEW ? 'NexLuck CRM — New bonus' : 'NexLuck CRM — Edit bonus';
-    api('/games').then((r) => setGames(r.items)).catch(() => {});
+    api('/games').then((r) => setGames(r.items)).catch(error => setStatus({ bad: true, text: error.message }));
     if (ID) load();
     else if (NEW) { setOrig(null); setForm(emptyBonus()); }
     else setStatus({ bad: true, text: 'Missing bonus id' });
@@ -855,4 +858,7 @@ function Editor() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<Editor />);
+CRMContext.mount(() => {
+  CATEGORIES = CRMContext.catalogs.categories.filter(category => category.kind === 'static').map(category => [category.id, category.name]);
+  ReactDOM.createRoot(document.getElementById('root')).render(<Editor />);
+});

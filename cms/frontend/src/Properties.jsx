@@ -17,7 +17,7 @@ export function Dialog({ title, onClose, children }) {
   </dialog>;
 }
 
-function SegmentPicker({ value, onChange }) {
+function SegmentPicker({ siteId, value, onChange }) {
   const [open, setOpen] = useState(false);
   const [segments, setSegments] = useState([]);
   const [query, setQuery] = useState('');
@@ -25,7 +25,7 @@ function SegmentPicker({ value, onChange }) {
   const [loading, setLoading] = useState(true);
   const load = async () => {
     setLoading(true); setError('');
-    try { setSegments((await api('/cms/api/segments/')).items); }
+    try { setSegments((await api(`/cms/api/segments/?site_id=${encodeURIComponent(siteId)}`)).items); }
     catch (e) { setError(e.message); }
     finally { setLoading(false); }
   };
@@ -73,7 +73,7 @@ function ArrayField({ value, onChange, label }) {
     }} />;
 }
 
-export function Properties({ block, schema, slots, onChange, onClose }) {
+export function Properties({ siteId, block, schema, slots, onChange, onClose }) {
   const update = (name, value) => onChange({ props: { ...block.props, [name]: value } });
   return <Dialog title={schema.label + ' properties'} onClose={onClose}>
     <p>{block.kind} · Changes appear in the private preview. Save draft to persist.</p>
@@ -81,7 +81,7 @@ export function Properties({ block, schema, slots, onChange, onClose }) {
     {Object.entries(schema.properties).map(([name, field]) => {
       const value = block.props[name] ?? field.default ?? '';
       const label = name === 'title' ? 'Module heading' : name === 'limit' ? 'Maximum items' : field.title;
-      if (field.widget === 'crm-segments') return <SegmentPicker key={name} value={value} onChange={v => update(name, v)} />;
+      if (field.widget === 'crm-segments') return <SegmentPicker key={`${siteId}:${name}`} siteId={siteId} value={value} onChange={v => update(name, v)} />;
       if (field.widget === 'html') return <HTMLField key={name} value={value} maxLength={field.maxLength} onChange={v => update(name, v)} />;
       if (field.type === 'boolean') return <label className="check" key={name}>
         <input type="checkbox" checked={value === true} onChange={e => update(name, e.target.checked)} />{label}

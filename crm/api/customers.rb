@@ -53,7 +53,7 @@ class CustomerStore
     # Upgrade existing profiles without overwriting saved fields or timestamps.
     defaults = seed
     @profiles = @profiles.map do |id, profile|
-      additions = defaults.fetch(id).select { |key, _| %w[funnel_status activity risk_indicators gender devices sessions_per_week bonus_wr_rate].include?(key) }
+      additions = defaults.fetch(id, {}).select { |key, _| %w[funnel_status activity risk_indicators gender devices sessions_per_week bonus_wr_rate].include?(key) }
       [id, additions.merge(profile)]
     end.to_h
     @credentials = load_file('credentials.json') || {}
@@ -110,7 +110,7 @@ class CustomerStore
     if @profiles.values.any? { |c| c['id'] != id && c['external_id'] == clean['external_id'] }
       errors['external_id'] = 'External ID is already in use'
     end
-    OPTIONS.merge('country' => COUNTRIES, 'currency' => CURRENCIES, 'lang' => LANGUAGES).each do |key, values|
+    profile_options.each do |key, values|
       errors[key] = 'Choose a supported value' unless values.include?(clean[key])
     end
     score = clean['risk_score']
@@ -140,6 +140,10 @@ class CustomerStore
     updated = @credentials.merge(id => record)
     write_file('credentials.json', updated)
     @credentials = updated
+  end
+
+  def profile_options
+    OPTIONS.merge('country' => COUNTRIES, 'currency' => CURRENCIES, 'lang' => LANGUAGES)
   end
 
   private

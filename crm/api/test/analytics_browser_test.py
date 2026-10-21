@@ -18,7 +18,7 @@ async def check(base):
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         await page.goto(base + "/crm/")
-        await page.locator('a[href="/crm/a/"]').first.click()
+        await page.locator('a[href^="/crm/a/"]').first.click()
         await page.get_by_role("heading", name="Filter every report", exact=True).wait_for()
         assert await page.title() == "NexLuck CRM — Analytics"
         assert await page.locator("[data-report]").count() == 16
@@ -58,7 +58,7 @@ async def check(base):
         assert await page.evaluate("crmNavigationMatches('management reports').some(p=>p.href==='/crm/a/')")
         # Construct a separate model for exact filter and aggregate checks.
         await page.evaluate("""async () => {
-          const fetchItems = async p => (await (await fetch('/crm/ui-api/v1/'+p)).json()).items;
+          const fetchItems = async p => (await (await CRMContext.fetch('/crm/ui-api/v1/'+p)).json()).items;
           const [games,categories,publishers,parameters,segments] = await Promise.all(
             ['games','games/categories','games/publishers','segments/parameters','segments'].map(fetchItems));
           window.testAnalytics = createAnalyticsDemo(games,categories,publishers,
@@ -94,7 +94,7 @@ async def check(base):
           if(milestones.some((n,i)=>i>0 && n>milestones[i-1])) throw Error('Non-monotone pipeline');
           return {profiles:scope.players.length,facts:scope.rows.length};
         }""", {"from": from_date, "to": to_date})
-        assert f'{result["profiles"]} scoped profiles / {result["facts"]} activity facts' in await page.get_by_role("status").inner_text()
+        assert f'{result["profiles"]} scoped profiles / {result["facts"]} activity facts' in await page.locator("main").get_by_role("status").inner_text()
         await page.evaluate("""({from,to}) => {
           const previous=analyticsPrevious(testAnalytics,{from,to,site:ANALYTICS_SITES[0]});
           if(!previous || Date.parse(previous.to)!==Date.parse(from)-ANALYTICS_DAY) throw Error('Comparison adjacency');
@@ -135,12 +135,14 @@ async def check(base):
               const rows=testAnalytics.rows.filter(r=>ids.has(r.player) && r.date>=from && r.date<=to);
               return players.length+' scoped profiles / '+rows.length+' activity facts';
             }""", {"key": key, "value": value, "from": from_date, "to": to_date})
-            assert expected in await page.get_by_role("status").inner_text(), label
+            assert expected in await page.locator("main").get_by_role("status").inner_text(), label
             assert await page.locator("[data-report]").count() == 16
             await control.select_option("")
         # Shared Customer segment definitions, OR selection and removable tags.
         await page.get_by_role("button", name="Segments", exact=True).click()
         segments_dialog = page.get_by_role("dialog", name="Segments", exact=True)
+        assert not await segments_dialog.get_by_role("button", name="+ New segment", exact=True).is_enabled()
+        await segments_dialog.get_by_label("Owner casino for segment changes").select_option("CS-0000000000000001")
         await segments_dialog.get_by_role("button", name="+ New segment", exact=True).click()
         editor = page.get_by_role("dialog", name="New segment", exact=True)
         await editor.get_by_label("Segment name", exact=True).fill("Analytics Germany")
@@ -153,29 +155,29 @@ async def check(base):
         await values_dialog.get_by_role("button", name="Apply values", exact=True).click()
         await editor.get_by_role("button", name="Save segment", exact=True).click()
         await editor.wait_for(state="hidden")
-        await segments_dialog.get_by_label("Select segment Analytics Germany", exact=True).dblclick()
+        await segments_dialog.get_by_label("Select segment Analytics Germany", exact=False).dblclick()
         await segments_dialog.get_by_role("button", name="Done", exact=True).click()
         expected = await page.evaluate("""async ({from,to}) => {
-          testAnalytics.segmentDefinitions=(await (await fetch(SEGMENT_API)).json()).items;
-          const saved=testAnalytics.segmentDefinitions.find(s=>s.name==='Analytics Germany');
+          testAnalytics.segmentDefinitions=(await (await CRMContext.fetch(SEGMENT_API)).json()).items;
+          const saved=testAnalytics.segmentDefinitions.find(s=>s.original_name==='Analytics Germany');
           const scope=analyticsScope(testAnalytics,{from,to,segment:[saved.id]});
           if(!scope.players.length || scope.players.some(p=>p.country!=='DE')) throw Error('Saved custom rules ignored');
           return scope.players.length+' scoped profiles / '+scope.rows.length+' activity facts';
         }""", {"from": from_date, "to": to_date})
-        assert expected in await page.get_by_role("status").first.inner_text()
+        assert expected in await page.locator("main").get_by_role("status").first.inner_text()
         await page.locator(".analytics-segment-filter .segment-tag button").click()
         await page.get_by_role("button", name="Segments", exact=True).click()
         for name in ["VIP", "REGISTERED"]:
-            await segments_dialog.get_by_label("Select segment " + name, exact=True).dblclick()
+            await segments_dialog.get_by_label("Select segment " + name + " (Aurora Casino, CS-0000000000000001)", exact=True).dblclick()
         await segments_dialog.get_by_role("button", name="Done", exact=True).click()
         assert await page.locator(".analytics-segment-filter .segment-tag").count() == 2
         expected = await page.evaluate("""({from,to}) => {
-          const ids=testAnalytics.segmentDefinitions.filter(s=>['VIP','REGISTERED'].includes(s.name)).map(s=>s.id);
+          const ids=testAnalytics.segmentDefinitions.filter(s=>s.casino_id==='CS-0000000000000001' && ['VIP','REGISTERED'].includes(s.original_name)).map(s=>s.id);
           const scope=analyticsScope(testAnalytics,{from,to,segment:ids});
           if(scope.players.some(p=>!p.segmentIds.some(id=>ids.includes(id)))) throw Error('Segment OR mismatch');
           return scope.players.length+' scoped profiles / '+scope.rows.length+' activity facts';
         }""", {"from": from_date, "to": to_date})
-        assert expected in await page.get_by_role("status").first.inner_text()
+        assert expected in await page.locator("main").get_by_role("status").first.inner_text()
         remove = page.locator(".analytics-segment-filter .segment-tag button").first
         await remove.click()
         assert await page.locator(".analytics-segment-filter .segment-tag").count() == 1
@@ -191,10 +193,12 @@ async def check(base):
         assert "Pragmatic Play" in csv
         await page.evaluate("""() => {
           const data=testAnalytics, filters={from:analyticsDate(Date.parse(data.end)-29*ANALYTICS_DAY),to:data.end};
-          const vip=data.segmentDefinitions.find(s=>s.name==='VIP');
+          const vips=data.segmentDefinitions.filter(s=>s.original_name==='VIP'), vip=vips[0];
           const answer=analyticsAsk(data,filters,'Show me GGR for a customer segment VIP for today');
-          if(answer.error || answer.filters.segment[0]!==vip.id || answer.filters.from!==data.end || answer.filters.to!==data.end) throw Error('VIP today parsing');
-          const expected=analyticsSummary(analyticsScope(data,{...filters,from:data.end,to:data.end,segment:[vip.id]}));
+          if(answer.error || answer.filters.segment.length!==vips.length || answer.filters.from!==data.end || answer.filters.to!==data.end) throw Error('VIP today parsing');
+          const specific=analyticsAsk(data,filters,'GGR segment '+vip.name+' today');
+          if(specific.error || specific.filters.segment.length!==1 || specific.filters.segment[0]!==vip.id) throw Error('Owner qualified segment parsing');
+          const expected=analyticsSummary(analyticsScope(data,{...filters,from:data.end,to:data.end,segment:vips.map(s=>s.id)}));
           if(Math.abs(expected.ggr-answer.totals.ggr)>1e-8) throw Error('AI GGR');
           const top=analyticsAsk(data,filters,'What are my cusomers with higherst GGR');
           if(top.error || top.rows.some((r,i)=>i && r.ggr>top.rows[i-1].ggr)) throw Error('AI ranking');
@@ -248,7 +252,8 @@ async def check(base):
             assert await ask.evaluate("e=>e.scrollWidth<=e.clientWidth && e.getBoundingClientRect().right<=innerWidth")
         await ask.get_by_role("button", name="Apply this scope to dashboard", exact=True).first.click()
         assert await page.get_by_label("From", exact=True).input_value() == await page.evaluate("testAnalytics.end")
-        assert await page.locator(".analytics-segment-filter .segment-tag").count() == 1
+        assert await page.locator(".analytics-segment-filter .segment-tag").count() == await page.evaluate(
+            "testAnalytics.segmentDefinitions.filter(segment=>segment.original_name==='VIP').length")
         await page.get_by_role("button", name="Reset filters", exact=True).click()
         # Exact-day retention fixture: an immature registrant must not dilute D7.
         await page.evaluate("""() => {
@@ -271,7 +276,7 @@ async def check(base):
         await page.get_by_label("Funnel status", exact=True).select_option("Lead")
         await page.get_by_label("KYC status", exact=True).select_option("VERIFIED")
         await page.get_by_label("Game", exact=True).select_option(index=1)
-        assert "0 activity facts" in await page.get_by_role("status").first.inner_text()
+        assert "0 activity facts" in await page.locator("main").get_by_role("status").first.inner_text()
         assert "N/A" in await page.locator(".analytics-kpis").inner_text()
         await page.get_by_role("button", name="Reset filters", exact=True).click()
         await page.get_by_label("From", exact=True).fill(to_date)
@@ -295,10 +300,10 @@ async def check(base):
         await page.get_by_role("button", name="Retry analytics", exact=True).click()
         await page.locator('[data-report="retention"]').wait_for()
         await page.goto(base + "/a/")
-        await page.wait_for_url("**/crm/a/")
+        await page.wait_for_url("**/crm/a/**")
         await page.locator('[data-report="retention"]').wait_for()
         await page.goto(base + "/crm/section.html?s=analytics")
-        await page.wait_for_url("**/crm/a/")
+        await page.wait_for_url("**/crm/a/**")
         await page.locator('[data-report="retention"]').wait_for()
         assert not errors, errors
         await browser.close()

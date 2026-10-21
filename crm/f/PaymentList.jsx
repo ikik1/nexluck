@@ -117,8 +117,13 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
   });
 
   const [testMsg, setTestMsg] = useState('');
-  const [testing, setTesting] = useState(false);
   const [errs, setErrs] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    CRMContext.setDirty('payment-editor', true);
+    return () => CRMContext.setDirty('payment-editor', false);
+  }, []);
 
   useEffect(() => {
     const k = e => { if (e.key === 'Escape') onClose(); };
@@ -164,28 +169,21 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
   };
 
   const runTest = () => {
-    setTesting(true);
-    setTestMsg('Connecting to ' + data.brand + ' endpoint…');
-    setTimeout(() => {
-      setTesting(false);
-      if (data.status === 'offline') {
-        setTestMsg('Connection failed: Gateway endpoint returned 504 Gateway Timeout.');
-      } else {
-        setTestMsg('Connection successful: Credentials verified · Latency 142 ms · TLS 1.3 OK');
-      }
-    }, 700);
+    setTestMsg('Live gateway verification is not configured. Saving stores configuration only; it does not verify credentials.');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return;
     const e = [];
     if (!data.name.trim()) e.push('Connection name is required.');
     if (!data.brand) e.push('Payment brand must be selected.');
     if (!data.countries.length) e.push('Select at least one country.');
     setErrs(e);
     if (!e.length) {
-      onSave({
+      setSaving(true);
+      try { await onSave({
         ...conn,
-        id: data.id || Math.max(0, ...PAYMENT_CONNECTIONS.map(c => c.id)) + 1,
+        id: data.id,
         name: data.name.trim(),
         brand: data.brand,
         currency: data.currency,
@@ -194,7 +192,11 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
         methods: data.methods,
         conn: data.status,
         settings: data.settings,
-      });
+      }); } catch (error) {
+        setErrs([error.message || 'Could not save the payment connection.']);
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
@@ -301,11 +303,11 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
         {errs.map(e => <div key={e} className="err" role="alert">{e}</div>)}
 
         <div className="dfoot">
-          <button type="button" className="new-btn btn-left" onClick={runTest} disabled={testing}>
-            {testing ? 'Testing…' : '⚡ Test connection'}
+          <button type="button" className="new-btn btn-left" onClick={runTest}>
+            ⚡ Test connection
           </button>
           <button type="button" className="new-btn" onClick={onClose}>Cancel</button>
-          <button type="button" className="new-btn pri" onClick={handleSave}>Save connection</button>
+          <button type="button" className="new-btn pri" disabled={saving} onClick={handleSave}>{saving ? 'Saving…' : 'Save connection'}</button>
         </div>
         {showSegments && <SegmentWidget state={segmentState} selected={data.segments}
           extraNames={[...ALL_SEGMENTS, ...data.segments]} selectionOwner="payment connection"
@@ -336,7 +338,8 @@ function PaymentList() {
     });
   }, [connections, applied, zones]);
 
-  const saveConnection = saved => {
+  const saveConnection = async draft => {
+    const saved = await saveFinanceRecord('connections', draft);
     setConnections(list => {
       const idx = list.findIndex(x => x.id === saved.id);
       let updated;
@@ -436,4 +439,4 @@ function PaymentList() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<PaymentList />);
+CRMContext.mount(() => ReactDOM.createRoot(document.getElementById('root')).render(<PaymentList />));

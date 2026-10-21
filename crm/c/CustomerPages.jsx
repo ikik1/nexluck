@@ -8,8 +8,9 @@ const CUSTOMER_FIELDS = [
   ['kyc_status', 'KYC status'], ['birthday', 'Birthday'], ['aml_status', 'AML status'], ['funnel_status', 'Funnel status'], ['info', 'Info']
 ];
 const CUSTOMER_OPTIONS = {
-  country: Object.keys(COUNTRIES).sort((a, b) => COUNTRIES[a][0].localeCompare(COUNTRIES[b][0])), currency: CURRENCIES,
-  lang: ['en', 'de', 'sv', 'pl', 'pt', 'fr', 'hi', 'ar', 'th'],
+  get country() { return CRMContext.catalogs.countries.map(record => record.code).sort((a, b) => COUNTRIES[a][0].localeCompare(COUNTRIES[b][0])); },
+  get currency() { return CRMContext.catalogs.currencies.map(record => record.code); },
+  get lang() { return CRMContext.catalogs.languages.map(record => record.code); },
   gender: ['Female', 'Male', 'Non-binary', 'Undisclosed'],
   mfa_type: ['NONE', 'TOTP', 'SMS', 'EMAIL'],
   kyc_status: ['NOT_STARTED', 'PENDING', 'VERIFIED', 'REJECTED'],
@@ -114,6 +115,10 @@ function CustomerEdit({ customer, onClose, onSave }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const formRef = useRef(null);
+  useEffect(() => {
+    CRMContext.setDirty('customer-editor', true);
+    return () => CRMContext.setDirty('customer-editor', false);
+  }, []);
   useEffect(() => {
     const previous = document.activeElement;
     const oldOverflow = document.body.style.overflow;
@@ -316,4 +321,4 @@ function CustomerInfo() {
   </>;
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(location.pathname.includes('/c/i') ? <CustomerInfo /> : <CustomerList />);
+CRMContext.mount(() => ReactDOM.createRoot(document.getElementById('root')).render(location.pathname.includes('/c/i') ? <CustomerInfo /> : <CustomerList />));

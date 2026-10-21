@@ -12,9 +12,22 @@ class CRMUnavailable(Exception):
     pass
 
 
-def crm_get(path, *, paginate=False):
+def require_casino_id(casino_id):
+    if not isinstance(casino_id, str) or not casino_id.strip():
+        raise CRMUnavailable("This CMS site is not linked to a CRM casino.")
+    return casino_id
+
+
+def casino_cache_key(prefix, casino_id):
+    owner = hashlib.sha256(require_casino_id(casino_id).encode()).hexdigest()
+    return f"cms:{prefix}:v2:{owner}"
+
+
+def crm_get(path, *, casino_id=None, paginate=False):
     base = settings.CRM_API_BASE.rstrip("/")
     headers = {"Accept": "application/json"}
+    if path != "casinos":
+        headers["X-Casino-Id"] = require_casino_id(casino_id)
     try:
         with httpx.Client(timeout=httpx.Timeout(4.0, connect=2.0), follow_redirects=False, trust_env=False) as client:
             if settings.CRM_DEMO_UI:
@@ -54,12 +67,12 @@ def crm_get(path, *, paginate=False):
         raise CRMUnavailable("CRM catalog unavailable. Please retry.") from exc
 
 
-def catalog_data(resource, props):
+def catalog_data(resource, props, *, casino_id):
     path = {"games": "games", "categories": "games/categories", "publishers": "games/publishers", "bonuses": "bonuses"}[resource]
-    key = "cms:catalog:v1:" + resource
+    key = casino_cache_key("catalog:" + resource, casino_id)
     items = cache.get(key)
     if items is None:
-        raw = crm_get(path, paginate=resource == "bonuses")
+        raw = crm_get(path, casino_id=casino_id, paginate=resource == "bonuses")
         if resource == "games":
             items = [{"id": g["id"], "name": g["name"], "provider": g["publisher_id"], "categories": g.get("category_ids", [])}
                      for g in raw if g.get("enabled")]
@@ -76,24 +89,25 @@ def catalog_data(resource, props):
     return {"items": selected[:props.get("limit", 8)], "source": "CRM catalog", "ttl": 30}
 
 
-def segment_catalog():
-    raw = crm_get("segments")
+def segment_catalog(*, casino_id):
+    raw = crm_get("segments", casino_id=require_casino_id(casino_id))
     return [{"id": s["id"], "name": s["name"]} for s in raw]
 
 
-def promotion_bonuses(props):
-    items = cache.get("cms:promotion-bonuses:v1")
+def promotion_bonuses(props, *, casino_id):
+    key = casino_cache_key("promotion-bonuses", casino_id)
+    items = cache.get(key)
     if items is None:
-        raw = crm_get("bonuses", paginate=True)
+        raw = crm_get("bonuses", casino_id=casino_id, paginate=True)
         items = [{"id": b["id"], "external_id": b["id"], "name": b["name"],
                   "created_at": b["createdAt"], "groups": b.get("groups", [])}
                  for b in raw if b.get("status") == "active" and not b.get("deleted")]
-        cache.set("cms:promotion-bonuses:v1", items, 30)
+        cache.set(key, items, 30)
     segment_ids = props.get("custom_segment", [])
     names = set()
     if segment_ids:
         from rest_framework.exceptions import ValidationError
-        segments = {s["id"]: s["name"] for s in segment_catalog()}
+        segments = {s["id"]: s["name"] for s in segment_catalog(casino_id=casino_id)}
         if set(segment_ids) - segments.keys():
             raise ValidationError({"custom_segment": "Select existing CRM segment IDs."})
         names = {segments[s] for s in segment_ids}

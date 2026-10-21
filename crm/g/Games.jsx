@@ -53,7 +53,7 @@ function GameEditor({ game, categories, games, publishers, onCategorySaved, onSa
         <GameChecks label="Categories" options={categories.filter(c => c.kind === 'static').map(c => [c.id, c.name])} values={categoryIds} disabled />
         <button type="button" className="game-categories-edit" aria-label="Edit game categories" disabled={busy} onClick={() => setCategoriesOpen(true)}><span>Click to edit</span></button>
       </div>
-      <GameChecks label="Deposit currencies" options={CURRENCIES.map(c => [c, c])} values={draft.deposit_currencies} onChange={v => set('deposit_currencies', v)} />
+      <GameChecks label="Deposit currencies" options={CRMContext.catalogs.currencies.map(record => [record.code, record.code])} values={draft.deposit_currencies} onChange={v => set('deposit_currencies', v)} />
       <GameChecks label="Game attributes" options={GAME_ATTRIBUTES} values={draft.attributes} onChange={v => set('attributes', v)} />
       {error && <div role="alert" className="error">{error}<ul>{Object.entries(fields).map(([key, message]) => <li key={key}>{key}: {message}</li>)}</ul></div>}
       <div className="customer-actions"><button className="btn" type="button" disabled={busy} onClick={onClose}>Cancel</button><button className="btn pri" disabled={busy}>Save game</button></div>
@@ -394,4 +394,4 @@ function GamesPage() {
   </>;
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<GamesPage />);
+CRMContext.mount(() => ReactDOM.createRoot(document.getElementById('root')).render(<GamesPage />));

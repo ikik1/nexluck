@@ -1,9 +1,21 @@
 openapi: 3.0.3
 info:
   title: NextLuck CRM API
-  version: 1.0.0
+  version: 1.1.0
   description: |
     REST API behind the CRM Bonuses (`/crm/b/`) and Customers (`/crm/c/list/`) pages.
+
+    ## Casino ownership
+    Operational endpoints require `X-Casino-Id: CS-...`. Missing or malformed context returns
+    400, an unpermitted casino returns 403, and a foreign detail or nested object returns 404.
+    Ownership is server assigned and immutable; request bodies containing `casino_id` return 422.
+    Lists, search, facets, nested resources and mutations share the same tenant store.
+    The casino registry, OAuth and `/reporting/*` endpoints are explicitly global.
+    Reporting is read-only and uses separate reporting permissions, never the operational header.
+
+    Browser routes default to visibly labeled demo-only operation. Production operators must
+    use `CRM_UI_MODE=authenticated` with configured credentials, HTTPS and casino permission
+    lists. OAuth alone does not authenticate the browser UI.
 
     ## Server-to-server authentication
     OAuth 2.0 **client credentials** grant (RFC 6749 §4.4). The calling server exchanges its `client_id` / `client_secret`
@@ -24,7 +36,57 @@ tags:
   - name: Segments
   - name: Games
   - name: Casinos
+  - name: Finance
+  - name: Reporting
+  - name: Dashboard
 paths:
+  /dashboard:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+    get:
+      tags: [Dashboard]
+      operationId: getCasinoHomeDashboard
+      summary: Get persisted casino-specific demo summary cards for CRM Home
+      description: |
+        Seeded summaries are synthetic samples, not derived operational balances or reports.
+        Every casino has an independent stable snapshot. No customers, payments or history
+        are created by this seed. The My Casinos card reflects the permitted global registry.
+        Analytics reports remain independently filtered despite the context-specific Home teaser.
+      security: [{ oauth2: ["dashboard:read"] }]
+      responses:
+        '200':
+          description: Casino-specific demo snapshot plus actual global registry card
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [casino_id, source, version, sections]
+                properties:
+                  casino_id: { type: string, readOnly: true }
+                  source: { type: string, enum: [synthetic_demo] }
+                  version: { type: integer }
+                  sections:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [value, label, metrics]
+                      properties:
+                        value: { type: string }
+                        label: { type: string }
+                        metrics:
+                          type: array
+                          minItems: 4
+                          maxItems: 4
+                          items:
+                            type: object
+                            required: [label, value, tone]
+                            properties:
+                              label: { type: string }
+                              value: { type: string }
+                              tone: { type: string, enum: ['', up, down] }
+        '400': { description: Missing or malformed X-Casino-Id }
+        '403': { description: Casino or dashboard read scope not permitted }
+        '405': { description: Dashboard is read-only }
   /casinos:
     servers:
       - url: /crm/ui-api/v1
@@ -53,6 +115,11 @@ paths:
       tags: [Casinos]
       operationId: createCasinoWebsite
       summary: Save a website configuration (does not deploy a website)
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string, minLength: 8, maxLength: 200 }
       security: [{ oauth2: ["casinos:write"] }]
       requestBody:
         required: true
@@ -71,6 +138,180 @@ paths:
         '422': { description: Validation failed with field errors }
         '401': { description: Missing or invalid token on secured API }
         '403': { description: Missing casinos write scope }
+        '400': { description: Missing or invalid Idempotency-Key }
+        '409': { description: Source revision changed, or key reused with a different request }
+  /casinos/clone-preview:
+    post:
+      tags: [Casinos]
+      operationId: previewCasinoConfigurationCopy
+      summary: Resolve configuration group dependencies and counts without creating a casino
+      security: [{ oauth2: ["casinos:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_id, groups]
+              properties:
+                source_id: { type: string, pattern: '^CS-[a-f0-9]{16}$' }
+                groups: { $ref: '#/components/schemas/CopyGroups' }
+      responses:
+        '200':
+          description: Source revision, requested/dependency groups and per-type counts; no credentials or history
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClonePreview' }
+        '403': { description: Source or scope not permitted }
+        '422': { description: Invalid groups or unsupported dependencies }
+  /context-events:
+    post:
+      tags: [Casinos]
+      operationId: recordContextChange
+      summary: Record a platform preference event without changing business objects
+      security: [{ oauth2: ["casinos:read"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                from: { type: string, nullable: true }
+                to: { type: string }
+      responses:
+        '200': { description: Preference event recorded }
+        '403': { description: Context not permitted }
+  /finance:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+    get:
+      tags: [Finance]
+      operationId: getCasinoFinance
+      summary: Casino-owned connections, gateways, cascades and financial records
+      security: [{ oauth2: ["finance:read"] }]
+      responses:
+        '200':
+          description: Finance data; histories exist only where originally owned, never globally reseeded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [connections, gateways, cascades, wallets, wallet_transactions, transactions, players, game_catalog]
+                additionalProperties: { type: array, items: { type: object } }
+        '400': { description: Missing or malformed X-Casino-Id }
+        '403': { description: Casino or scope not permitted }
+  /finance/{resource}:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+      - in: path
+        name: resource
+        required: true
+        schema: { type: string, enum: [connections, cascades] }
+    post:
+      tags: [Finance]
+      operationId: createCasinoFinanceConfiguration
+      summary: Create an owner-validated connection or cascade
+      security: [{ oauth2: ["finance:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Persisted configuration }
+        '400': { description: Missing or malformed context }
+        '403': { description: Casino or scope not permitted }
+        '422': { description: Validation failed; secrets required before enabling cloned connections }
+  /finance/{resource}/{id}:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+      - in: path
+        name: resource
+        required: true
+        schema: { type: string, enum: [connections, cascades] }
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Finance]
+      operationId: updateCasinoFinanceConfiguration
+      security: [{ oauth2: ["finance:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Updated configuration }
+        '404': { description: Owner-local object not found }
+        '422': { description: Invalid configuration or foreign reference }
+    delete:
+      tags: [Finance]
+      operationId: deleteCasinoFinanceConfiguration
+      security: [{ oauth2: ["finance:write"] }]
+      responses:
+        '200': { description: Deleted configuration }
+        '404': { description: Owner-local object not found }
+        '422': { description: Connection is still referenced by a cascade }
+  /catalogs:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+    get:
+      tags: [Games]
+      operationId: getCasinoCatalogs
+      summary: Owner-local providers, categories, currencies, countries and languages
+      security: [{ oauth2: ["games:read"] }]
+      responses:
+        '200': { description: Independent casino catalogs }
+        '400': { description: Missing or malformed context }
+        '403': { description: Casino or read scope not permitted }
+  /reporting/segments:
+    get:
+      tags: [Reporting]
+      operationId: getReportingSegments
+      summary: Read-only reporting segments independent of operational context
+      description: |
+        Object IDs are qualified as casino_id:object_id. Rows include object_id, casino_id,
+        casino_name, original_name and a disambiguated name. Related IDs are qualified too.
+        The synthetic Analytics website dimension remains explicitly synthetic and independent.
+      security: [{ oauth2: ["segments:read"] }]
+      responses: &ReportingResponses
+        '200': { description: Reporting-permitted owner-qualified dimensions }
+        '403': { description: Reporting permissions or corresponding resource read scope required }
+        '405': { description: Reporting does not accept mutations; choose an explicit operational owner }
+  /reporting/segments/parameters:
+    get:
+      tags: [Reporting]
+      operationId: getReportingSegmentParameters
+      summary: Immutable reporting parameter schema, not operational catalog configuration
+      security: [{ oauth2: ["segments:read"] }]
+      responses:
+        '200': { description: Parameter type, operator and protocol metadata }
+        '403': { description: Segments read scope required }
+  /reporting/games:
+    get:
+      tags: [Reporting]
+      operationId: getReportingGames
+      summary: Reporting-permitted games with qualified owner and reference identities
+      security: [{ oauth2: ["games:read"] }]
+      responses: *ReportingResponses
+  /reporting/games/categories:
+    get:
+      tags: [Reporting]
+      operationId: getReportingCategories
+      summary: Reporting-permitted categories with owner-qualified game references
+      security: [{ oauth2: ["games:read"] }]
+      responses: *ReportingResponses
+  /reporting/games/publishers:
+    get:
+      tags: [Reporting]
+      operationId: getReportingProviders
+      summary: Reporting-permitted providers with owner-qualified identities
+      security: [{ oauth2: ["games:read"] }]
+      responses: *ReportingResponses
   /casinos/{id}:
     servers:
       - url: /crm/ui-api/v1
@@ -115,6 +356,8 @@ paths:
         '401': { description: Missing or invalid token on secured API }
         '403': { description: Missing casinos write scope }
   /segments:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     servers:
       - url: /crm/ui-api/v1
         description: CRM browser UI prototype (no bearer token)
@@ -160,6 +403,8 @@ paths:
         '401': { description: Missing or invalid token on secured API }
         '403': { description: Missing segments write scope }
   /segments/parameters:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     servers:
       - url: /crm/ui-api/v1
       - url: /crm/api/v1
@@ -194,6 +439,7 @@ paths:
       - url: /crm/ui-api/v1
       - url: /crm/api/v1
     parameters:
+      - $ref: '#/components/parameters/CasinoContext'
       - in: path
         name: id
         required: true
@@ -231,6 +477,8 @@ paths:
         '404': { description: Segment not found }
         '422': { description: Invalid rule tree or duplicate name }
   /customers:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     get:
       tags: [Customers]
       summary: List persisted customer profiles (never includes credentials)
@@ -260,6 +508,7 @@ paths:
                     items: { $ref: '#/components/schemas/Customer' }
   /customers/{id}:
     parameters:
+      - $ref: '#/components/parameters/CasinoContext'
       - in: path
         name: id
         required: true
@@ -314,6 +563,7 @@ paths:
               schema: { $ref: '#/components/schemas/ValidationError' }
   /customers/{id}/credentials:
     parameters:
+      - $ref: '#/components/parameters/CasinoContext'
       - in: path
         name: id
         required: true
@@ -388,6 +638,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/OAuthError' }
   /bonuses:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     post:
       tags: [Bonuses]
       summary: Create a bonus
@@ -477,6 +729,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
   /bonuses/{id}/delete:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     post:
       tags: [Bonuses]
       summary: Mark a bonus as deleted
@@ -513,6 +767,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
   /bonuses/{id}:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     get:
       tags: [Bonuses]
       summary: Get a bonus with all its settings
@@ -600,6 +856,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ValidationError' }
   /bonuses/{id}/changelog:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     get:
       tags: [Bonuses]
       summary: Bonus changelog (newest first)
@@ -641,6 +899,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
   /bonuses/{id}/promo-banner:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     get:
       tags: [Bonuses]
       summary: Get the promo banner shown on the casino site for a bonus
@@ -696,6 +956,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
   /bonuses/{id}/promo-codes:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     get:
       tags: [Bonuses]
       summary: List promo codes for a bonus
@@ -762,6 +1024,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
   /bonuses/{id}/promo-codes/{code}:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     patch:
       tags: [Bonuses]
       summary: Change the text of a promo code
@@ -829,6 +1093,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
   /games:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     servers:
       - url: /crm/ui-api/v1
         description: CRM prototype UI API
@@ -860,6 +1126,7 @@ paths:
       - url: /crm/ui-api/v1
       - url: /crm/api/v1
     parameters:
+      - $ref: '#/components/parameters/CasinoContext'
       - in: path
         name: id
         required: true
@@ -899,6 +1166,8 @@ paths:
         '401': { description: Missing or invalid token }
         '403': { description: Missing games write scope }
   /games/publishers:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     servers:
       - url: /crm/ui-api/v1
       - url: /crm/api/v1
@@ -926,6 +1195,8 @@ paths:
                         color: { type: string }
                         logo: { type: string, description: Local SVG mark path, not an official publisher logo }
   /games/categories:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     servers:
       - url: /crm/ui-api/v1
       - url: /crm/api/v1
@@ -965,6 +1236,7 @@ paths:
       - url: /crm/ui-api/v1
       - url: /crm/api/v1
     parameters:
+      - $ref: '#/components/parameters/CasinoContext'
       - in: path
         name: categoryId
         required: true
@@ -988,6 +1260,8 @@ paths:
         '404': { description: Category not found }
         '422': { description: Invalid fields or duplicate name/CMS identifier }
   /exchange-rates:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
     get:
       tags: [Exchange rates]
       summary: Exchange rates (units of currency per 1 EUR)
@@ -1054,6 +1328,13 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ValidationError' }
 components:
+  parameters:
+    CasinoContext:
+      in: header
+      name: X-Casino-Id
+      required: true
+      description: Immutable owning casino. 400 if missing/malformed; 403 if not permitted; foreign objects are 404.
+      schema: { type: string, pattern: '^CS-[a-f0-9]{16}$' }
   securitySchemes:
     oauth2:
       type: oauth2
@@ -1073,11 +1354,32 @@ components:
             games:write: Edit games and manage game categories
             casinos:read: Read casino website configurations
             casinos:write: Create and edit casino website configurations
+            finance:read: Read casino-owned payment configuration and financial records
+            finance:write: Manage casino-owned payment connections and cascades
+            dashboard:read: Read casino-specific CRM Home sample summaries
     basicAuth:
       type: http
       scheme: basic
       description: client_id and client_secret, used only at the token endpoint.
   schemas:
+    CopyGroups:
+      type: array
+      uniqueItems: true
+      items: { type: string, enum: [segments, games, catalogs, payment_connections] }
+    ClonePreview:
+      type: object
+      required: [source_id, source_revision, requested_groups, dependency_groups, counts]
+      properties:
+        source_id: { type: string }
+        source_revision: { type: integer }
+        requested_groups: { $ref: '#/components/schemas/CopyGroups' }
+        dependency_groups: { $ref: '#/components/schemas/CopyGroups' }
+        counts: { type: object, additionalProperties: { type: integer } }
+    Ownership:
+      type: object
+      required: [casino_id]
+      properties:
+        casino_id: { type: string, readOnly: true, description: Assigned by server; cannot be transferred through ordinary writes }
     CasinoWebsiteWrite:
       type: object
       additionalProperties: false
@@ -1086,6 +1388,9 @@ components:
         url: { type: string, format: uri, maxLength: 2048, description: Absolute HTTP(S) URL without credentials }
         theme: { type: string, enum: [classic, modern, dark] }
         enabled: { type: boolean, default: true, description: Stored configuration status only }
+        source_id: { type: string, description: Creation only. Explicit permitted copy source; omitted means no copy }
+        groups: { $ref: '#/components/schemas/CopyGroups' }
+        source_revision: { type: integer, description: Creation only. Required when source_id is set; obtained from clone-preview }
     CasinoWebsite:
       type: object
       required: [id, name, url, theme, enabled, created_at, updated_at]
@@ -1097,6 +1402,14 @@ components:
         enabled: { type: boolean }
         created_at: { type: string, format: date-time, readOnly: true }
         updated_at: { type: string, format: date-time, readOnly: true }
+        clone:
+          type: object
+          nullable: true
+          description: Creation result, requested/dependency groups and per-type counts; no credentials or membership history
+          properties:
+            requested_groups: { $ref: '#/components/schemas/CopyGroups' }
+            dependency_groups: { $ref: '#/components/schemas/CopyGroups' }
+            counts: { type: object, additionalProperties: { type: integer } }
     GameCategoryWrite:
       type: object
       description: Partial update; creation requires name. Copy sources add existing game references once on save (deduplicated), never duplicate game records or sync future changes. Dynamic categories cannot have fixed games, copy sources or automatic sorting. Unknown fields are rejected.
@@ -1111,6 +1424,7 @@ components:
         copy_category_ids: { type: array, maxItems: 100, items: { type: string }, writeOnly: true, description: Static categories other than this category. }
     GameCategory:
       allOf:
+        - $ref: '#/components/schemas/Ownership'
         - $ref: '#/components/schemas/GameCategoryWrite'
         - type: object
           properties:
@@ -1144,6 +1458,7 @@ components:
         attributes: { type: array, maxItems: 100, items: { type: string, enum: [jackpot, free_spins, desktop, mobile] } }
     CatalogGame:
       allOf:
+        - $ref: '#/components/schemas/Ownership'
         - $ref: '#/components/schemas/CatalogGameWrite'
         - type: object
           properties:
@@ -1164,6 +1479,7 @@ components:
         rules: { $ref: '#/components/schemas/SegmentNode' }
     CustomerSegment:
       allOf:
+        - $ref: '#/components/schemas/Ownership'
         - $ref: '#/components/schemas/CustomerSegmentWrite'
         - type: object
           properties:
@@ -1224,6 +1540,8 @@ components:
       type: object
       additionalProperties: false
       properties:
+        casino_id: { type: string, readOnly: true, description: Immutable owning casino }
+        legacy_groups: { type: array, readOnly: true, items: { type: string }, description: Preserved imported demo tags; not inferred real-time segment membership }
         <<: *CustomerProperties
         id: { type: string, readOnly: true, example: CU-1001 }
         created_at: { type: string, format: date-time, readOnly: true }
@@ -1252,6 +1570,7 @@ components:
       type: object
       required: [id, name, status, bonusType, hasPromo, createdAt, dateStart, dateEnd, event, bonusValue, wagered, wins, received, groups, deleted]
       properties:
+        casino_id: { type: string, readOnly: true, description: Immutable owning casino }
         id: { type: string, example: BN-1001 }
         name: { type: string, example: Welcome Pack 100% }
         status: { type: string, enum: [active, inactive, auto] }
@@ -1371,6 +1690,7 @@ components:
       type: object
       description: Banner shown on the casino web site. Target segments are the bonus include segments.
       properties:
+        casino_id: { type: string, readOnly: true, description: Immutable owning casino }
         images:
           type: object
           description: Data URLs (png, jpeg, webp, gif; max about 2 MB each) or null
@@ -1393,6 +1713,7 @@ components:
     PromoCode:
       type: object
       properties:
+        casino_id: { type: string, readOnly: true, description: Immutable owning casino }
         code: { type: string, example: PROMO-7H3K9P2Q }
         startTime: { type: string, example: "2026-09-01T00:00" }
         endTime: { type: string, example: "2026-12-31T23:59" }
@@ -1427,6 +1748,7 @@ components:
     ChangelogEntry:
       type: object
       properties:
+        casino_id: { type: string, readOnly: true, description: Immutable owning casino }
         at: { type: string, format: date-time }
         by: { type: string }
         summary: { type: string }
@@ -1441,6 +1763,7 @@ components:
     ExchangeRates:
       type: object
       properties:
+        casino_id: { type: string, readOnly: true, description: Immutable owning casino }
         base: { type: string, example: EUR }
         rates: { type: object, additionalProperties: { type: number }, example: { USD: 1.08, GBP: 0.85 } }
         updatedAt: { type: string, format: date-time }

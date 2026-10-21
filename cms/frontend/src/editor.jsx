@@ -220,7 +220,7 @@ function Editor() {
       {context && block && <ContextMenu position={context} block={block} onClose={() => setContext(null)} onProperties={openProperties}
         onVisible={() => { changeBlock({ enabled: !block.enabled }); setContext(null); }}
         onRemove={() => { change({ blocks: draft.blocks.filter(b => b.key !== selected) }); setSelected(''); setContext(null); }} />}
-      {properties && block && schemas.find(s => s.key === block.kind) && <Properties block={block} slots={slots}
+      {properties && block && schemas.find(s => s.key === block.kind) && <Properties siteId={siteId} block={block} slots={slots}
         schema={schemas.find(s => s.key === block.kind)} onChange={changeBlock} onClose={() => setProperties(false)} />}
     </>}
   </>;

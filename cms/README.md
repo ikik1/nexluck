@@ -137,8 +137,13 @@ CMS belongs to the CMS draft and does not write back into CRM.
 
 ### Data boundaries
 
-- Games, categories, providers and active promotions fetch the current **global
-  CRM demo catalog** through a private fixed-origin adapter, not arbitrary URLs.
+- Games, categories, providers, segments and active promotions fetch only the
+  site's **CRM casino catalog** through a private fixed-origin adapter, not
+  arbitrary URLs. `Site.crm_id` supplies `X-Casino-Id` on every catalog request;
+  catalog caches are casino-specific. Unlinked sites fail explicitly with 503,
+  never falling back to a global catalog. Only the casino registry and module
+  property schemas remain global. Staff catalog queries require `site_id` and
+  site permission before contacting CRM.
   Game filters accept provider/category IDs and max items (1-40). Disabled games
   are omitted; output only contains allowlisted public fields. No customer PII,
   risk/financial metrics, internal bonus configuration or credentials reach
@@ -227,8 +232,8 @@ shared cache in production. Public endpoints never expose drafts.
 | `/cms/api/` | GET | Staff; self-hosted Swagger UI |
 | `/cms/api/openapi.json` | GET | Staff; module API OpenAPI 3 specification |
 | `/cms/api/modules/` | GET | Staff; parameter schemas/defaults used in Properties dialogs |
-| `/cms/api/segments/` | GET | Staff; saved CRM segment IDs/names, no customer membership |
-| `/cms/api/get_promotion_bonuses/` | GET | Staff; validated promotion catalog query |
+| `/cms/api/segments/?site_id=<id>` | GET | Site editor; saved casino-owned CRM segment IDs/names, no customer membership |
+| `/cms/api/get_promotion_bonuses/?site_id=<id>` | GET | Site editor; validated casino-owned promotion catalog query |
 
 See [frontend module API specifications](api/README.md) for parameter semantics,
 examples and public-widget boundaries. Production CRM credentials require

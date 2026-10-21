@@ -1,7 +1,8 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NexLuck CRM</title><link rel="stylesheet" href="/crm/crm.css?v=202610181450"></head>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NexLuck CRM</title><link rel="stylesheet" href="/crm/crm.css?v=202610222100"></head>
 <body><header id="hdr"></header><div class="subbar" id="sub"></div>
-<main><h1>Operator Console</h1><p class="lead">Key performance summary across your casino operation. Select a tile to open details.</p><div class="tiles" id="tiles"></div></main>
+<main><h1>Operator Console</h1><p class="lead">Key performance summary for the selected casino. Select a tile to open details.</p><p class="lead" id="home-status" role="status">Loading casino dashboard...</p><button class="btn" id="home-retry" type="button" hidden>Retry dashboard</button><div class="tiles" id="tiles"></div></main>
 <footer id="ftr"></footer>
-<script src="/crm/data.js?v=202610211200"></script>
-<script>chrome();
-document.getElementById('tiles').innerHTML=SECTIONS.map(s=>`<a class="tile" style="--c:${s.c}" href="${s.href||'/crm/section.html?s='+s.k}"><div class="top"><div class="ico">${s.i}</div>${s.n}</div><div class="big">${s.big[0]}<small>${s.big[1]}</small></div><div class="kv">${s.kv.map(x=>`<div>${x[0]}<b class="${x[2]}">${x[1]}</b></div>`).join('')}</div><span class="go">View details →</span></a>`).join('');</script></body></html>
+<script src="/crm/context.js?v=202610222100"></script>
+<script src="/crm/data.js?v=202610222100"></script>
+<script>chrome();</script>
+<script src="/crm/home.js?v=202610222200"></script></body></html>

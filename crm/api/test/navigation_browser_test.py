@@ -20,13 +20,14 @@ async def check(base):
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         await page.goto(base + "/crm/")
+        await page.locator('#tiles [data-section="games"]').wait_for()
         assert await page.locator(".crm-navigation").is_hidden()
         await page.mouse.move(900, 700)
         assert await page.locator(".crm-navigation").is_hidden()
         await page.locator("#sub").hover()
         assert await page.locator(".crm-navigation").evaluate(
             "e => e.getAnimations().some(a => a.effect.getTiming().duration === 240)")
-        assert await page.locator(".crm-navigation").is_visible()
+        await page.locator(".crm-navigation").wait_for(state="visible")
         await page.wait_for_timeout(1400)
         assert await page.locator(".crm-navigation").is_visible()
         await page.mouse.move(900, 700)
@@ -64,19 +65,19 @@ async def check(base):
         await nav.press("Tab")
         assert await nav.input_value() == "Show me list of games"
         await nav.press("Enter")
-        await page.wait_for_url("**/crm/g/")
+        await page.wait_for_url("**/crm/g/**")
         await page.locator("#crm-nav-recent").get_by_role("button", name="Show me list of games", exact=True).wait_for()
         await nav.fill("list of customers")
         await nav.press("Enter")
-        await page.wait_for_url("**/crm/c/list/")
+        await page.wait_for_url("**/crm/c/list/**")
         await page.locator("#crm-nav-recent").get_by_role("button", name="Show me list of games", exact=True).click()
-        await page.wait_for_url("**/crm/g/")
+        await page.wait_for_url("**/crm/g/**")
         await nav.fill("customer CU-1001")
         await nav.press("Enter")
-        await page.wait_for_url("**/crm/c/i/?id=CU-1001")
+        await page.wait_for_url("**/crm/c/i/?id=CU-1001*")
         await nav.fill("edit bonus BN-1001")
         await nav.press("Enter")
-        await page.wait_for_url("**/crm/b/e/?id=BN-1001")
+        await page.wait_for_url("**/crm/b/e/?id=BN-1001*")
         await nav.fill("random unmatched words")
         assert await page.locator("#crm-nav-status").inner_text() == "No CRM page matches. Try games, customers, bonuses, or API docs."
         await nav.press("Enter")
@@ -87,7 +88,7 @@ async def check(base):
         assert await nav.get_attribute("aria-expanded") == "false"
         await nav.fill("swagger")
         await nav.press("Enter")
-        await page.wait_for_url("**/crm/api-docs/")
+        await page.wait_for_url("**/crm/api-docs/**")
         await nav.wait_for()
         # Every static CRM HTML entry point is represented by a route or a
         # parameterized detail template; no customer-facing routes are indexed.

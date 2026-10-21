@@ -12,6 +12,9 @@ module CustomerSegments
     parameter('age', 'Age (date of birth)', 'Profile', 'number', nil, false, 'Completed years calculated from birthday.'),
     parameter('gender', 'Gender', 'Profile', 'list', %w[Female Male Non-binary Undisclosed]),
     parameter('funnel_status', 'Funnel status', 'Account', 'list', CUSTOMER_FUNNEL_STATUSES),
+    parameter('legacy_group', 'Imported demo targeting tag', 'Account', 'list',
+      %w[REGISTERED VIP KYC_VERIFIED FIRST_DEP HIGH_ROLLER MOBILE NO_DEPOSIT registered no_deposit kyc_verified restricted_countries restricted_currencies],
+      false, 'Preserved imported demo tags, not inferred thresholds or live segment membership.'),
     parameter('registration_date', 'Registration date', 'Account', 'date'),
     parameter('account_age', 'Account age (days)', 'Account', 'number'),
     parameter('kyc_status', 'KYC status', 'Account', 'list', CustomerStore::OPTIONS['kyc_status']),
@@ -77,13 +80,13 @@ module CustomerSegments
     }
   ].freeze
 
-  def self.validate(body)
+  def self.validate(body, parameters = PARAMETERS)
     errors = {}
     (body.keys - %w[name rules]).each { |k| errors[k] = 'Unknown or read-only field' }
     name = body['name']
     errors['name'] = 'Supply a name of 1 to 200 characters' unless name.is_a?(String) && name.strip.length.between?(1, 200)
     count = [0]
-    validate_node(body['rules'], 'rules', 0, count, errors)
+    validate_node(body['rules'], 'rules', 0, count, errors, parameters.map { |parameter| [parameter['key'], parameter] }.to_h)
     [errors.empty? ? { 'name' => name.strip, 'rules' => normalize(body['rules']) } : nil, errors]
   end
 
@@ -92,7 +95,7 @@ module CustomerSegments
     node.merge('operator' => node['operator'] == '<=' ? '=<' : node['operator'])
   end
 
-  def self.validate_node(node, path, depth, count, errors)
+  def self.validate_node(node, path, depth, count, errors, by_key = BY_KEY)
     count[0] += 1
     if depth > 5 || count[0] > 100
       errors[path] = 'Maximum depth is 5 and maximum total rule/group count is 100'
@@ -111,10 +114,10 @@ module CustomerSegments
         errors["#{path}.children"] = 'Add between 1 and 100 rules or groups'
         return
       end
-      children.each_with_index { |child, i| validate_node(child, "#{path}.children.#{i}", depth + 1, count, errors) }
+      children.each_with_index { |child, i| validate_node(child, "#{path}.children.#{i}", depth + 1, count, errors, by_key) }
       return
     end
-    unless node['kind'] == 'rule' && (parameter = BY_KEY[node['field']])
+    unless node['kind'] == 'rule' && (parameter = by_key[node['field']])
       errors[path] = 'Choose a supported segmentation parameter'
       return
     end

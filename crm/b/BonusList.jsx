@@ -88,7 +88,7 @@ function BonusList() {
     setLoading(true); setError(null);
     try {
       const params = new URLSearchParams({ status: sel.status.join(','), promo: sel.promo.join(','), bonusType: sel.bonusType.join(','), q: query, offset, limit: STEP });
-      const res = await fetch(`${API}/bonuses?${params}`, { signal: c.signal });
+      const res = await CRMContext.fetch(`${API}/bonuses?${params}`, { signal: c.signal });
       if (!res.ok) throw new Error('Server returned ' + res.status);
       const data = await res.json();
       setItems(prev => offset ? prev.concat(data.items) : data.items);
@@ -104,7 +104,7 @@ function BonusList() {
   const markDeleted = async (b) => {
     setMenu(null);
     try {
-      const res = await fetch(`${API}/bonuses/${encodeURIComponent(b.id)}/delete`, { method: 'POST' });
+      const res = await CRMContext.fetch(`${API}/bonuses/${encodeURIComponent(b.id)}/delete`, { method: 'POST' });
       if (!res.ok) throw new Error('Server returned ' + res.status);
       const upd = await res.json();
       setItems(prev => prev.map(x => x.id === upd.id ? upd : x));
@@ -161,4 +161,4 @@ function BonusList() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<BonusList />);
+CRMContext.mount(() => ReactDOM.createRoot(document.getElementById('root')).render(<BonusList />));

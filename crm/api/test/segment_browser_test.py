@@ -19,7 +19,9 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def request(base, path, method="GET", body=None, token=None):
-    headers = {"Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json", "X-Casino-Id": "CS-0000000000000001"}
+    if method == "POST" and path.endswith("/casinos"):
+        headers["Idempotency-Key"] = secrets.token_hex(16)
     if token:
         headers["Authorization"] = "Bearer " + token
     req = urllib.request.Request(base + path, headers=headers, method=method,
@@ -38,7 +40,7 @@ def start(port, env):
         if process.poll() is not None:
             raise RuntimeError(process.stderr.read().decode())
         try:
-            urllib.request.urlopen(f"http://127.0.0.1:{port}/crm/ui-api/v1/segments", timeout=1).close()
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/crm/ui-api/v1/casinos", timeout=1).close()
             return process
         except urllib.error.URLError:
             time.sleep(0.05)
@@ -114,6 +116,7 @@ async def check_browser(base):
             const facts=segmentFacts(c,now);
             const expected={country:'DE',geo_zone:'Europe',currency:'EUR',lang:'de',age:40,gender:'Female',
               funnel_status:'Lead',registration_date:'2026-08-01',account_age:73,kyc_status:'NOT_STARTED',
+              legacy_group:c.legacy_groups,
               days_since_login:1,hours_in_game:5000,session_time:3,sessions_per_week:4,devices:['Desktop','Mobile'],
               lifetime_ggr:250,net_cash_flow:1000,number_of_deposits:3,deposit_frequency:21/73,
               real_balance:750,bonus_balance:20,win_over_loss:-250,favourite_game:['Gates of Olympus','Aviator'],
@@ -151,7 +154,7 @@ async def check_browser(base):
             if(segmentFacts({...c,birthday:'1985-10-13'},now).values.age!==41) throw Error('Birthday boundary');
           } finally { WALLETS.splice(0,WALLETS.length,...ws); WALLET_TX.splice(0,WALLET_TX.length,...ts); }
         }""")
-        print("All 36 segment parameters, operators, currency windows and unknown/NOT semantics passed")
+        print("All 37 segment parameters, operators, currency windows and unknown/NOT semantics passed")
 
         await page.get_by_role("button", name="Segments", exact=True).click()
         library = page.get_by_role("dialog", name="Segments", exact=True)
@@ -279,7 +282,7 @@ async def check_browser(base):
         await page.get_by_role("button", name="View segment parameters", exact=True).click()
         values = page.get_by_role("dialog", name="Customer segment parameters", exact=True)
         await values.locator('[data-parameter="gender"]').wait_for()
-        assert await values.locator('[data-parameter]').count() == 36
+        assert await values.locator('[data-parameter]').count() == 37
         assert await values.locator('.parameter-group').count() == 7
         assert await values.locator('[data-parameter="gender"]').inner_text() == "Undisclosed"
         assert "SE" == await values.locator('[data-parameter="country"]').inner_text()
@@ -384,6 +387,13 @@ async def check_browser(base):
         await page.get_by_role("button", name="+ New connection", exact=True).click()
         connection = page.get_by_role("dialog", name="New payment connection", exact=True)
         await connection.get_by_label("Connection name", exact=True).fill("Shared segment connection")
+        for label, value in [
+            ("Stripe Account ID", "acct_demo_test"),
+            ("Secret API Key", "demo_secret"),
+            ("Webhook Signing Secret", "demo_webhook"),
+            ("Terminal / Reader ID", "demo_terminal"),
+        ]:
+            await connection.get_by_label(label, exact=True).fill(value)
         await connection.get_by_role("button", name="Edit connection segments", exact=True).click()
         picker = page.get_by_role("dialog", name="Segments", exact=True)
         await picker.get_by_role("searchbox").fill("BONUS_SHARED_SEGMENT")
@@ -431,6 +441,7 @@ async def check_browser(base):
         await page.keyboard.press("Escape")
         assert await connection.get_by_role("button", name="Remove segment VIP", exact=True).count() == 1
         await connection.get_by_role("button", name="Save connection", exact=True).click()
+        await connection.wait_for(state="hidden")
         assert await page.locator("tbody tr").filter(has_text="Shared segment connection").locator(".tag").filter(has_text="VIP").count() == 1
         assert not errors, errors
         await browser.close()
@@ -466,10 +477,11 @@ def main():
             assert request(base, bonus_path, "PATCH", {"availability": {"includeSegments": ["DOES_NOT_EXIST"]}})[0] == 422
             assert request(base, "/crm/ui-api/v1/segments/" + saved["id"], "PATCH", dict(body, name="API_RENAMED"))[0] == 200
             assert request(base, bonus_path, "PATCH", {"description": "Keep previously selected segment names"})[0] == 200
-            assert request(base, bonus_path)[1]["availability"]["includeSegments"] == ["API_EDITED"]
+            assert request(base, bonus_path)[1]["availability"]["includeSegments"] == ["API_RENAMED"]
             assert request(base, "/crm/ui-api/v1/bonuses/BN-1003", "PATCH", {"availability": {"includeSegments": ["API_EDITED"]}})[0] == 422
             assert request(base, "/crm/ui-api/v1/segments/" + saved["id"], "PATCH", dict(body, name="API_EDITED"))[0] == 200
             new_bonus = request(base, "/crm/ui-api/v1/bonuses/BN-1004")[1]
+            new_bonus.pop("casino_id")
             new_bonus["name"] = "Segment selection test bonus"
             new_bonus["availability"]["includeSegments"] = ["API_EDITED"]
             new_bonus["availability"]["excludeSegments"] = ["VIP"]

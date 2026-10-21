@@ -78,16 +78,17 @@ class CMSTests(TestCase):
         ]
         get.side_effect = lambda path, **kwargs: [{"id": "SG-1", "name": "VIP"}] if path == "segments" else bonuses
         response = self.client.get("/cms/api/get_promotion_bonuses/", {
+            "site_id": self.site.id,
             "custom_segment": ["SG-1"], "total": 1, "sort_by": "created_at",
             "bonus_external_ids": ["BN-1", "BN-2"],
         })
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data["total"], 2)
         self.assertEqual(response.data["items"], [{"id": "BN-2", "external_id": "BN-2", "name": "VIP new", "created_at": "2026-02-01"}])
-        get.assert_any_call("bonuses", paginate=True)
+        get.assert_any_call("bonuses", casino_id=self.site.crm_id, paginate=True)
         for params in [{"total": 0}, {"total": 41}, {"sort_by": "name"}, {"unknown": "x"}, {"custom_segment": ["SG-missing"]}]:
-            self.assertEqual(self.client.get("/cms/api/get_promotion_bonuses/", params).status_code, 400)
-        response = self.client.get("/cms/api/get_promotion_bonuses/", {"custom_segment": ["SG-1"]})
+            self.assertEqual(self.client.get("/cms/api/get_promotion_bonuses/", {"site_id": self.site.id, **params}).status_code, 400)
+        response = self.client.get("/cms/api/get_promotion_bonuses/", {"site_id": self.site.id, "custom_segment": ["SG-1"]})
         self.assertEqual([b["id"] for b in response.data["items"]], ["BN-3", "BN-2", "BN-1"])
 
     @patch("core.crm.httpx.Client")
@@ -100,8 +101,107 @@ class CMSTests(TestCase):
         responses[1].json.return_value = {"items": [{"id": "BN-2"}], "total": 2}
         session = client.return_value.__enter__.return_value
         session.get.side_effect = responses
-        self.assertEqual(crm_get("bonuses", paginate=True), [{"id": "BN-1"}, {"id": "BN-2"}])
+        self.assertEqual(crm_get("bonuses", casino_id=self.site.crm_id, paginate=True), [{"id": "BN-1"}, {"id": "BN-2"}])
         self.assertTrue(session.get.call_args_list[1].args[0].endswith("limit=100&offset=1"))
+        for call in session.get.call_args_list:
+            self.assertEqual(call.kwargs["headers"]["X-Casino-Id"], self.site.crm_id)
+
+    @patch("core.crm.httpx.Client")
+    @override_settings(CRM_CLIENT_ID="test-client", CRM_CLIENT_SECRET="test-secret")
+    def test_crm_headers_scope_every_feed_but_not_casino_registry(self, client):
+        from core.crm import crm_get
+        session = client.return_value.__enter__.return_value
+        session.get.return_value.json.return_value = {"items": []}
+        session.post.return_value.json.return_value = {"access_token": "test-token", "expires_in": 900}
+        for demo in (True, False):
+            with self.settings(CRM_DEMO_UI=demo):
+                for site in (self.site, self.site2):
+                    for path in ("games", "games/categories", "games/publishers", "bonuses", "segments"):
+                        crm_get(path, casino_id=site.crm_id)
+                        headers = session.get.call_args.kwargs["headers"]
+                        self.assertEqual(headers["X-Casino-Id"], site.crm_id)
+                        if not demo:
+                            self.assertEqual(headers["Authorization"], "Bearer test-token")
+                crm_get("casinos")
+                self.assertNotIn("X-Casino-Id", session.get.call_args.kwargs["headers"])
+        self.assertEqual(session.post.call_count, 1)
+        count = session.get.call_count
+        for owner in (None, "", " "):
+            with self.assertRaises(CRMUnavailable):
+                crm_get("games", casino_id=owner)
+        self.assertEqual(session.get.call_count, count)
+
+    @patch("core.crm.crm_get")
+    def test_staff_catalog_endpoints_require_authorized_site(self, get):
+        get.return_value = [{"id": "SG-1", "name": "VIP"}]
+        self.client.force_authenticate(self.editor)
+        for endpoint in ("segments", "get_promotion_bonuses"):
+            url = f"/cms/api/{endpoint}/"
+            for params in ({}, {"site_id": "invalid"}, {"site_id": 0}):
+                self.assertEqual(self.client.get(url, params).status_code, 400)
+            self.assertEqual(self.client.get(url, {"site_id": self.site2.id}).status_code, 404)
+        get.assert_not_called()
+        self.assertEqual(self.client.get("/cms/api/segments/", {"site_id": self.site.id}).status_code, 200)
+        get.assert_called_once_with("segments", casino_id=self.site.crm_id)
+
+    @patch("core.crm.crm_get")
+    def test_two_site_widgets_and_staff_feeds_have_isolated_catalog_caches(self, get):
+        def catalog(path, *, casino_id, **kwargs):
+            suffix = "A" if casino_id == self.site.crm_id else "B"
+            if path == "segments":
+                return [{"id": f"SG-{suffix}", "name": suffix}]
+            if path == "bonuses":
+                return [{"id": f"BN-{suffix}", "name": suffix, "status": "active",
+                         "createdAt": "2026-01-01", "groups": [suffix]}]
+            if path == "games":
+                return [{"id": f"GM-{suffix}", "name": suffix, "enabled": True,
+                         "publisher_id": f"PR-{suffix}", "category_ids": [f"CAT-{suffix}"]}]
+            return [{"id": f"{'CAT' if path.endswith('categories') else 'PR'}-{suffix}",
+                     "name": suffix, "kind": "static"}]
+        get.side_effect = catalog
+        cache.set("cms:catalog:v1:games", [{"id": "legacy-global"}])
+        cache.set("cms:promotion-bonuses:v1", [{"id": "legacy-global"}])
+        for site, suffix in ((self.site, "A"), (self.site2, "B")):
+            page = Page.objects.get(site=site)
+            publication = publish_page(page.id, 1, self.admin)
+            for key, expected in (("games-3", "GM"), ("categories-2", "CAT"),
+                                  ("providers-5", "PR"), ("promotions-1", "BN")):
+                for url in (f"/cms/api/sites/{site.id}/widgets/{key}/",
+                            f"/cms/api/public/{site.slug}/{publication.id}/widgets/{key}/"):
+                    response = self.client.get(url)
+                    self.assertEqual(response.status_code, 200, response.data)
+                    self.assertEqual([item["id"] for item in response.data["items"]], [f"{expected}-{suffix}"])
+            response = self.client.get("/cms/api/segments/", {"site_id": site.id})
+            self.assertEqual(response.data["items"], [{"id": f"SG-{suffix}", "name": suffix}])
+            response = self.client.get("/cms/api/get_promotion_bonuses/", {
+                "site_id": site.id, "custom_segment": [f"SG-{suffix}"]})
+            self.assertEqual([item["id"] for item in response.data["items"]], [f"BN-{suffix}"])
+            response = self.client.get("/cms/api/get_promotion_bonuses/", {
+                "site_id": site.id, "custom_segment": [f"SG-{'B' if suffix == 'A' else 'A'}"]})
+            self.assertEqual(response.status_code, 400)
+        for owner in (self.site.crm_id, self.site2.crm_id):
+            for path in ("games", "games/categories", "games/publishers", "bonuses"):
+                calls = [call for call in get.call_args_list
+                         if call.args == (path,) and call.kwargs["casino_id"] == owner]
+                self.assertEqual(len(calls), 1)
+        # Returning to the first site must read its own warm cache, not the last site's data.
+        response = self.client.get(f"/cms/api/sites/{self.site.id}/widgets/games-3/")
+        self.assertEqual(response.data["items"][0]["id"], "GM-A")
+
+    @patch("core.crm.httpx.Client")
+    def test_unlinked_site_feeds_fail_without_crm_requests_or_global_cache(self, client):
+        self.site.crm_id = ""
+        self.site.save(update_fields=["crm_id"])
+        publication = publish_page(self.page.id, 1, self.admin)
+        for key in ("games-3", "categories-2", "providers-5", "promotions-1"):
+            for url in (f"/cms/api/sites/{self.site.id}/widgets/{key}/",
+                        f"/cms/api/public/{self.site.slug}/{publication.id}/widgets/{key}/"):
+                self.assertEqual(self.client.get(url).status_code, 503)
+        for endpoint in ("segments", "get_promotion_bonuses"):
+            response = self.client.get(f"/cms/api/{endpoint}/", {"site_id": self.site.id})
+            self.assertEqual(response.status_code, 503)
+            self.assertIn("not linked", response.data["detail"])
+        client.assert_not_called()
 
     def test_seo_html_is_sanitized_and_remains_ssr(self):
         doc = self.document()

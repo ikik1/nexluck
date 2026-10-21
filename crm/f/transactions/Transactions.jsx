@@ -112,4 +112,4 @@ function Transactions() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<Transactions />);
+CRMContext.mount(() => ReactDOM.createRoot(document.getElementById('root')).render(<Transactions />));

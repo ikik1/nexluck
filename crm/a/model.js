@@ -41,6 +41,10 @@ function createAnalyticsDemo(games, categories, publishers, statuses, today = Da
       risk: ['None', 'Bonus abuse', 'Multi-accounting', 'Payment risk'][Math.floor(i / 19) % 4],
       provider: publishers.find(p => p.id === game.publisher_id).name,
       game: game.name, category: category?.name || 'Uncategorized',
+      catalogCasinoId: game.casino_id,
+      businessGame: game.original_name || game.name,
+      businessCategory: category?.original_name || category?.name || 'Uncategorized',
+      businessProvider: publishers.find(p => p.id === game.publisher_id).original_name || publishers.find(p => p.id === game.publisher_id).name,
       payment: ['Card', 'Bank transfer', 'E-wallet'][Math.floor(i / 29) % 3],
       theoreticalRtp: game.rtp,
       lead: registration - ANALYTICS_DAY, registered, ftd, trusted, vip, dormant,
@@ -91,8 +95,8 @@ function analyticsSegmentIds(data, player, asOf) {
     country: player.country, currency: player.currency, funnel_status: player.statusAt(asOf),
     registration_date: registered === null ? null : analyticsDate(registered),
     account_age: registered === null ? null : Math.floor((asOf - registered) / ANALYTICS_DAY),
-    kyc_status: player.kyc, devices: [player.device], favourite_game: [player.game],
-    favourite_category: [player.category], favourite_provider: [player.provider],
+    kyc_status: player.kyc, devices: [player.device], favourite_game: [player.businessGame || player.game],
+    favourite_category: [player.businessCategory || player.category], favourite_provider: [player.businessProvider || player.provider],
     risk_bonus_abuse: player.risk === 'Bonus abuse',
     number_of_deposits: analyticsSum(history, 'approved')
   };
@@ -106,7 +110,7 @@ function analyticsSegmentIds(data, player, asOf) {
     const amount = node.field === 'net_cash_flow' ? analyticsSum(rows, 'deposits') - analyticsSum(rows, 'withdrawals') : analyticsSum(rows, 'ggr') * (node.field === 'win_over_loss' ? -1 : 1);
     return amount / rate;
   } };
-  return data.segmentDefinitions.filter(s => evaluateSegment(s.rules, facts, data.parameters) === true).map(s => s.id);
+  return data.segmentDefinitions.filter(s => (!s.casino_id || s.casino_id === player.catalogCasinoId) && evaluateSegment(s.rules, facts, data.parameters) === true).map(s => s.id);
 }
 
 function analyticsScope(data, filters) {
@@ -199,10 +203,13 @@ function analyticsAsk(data, currentFilters, request) {
     } else if (/\b(tomorrow|week|month|year|days)\b/.test(text)) return { error: 'Supported dates: today, yesterday, last 7 days, last 30 days, or YYYY-MM-DD ranges.' };
   }
   if (!filters.from || !filters.to || filters.from < data.start || filters.to > data.end || filters.from > filters.to) return { error: 'Requested dates must be within ' + data.start + ' — ' + data.end + '.' };
-  const matchedSegments = data.segmentDefinitions.filter(s => {
-    const escaped = s.name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const matchesName = name => {
+    const escaped = name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp('(^|[^a-z0-9_])' + escaped + '($|[^a-z0-9_])').test(text);
-  });
+  };
+  const qualifiedSegments = data.segmentDefinitions.filter(segment => matchesName(segment.name));
+  const matchedSegments = qualifiedSegments.length ? qualifiedSegments :
+    data.segmentDefinitions.filter(segment => matchesName(segment.original_name || segment.name));
   if (/\bsegments?\b/.test(text) && !matchedSegments.length) return { error: 'Name a saved Customer segment, e.g. VIP, or choose segments in the dashboard filters.' };
   if (matchedSegments.length && (/\bsegments?\b/.test(text) || !campaign)) filters.segment = matchedSegments.map(s => s.id);
   let campaignName = '';
