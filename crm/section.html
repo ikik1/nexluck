@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NexLuck CRM</title><link rel="stylesheet" href="/crm/crm.css?v=202610222100"></head>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NexLuck CRM</title><link rel="stylesheet" href="/crm/crm.css?v=202610222100"><script src="/localization/catalog.js?v=202610220900"></script><script src="/localization/runtime.js?v=202610220900"></script></head>
 <body><header id="hdr"></header><div class="subbar" id="sub"></div>
 <main id="m"></main><footer id="ftr"></footer>
 <script src="/crm/context.js?v=202610222100"></script>
@@ -7,8 +7,8 @@
 const s=SECTIONS.find(x=>x.k===new URLSearchParams(location.search).get('s'))||SECTIONS[0];
 if (s.k === 'analytics') location.replace('/crm/a/');
 if (s.k === 'casinos') location.replace('/crm/c/l/');
-chrome(`<span class="crumb"><a href="/crm/">Home</a> / ${s.n}</span>`);document.title='NexLuck CRM — '+s.n;
-document.getElementById('m').innerHTML=`<h1>${s.i} ${s.n}</h1><p class="lead">Section details (prototype placeholder).</p>
-<p class="notice">Casino-specific metrics and activity are unavailable: this section has no connected data source. No global sample totals are shown.</p>
-<p style="margin-top:16px"><a class="go" href="/crm/">← Back to home</a></p>`;
+chrome(`<span class="crumb"><a href="/crm/">${NexLuckI18n.html("Home")}</a> / ${s.n}</span>`);document.title='NexLuck CRM — '+s.n;
+document.getElementById('m').innerHTML=`<h1>${s.i} ${s.n}</h1><p class="lead">${NexLuckI18n.html("Section details (prototype placeholder).")}</p>
+<p class="notice">${NexLuckI18n.html("Casino-specific metrics and activity are unavailable: this section has no connected data source. No global sample totals are shown.")}</p>
+<p style="margin-top:16px"><a class="go" href="/crm/">${NexLuckI18n.html("← Back to home")}</a></p>`;
 </script></body></html>

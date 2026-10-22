@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NexLuck CRM — Payment cascades</title><link rel="stylesheet" href="/crm/crm.css?v=202610222100"><link rel="stylesheet" href="/crm/f/f.css?v=202610121736">
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title data-i18n="NexLuck CRM — Payment cascades">NexLuck CRM — Payment cascades</title><link rel="stylesheet" href="/crm/crm.css?v=202610222100"><link rel="stylesheet" href="/crm/f/f.css?v=202610121736">
 <style>
 .wf{position:relative;padding:4px 0 8px}
 .step{position:relative;display:grid;grid-template-columns:34px 1fr auto;gap:8px 12px;align-items:center;background:#fff;border:1px solid #9bbde6;border-left:5px solid var(--brand);border-radius:8px;padding:10px 12px;box-shadow:0 2px 6px #0b5cab22;max-width:calc(100% - var(--off))}
@@ -29,9 +29,9 @@
 .edit:hover{border-color:var(--brand)}
 .edit svg{width:16px;height:16px;fill:none;stroke:var(--brand);stroke-width:1.6}
 @media(max-width:600px){.step{grid-template-columns:34px 1fr}.sact{grid-column:1 / -1;justify-content:flex-start}}
-</style></head>
+</style><script src="/localization/catalog.js?v=202610220900"></script><script src="/localization/runtime.js?v=202610220900"></script></head>
 <body><header id="hdr"></header><div class="subbar" id="sub"></div>
-<main><h1>⇢ Payment Cascades and Routing</h1><p class="lead">Define how transactions fall through payment systems when a gateway under-performs or declines.</p><div id="root"></div></main><footer id="ftr"></footer>
+<main><h1 data-i18n="⇢ Payment Cascades and Routing">⇢ Payment Cascades and Routing</h1><p class="lead" data-i18n="Define how transactions fall through payment systems when a gateway under-performs or declines.">Define how transactions fall through payment systems when a gateway under-performs or declines.</p><div id="root"></div></main><footer id="ftr"></footer>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js" crossorigin></script>
@@ -39,6 +39,6 @@
 <script src="/crm/data.js?v=202610222100"></script>
 <script src="/crm/f/data.js?v=202610222100"></script>
 <script src="/crm/f/nav.js?v=202610121736"></script>
-<script>chrome('<span class="crumb"><a href="/crm/">Home</a> / <a href="/crm/f/">Finance</a> / Payment cascades</span>');</script>
+<script>chrome(`<span class="crumb"><a href="/crm/">${NexLuckI18n.html("Home")}</a> / <a href="/crm/f/">${NexLuckI18n.html("Finance")}</a>${NexLuckI18n.html(" / Payment cascades")}</span>`);</script>
 <script type="text/babel" src="/crm/f/cascades/Cascades.jsx?v=202610222100"></script>
 </body></html>

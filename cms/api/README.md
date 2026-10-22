@@ -1,8 +1,14 @@
 # Frontend CMS module API
 
-Interactive Swagger UI: `/cms/api/`. OpenAPI 3 JSON:
+Localized interactive API reference: `/cms/api/`. OpenAPI 3 JSON:
 `/cms/api/openapi.json`. Both require an authenticated CMS staff session.
 The API is mounted alongside the site-scoped draft/publication APIs.
+
+The default reference is localized and supports executable GET requests.
+The **Swagger UI** link opens `/cms/api/?view=swagger`, preserving the standard
+self-hosted Swagger interface, Try it out/Execute, request and response details,
+response schemas, and session security documentation. Both views use the same
+OpenAPI document and same-origin staff-session credentials.
 
 ## Module properties
 
@@ -11,6 +17,10 @@ The API is mounted alongside the site-scoped draft/publication APIs.
 this endpoint when opened; plugins can supply a serializer through the optional
 `Module.properties` registry argument. Existing plugins without it retain the
 standard schema.
+
+Labels follow the shared five-language management-language cookie (English,
+Russian, Portuguese (Portugal), Portuguese (Brazil), and Spanish (Spain)).
+Defaults and saved casino content are never translated by this endpoint.
 
 Games expose maximum items, provider ID and category ID. Categories/providers
 expose maximum items. Promotions expose the following query parameters.

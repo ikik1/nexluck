@@ -7,3 +7,4 @@
 .announcement-list{display:grid;gap:12px}.announcement-list article{padding:16px;background:#111b46;border:1px solid var(--home-line);border-radius:6px}.announcement-list h3{margin:0;font:22px 'Barlow Condensed',sans-serif}.announcement-list p{font-size:12px}.home-menu.preview-selected{outline-offset:-8px}
 .layout-compact{--landing-bg:var(--site-background);--home-surface:var(--site-panel);color:var(--site-text)}
 @media(max-width:700px){.columns-2,.columns-3{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:520px){.home-header{position:relative;margin-bottom:28px}.website-language{position:absolute;top:100%;right:0;z-index:2;max-width:50vw;background:var(--home-surface,#111b46)}.website-language select{max-width:50vw}}

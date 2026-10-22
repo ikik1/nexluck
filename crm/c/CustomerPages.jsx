@@ -1,48 +1,48 @@
 const { useState, useEffect, useRef } = React;
 const CUSTOMER_API = '/crm/ui-api/v1/customers';
 const CUSTOMER_FIELDS = [
-  ['external_id', 'External ID'], ['name', 'Name'], ['DocumentINo', 'DocumentINo'],
-  ['country', 'Country'], ['currency', 'Currency'], ['lang', 'Language'], ['gender', 'Gender'],
-  ['addr1', 'Address line 1'], ['addr12', 'Address line 2 (addr12)'],
-  ['mfa_type', 'MFA type'], ['risk_score', 'Risk score'],
-  ['kyc_status', 'KYC status'], ['birthday', 'Birthday'], ['aml_status', 'AML status'], ['funnel_status', 'Funnel status'], ['info', 'Info']
+  ['external_id', NexLuckI18n.t("External ID")], ['name', NexLuckI18n.t("Name")], ['DocumentINo', 'DocumentINo'],
+  ['country', NexLuckI18n.t("Country")], ['currency', NexLuckI18n.t("Currency")], ['lang', NexLuckI18n.t("Language")], ['gender', NexLuckI18n.t("Gender")],
+  ['addr1', NexLuckI18n.t("Address line 1")], ['addr12', NexLuckI18n.t("Address line 2 (addr12)")],
+  ['mfa_type', NexLuckI18n.t("MFA type")], ['risk_score', NexLuckI18n.t("Risk score")],
+  ['kyc_status', NexLuckI18n.t("KYC status")], ['birthday', NexLuckI18n.t("Birthday")], ['aml_status', NexLuckI18n.t("AML status")], ['funnel_status', NexLuckI18n.t("Funnel status")], ['info', NexLuckI18n.t("Info")]
 ];
 const CUSTOMER_OPTIONS = {
   get country() { return CRMContext.catalogs.countries.map(record => record.code).sort((a, b) => COUNTRIES[a][0].localeCompare(COUNTRIES[b][0])); },
   get currency() { return CRMContext.catalogs.currencies.map(record => record.code); },
   get lang() { return CRMContext.catalogs.languages.map(record => record.code); },
-  gender: ['Female', 'Male', 'Non-binary', 'Undisclosed'],
+  gender: ['Female', "Male", 'Non-binary', 'Undisclosed'],
   mfa_type: ['NONE', 'TOTP', 'SMS', 'EMAIL'],
   kyc_status: ['NOT_STARTED', 'PENDING', 'VERIFIED', 'REJECTED'],
   aml_status: ['CLEAR', 'REVIEW', 'BLOCKED'],
-  funnel_status: ['Lead', 'Registered', 'FTD', 'Trusted', 'VIP', 'Dormant']
+  funnel_status: ['Lead', "Registered", 'FTD', 'Trusted', 'VIP', 'Dormant']
 };
 const CUSTOMER_RISKS = [
   ['rdw', 'RDW', 'Rapid Deposit and Withdrawal cycles'],
-  ['multiple_payment_methods', 'Multiple payment methods', 'Use of multiple payment methods'],
-  ['pof_pow_violations', 'PoF/PoW violations', "Proof of Funds / Proof of Wealth: amounts do not match the client's wealth"],
-  ['abnormal_activity', 'Abnormal activity', 'Unusual transaction or gaming patterns'],
-  ['bonus_abuse', 'Bonus abuse', 'Multiple accounts used to abuse bonuses'],
-  ['bot_activity', 'Bot activity', 'Suspected automated play'],
-  ['device_fingerprint_mismatches', 'Device fingerprint mismatches', 'Inconsistent device fingerprints'],
-  ['failed_kyc_attempts', 'Failed KYC attempts', 'Unsuccessful identity verification attempts'],
-  ['vpn_multiple_ips', 'VPN / Multiple IPs', 'VPN use or multiple IP addresses']
+  ['multiple_payment_methods', NexLuckI18n.t("Multiple payment methods"), 'Use of multiple payment methods'],
+  ['pof_pow_violations', NexLuckI18n.t("PoF/PoW violations"), "Proof of Funds / Proof of Wealth: amounts do not match the client's wealth"],
+  ['abnormal_activity', NexLuckI18n.t("Abnormal activity"), 'Unusual transaction or gaming patterns'],
+  ['bonus_abuse', NexLuckI18n.t("Bonus abuse"), 'Multiple accounts used to abuse bonuses'],
+  ['bot_activity', NexLuckI18n.t("Bot activity"), 'Suspected automated play'],
+  ['device_fingerprint_mismatches', NexLuckI18n.t("Device fingerprint mismatches"), 'Inconsistent device fingerprints'],
+  ['failed_kyc_attempts', NexLuckI18n.t("Failed KYC attempts"), 'Unsuccessful identity verification attempts'],
+  ['vpn_multiple_ips', NexLuckI18n.t("VPN / Multiple IPs"), 'VPN use or multiple IP addresses']
 ];
-const dateText = value => new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
-const amountText = (value, currency) => value.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currency;
+const dateText = value => new Date(value).toLocaleString(NexLuckI18n.formatLocale, { dateStyle: 'medium', timeStyle: 'short' });
+const amountText = (value, currency) => value.toLocaleString(NexLuckI18n.formatLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currency;
 
 async function customerRequest(path = '', options = {}) {
   return apiRequest(CUSTOMER_API + path, options);
 }
 
 function CustomerStatus({ value }) {
-  if (['NOT_STARTED', 'CLEAR'].includes(value)) return <span className="hint" aria-label="No alert">—</span>;
+  if (['NOT_STARTED', 'CLEAR'].includes(value)) return <span className="hint" aria-label={NexLuckI18n.t("No alert")}>—</span>;
   const tone = ['VERIFIED', 'CLEAR'].includes(value) ? 'good' : ['REJECTED', 'BLOCKED'].includes(value) ? 'bad' : 'warn';
-  return <span className={'status ' + tone}>{value.replace(/_/g, ' ')}</span>;
+  return <span className={'status ' + tone}>{NexLuckI18n.t(value.replace(/_/g, ' '))}</span>;
 }
 
 function FunnelStatus({ value }) {
-  return <span className={'status funnel funnel-' + value.toLowerCase()}>{value}</span>;
+  return <span className={'status funnel funnel-' + value.toLowerCase()}>{NexLuckI18n.t(value)}</span>;
 }
 
 function CustomerList() {
@@ -75,34 +75,34 @@ function CustomerList() {
   const change = (setter, value) => { setter(value); setPage(0); };
   return <>
     <section className="customer-segments">
-      <h2>Segments <button type="button" className="btn" disabled={segmentState.loading || Boolean(segmentState.error)} onClick={() => setSegmentWidget(true)}>Segments</button></h2>
-      {segmentState.loading && <p role="status" className="hint">Loading segments…</p>}
-      {segmentState.error && <p role="alert" className="error">{segmentState.error} <button type="button" className="btn" onClick={segmentState.load}>Retry segments</button></p>}
+      <h2>{NexLuckI18n.t("Segments ")}<button type="button" className="btn" disabled={segmentState.loading || Boolean(segmentState.error)} onClick={() => setSegmentWidget(true)}>{NexLuckI18n.t("Segments")}</button></h2>
+      {segmentState.loading && <p role="status" className="hint">{NexLuckI18n.t("Loading segments…")}</p>}
+      {segmentState.error && <p role="alert" className="error">{segmentState.error} <button type="button" className="btn" onClick={segmentState.load}>{NexLuckI18n.t("Retry segments")}</button></p>}
       <SegmentTags segments={segmentState.segments.filter(s => selectedSegments.includes(s.id))} onRemove={id => { setSelectedSegments(old => old.filter(s => s !== id)); setPage(0); }} />
-      <p className="hint">Select segment tags to filter customers. Selected segments use OR; other filters use AND.</p>
+      <p className="hint">{NexLuckI18n.t("Select segment tags to filter customers. Selected segments use OR; other filters use AND.")}</p>
     </section>
     <div className="customer-tools">
-      <label className="field search-field">Search customers<input type="search" placeholder="ID, external ID, name, document, country, currency…" value={query} onChange={e => change(setQuery, e.target.value)} /></label>
+      <label className="field search-field">{NexLuckI18n.t("Search customers")}<input type="search" placeholder={NexLuckI18n.t("ID, external ID, name, document, country, currency…")} value={query} onChange={e => change(setQuery, e.target.value)} /></label>
       {[['Country', country, setCountry, CUSTOMER_OPTIONS.country], ['Funnel status', funnel, setFunnel, CUSTOMER_OPTIONS.funnel_status], ['KYC status', kyc, setKyc, CUSTOMER_OPTIONS.kyc_status], ['AML status', aml, setAml, CUSTOMER_OPTIONS.aml_status]].map(([label, value, setter, options]) =>
-        <label className="field" key={label}>{label}<select aria-label={label} value={value} onChange={e => change(setter, e.target.value)}><option value="">All</option>{options.map(v => <option key={v} value={v}>{label === 'Country' ? COUNTRIES[v][0] : v.replace(/_/g, ' ')}</option>)}</select></label>)}
-      <button className="btn" onClick={() => { setQuery(''); setCountry(''); setKyc(''); setAml(''); setFunnel(''); setSelectedSegments([]); setPage(0); }}>Clear filters</button>
+        <label className="field" key={label}>{NexLuckI18n.t(label)}<select aria-label={NexLuckI18n.t(label)} value={value} onChange={e => change(setter, e.target.value)}><option value="">{NexLuckI18n.t("All")}</option>{options.map(v => <option key={v} value={v}>{NexLuckI18n.t(label === 'Country' ? COUNTRIES[v][0] : v.replace(/_/g, ' '))}</option>)}</select></label>)}
+      <button className="btn" onClick={() => { setQuery(''); setCountry(''); setKyc(''); setAml(''); setFunnel(''); setSelectedSegments([]); setPage(0); }}>{NexLuckI18n.t("Clear filters")}</button>
     </div>
-    {loading && <p role="status">Loading customers…</p>}
-    {error && <div className="error" role="alert">{error} <button className="btn" onClick={load}>Retry</button></div>}
+    {loading && <p role="status">{NexLuckI18n.t("Loading customers…")}</p>}
+    {error && <div className="error" role="alert">{error} <button className="btn" onClick={load}>{NexLuckI18n.t("Retry")}</button></div>}
     {!loading && !error && <>
-      <p className="count">{filtered.length} of {customers.length} customers</p>
+      <p className="count">{filtered.length}{NexLuckI18n.t(" of ")}{customers.length}{NexLuckI18n.t(" customers")}</p>
       <div className="customer-table"><table>
-        <thead><tr>{['Customer', 'Segments', 'Funnel status', 'External ID', 'DocumentINo', 'Country', 'Currency', 'Language', 'MFA', 'KYC', 'AML', 'Risk', 'Created', 'Info'].map(label => <th key={label}>{label}</th>)}</tr></thead>
+        <thead><tr>{['Customer', "Segments", 'Funnel status', 'External ID', 'DocumentINo', 'Country', 'Currency', 'Language', 'MFA', 'KYC', 'AML', 'Risk', 'Created', 'Info'].map(label => <th key={label}>{NexLuckI18n.t(label)}</th>)}</tr></thead>
         <tbody>{filtered.slice(currentPage * 10, (currentPage + 1) * 10).map(c => <tr key={c.id}>
           <td><a href={'/crm/c/i/?id=' + encodeURIComponent(c.id)}>{c.name}</a><small>{c.id}</small></td>
           <td>{segmentState.loading ? 'Loading…' : segmentState.error ? 'Unavailable' : <SegmentTags segments={segmentState.segments.filter(s => membership[c.id]?.includes(s.id))} />}</td>
           <td><FunnelStatus value={c.funnel_status} /></td>
           <td>{c.external_id}</td><td>{c.DocumentINo}</td><td>{COUNTRIES[c.country][0]}</td><td>{c.currency}</td><td>{c.lang}</td><td>{c.mfa_type}</td>
           <td><CustomerStatus value={c.kyc_status} /></td><td><CustomerStatus value={c.aml_status} /></td><td>{c.risk_score} / 100</td><td>{dateText(c.created_at)}</td>
-          <td><a className="btn" href={'/crm/c/i/?id=' + encodeURIComponent(c.id)} aria-label={'View ' + c.name}>View</a></td>
+          <td><a className="btn" href={'/crm/c/i/?id=' + encodeURIComponent(c.id)} aria-label={NexLuckI18n.t("View ") + c.name}>{NexLuckI18n.t("View")}</a></td>
         </tr>)}</tbody>
-      </table>{!filtered.length && <div className="empty">No customers match these filters.</div>}</div>
-      {pages > 1 && <div className="pager"><button className="btn" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</button><span>Page {currentPage + 1} of {pages}</span><button className="btn" disabled={currentPage + 1 === pages} onClick={() => setPage(currentPage + 1)}>Next</button></div>}
+      </table>{!filtered.length && <div className="empty">{NexLuckI18n.t("No customers match these filters.")}</div>}</div>
+      {pages > 1 && <div className="pager"><button className="btn" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>{NexLuckI18n.t("Previous")}</button><span>{NexLuckI18n.t("Page ")}{currentPage + 1}{NexLuckI18n.t(" of ")}{pages}</span><button className="btn" disabled={currentPage + 1 === pages} onClick={() => setPage(currentPage + 1)}>{NexLuckI18n.t("Next")}</button></div>}
     </>}
     {segmentWidget && <SegmentWidget state={segmentState} customers={customers} selected={selectedSegments} onClose={() => setSegmentWidget(false)}
       onToggle={id => { setSelectedSegments(old => old.includes(id) ? old.filter(s => s !== id) : [...old, id]); setPage(0); }} />}
@@ -145,22 +145,22 @@ function CustomerEdit({ customer, onClose, onSave }) {
   };
   return <div className="customer-modal-overlay">
     <form className="customer-modal" role="dialog" aria-modal="true" aria-labelledby="edit-title" onSubmit={save} ref={formRef}>
-      <h2 id="edit-title">Edit customer info <button className="btn" type="button" disabled={busy} onClick={onClose} aria-label="Close">×</button></h2>
+      <h2 id="edit-title">{NexLuckI18n.t("Edit customer info ")}<button className="btn" type="button" disabled={busy} onClick={onClose} aria-label={NexLuckI18n.t("Close")}>×</button></h2>
       <div className="edit-grid">
-        <label className="field">Customer ID<input readOnly value={customer.id} /></label>
+        <label className="field">{NexLuckI18n.t("Customer ID")}<input readOnly value={customer.id} /></label>
         {CUSTOMER_FIELDS.map(([key, label]) => <label className={'field' + (key === 'info' ? ' full' : '') + (fields[key] ? ' invalid' : '')} key={key}>
-          {label}
-          {CUSTOMER_OPTIONS[key] ? <select aria-label={label} value={draft[key]} disabled={busy} onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))}>{CUSTOMER_OPTIONS[key].map(v => <option key={v} value={v}>{key === 'country' ? COUNTRIES[v][0] : v.replace(/_/g, ' ')}</option>)}</select>
-            : key === 'info' ? <textarea aria-label={label} value={draft[key]} maxLength={4000} disabled={busy} onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))} />
-            : <input aria-label={label} type={key === 'risk_score' ? 'number' : key === 'birthday' ? 'date' : 'text'} value={draft[key]} required={['name', 'external_id', 'birthday', 'risk_score'].includes(key)} min={key === 'risk_score' ? 0 : undefined} max={key === 'risk_score' ? 100 : key === 'birthday' ? new Date(Date.now() - 86400000).toISOString().slice(0, 10) : undefined} maxLength={200} disabled={busy} onChange={e => setDraft(d => ({ ...d, [key]: key === 'risk_score' && e.target.value !== '' ? Number(e.target.value) : e.target.value }))} />}
+          {NexLuckI18n.t(label)}
+          {CUSTOMER_OPTIONS[key] ? <select aria-label={NexLuckI18n.t(label)} value={draft[key]} disabled={busy} onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))}>{CUSTOMER_OPTIONS[key].map(v => <option key={v} value={v}>{NexLuckI18n.t(key === 'country' ? COUNTRIES[v][0] : v.replace(/_/g, ' '))}</option>)}</select>
+            : key === 'info' ? <textarea aria-label={NexLuckI18n.t(label)} value={draft[key]} maxLength={4000} disabled={busy} onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))} />
+            : <input aria-label={NexLuckI18n.t(label)} type={key === 'risk_score' ? 'number' : key === 'birthday' ? 'date' : 'text'} value={draft[key]} required={['name', 'external_id', 'birthday', 'risk_score'].includes(key)} min={key === 'risk_score' ? 0 : undefined} max={key === 'risk_score' ? 100 : key === 'birthday' ? new Date(Date.now() - 86400000).toISOString().slice(0, 10) : undefined} maxLength={200} disabled={busy} onChange={e => setDraft(d => ({ ...d, [key]: key === 'risk_score' && e.target.value !== '' ? Number(e.target.value) : e.target.value }))} />}
           {fields[key] && <span className="field-error">{fields[key]}</span>}
         </label>)}
-        <label className="field">Created at<input readOnly value={dateText(customer.created_at)} /></label>
-        <label className="field">Updated at<input readOnly value={dateText(customer.updated_at)} /></label>
+        <label className="field">{NexLuckI18n.t("Created at")}<input readOnly value={dateText(customer.created_at)} /></label>
+        <label className="field">{NexLuckI18n.t("Updated at")}<input readOnly value={dateText(customer.updated_at)} /></label>
       </div>
-      <p className="notice">Passwords are write-only in a separate secured credential entity. Credential changes require an authenticated server-to-server request.</p>
+      <p className="notice">{NexLuckI18n.t("Passwords are write-only in a separate secured credential entity. Credential changes require an authenticated server-to-server request.")}</p>
       {error && <p className="error" role="alert">{error}</p>}
-      <div className="customer-actions"><button className="btn" type="button" disabled={busy} onClick={onClose}>Cancel</button><button className="btn pri" disabled={busy}>{busy ? 'Saving…' : 'Save customer'}</button></div>
+      <div className="customer-actions"><button className="btn" type="button" disabled={busy} onClick={onClose}>{NexLuckI18n.t("Cancel")}</button><button className="btn pri" disabled={busy}>{busy ? NexLuckI18n.t("Saving…") : NexLuckI18n.t("Save customer")}</button></div>
     </form>
   </div>;
 }
@@ -197,7 +197,7 @@ function customerActivity(id, now = Date.now()) {
 }
 
 function Stats({ items }) {
-  return <div className="stat-list">{items.map(([label, value]) => <div key={label}><span>{label}</span><b>{value}</b></div>)}</div>;
+  return <div className="stat-list">{items.map(([label, value]) => <div key={label}><span>{NexLuckI18n.t(label)}</span><b>{NexLuckI18n.t(value)}</b></div>)}</div>;
 }
 
 function CustomerInfo() {
@@ -213,7 +213,7 @@ function CustomerInfo() {
   const [message, setMessage] = useState('');
   const load = async () => {
     setError('');
-    if (!id || !/^CU-\d+$/.test(id)) { setError('A valid customer ID is required. Select a customer from the list.'); return; }
+    if (!id || !/^CU-\d+$/.test(id)) { setError(NexLuckI18n.t("A valid customer ID is required. Select a customer from the list.")); return; }
     try { setCustomer(await customerRequest('/' + encodeURIComponent(id))); }
     catch (e) { setError(e.message); }
   };
@@ -223,96 +223,96 @@ function CustomerInfo() {
     try { setSegmentCustomers((await customerRequest()).items); setSegmentWidget(true); }
     catch (e) { setSegmentCustomerError(e.message); }
   };
-  if (error) return <><a className="btn" href="/crm/c/list/">Back to customers</a><p className="error" role="alert">{error}</p><button className="btn" onClick={load}>Retry</button></>;
-  if (!customer) return <p role="status">Loading customer…</p>;
+  if (error) return <><a className="btn" href="/crm/c/list/">{NexLuckI18n.t("Back to customers")}</a><p className="error" role="alert">{error}</p><button className="btn" onClick={load}>{NexLuckI18n.t("Retry")}</button></>;
+  if (!customer) return <p role="status">{NexLuckI18n.t("Loading customer…")}</p>;
   const activity = customerActivity(customer.id);
   const profileFields = CUSTOMER_FIELDS.filter(([key]) => !['name', 'funnel_status'].includes(key));
   const lastLoginDays = customer.activity.last_login_at === null ? null : Math.max(0, Math.floor((Date.now() - Date.parse(customer.activity.last_login_at)) / 86400000));
   return <>
-    <a className="btn" href="/crm/c/list/">← Customer list</a>
+    <a className="btn" href="/crm/c/list/">{NexLuckI18n.t("← Customer list")}</a>
     {message && <p className="notice ok" role="status">{message}</p>}
-    <p className="notice">Demo activity from Finance wallets; rolling turnover periods end now (1 month = 30 days, 1 year = 365 days). Monetary values remain in each wallet's currency. Profile edits are saved on the server.</p>
+    <p className="notice">{NexLuckI18n.t("Demo activity from Finance wallets; rolling turnover periods end now (1 month = 30 days, 1 year = 365 days). Monetary values remain in each wallet's currency. Profile edits are saved on the server.")}</p>
     <div className="customer-sat">
       <section className="customer-card customer-center">
         <div className="customer-identity">
-          <dl className="customer-timestamps"><dt>created_at</dt><dd>{dateText(customer.created_at)}</dd><dt>updated_at</dt><dd>{dateText(customer.updated_at)}</dd></dl>
+          <dl className="customer-timestamps"><dt>{NexLuckI18n.t("created_at")}</dt><dd>{dateText(customer.created_at)}</dd><dt>{NexLuckI18n.t("updated_at")}</dt><dd>{dateText(customer.updated_at)}</dd></dl>
           <div className="avatar" aria-hidden="true">{customer.name.slice(0, 2).toUpperCase()}</div>
-          <button className="btn" onClick={() => { setMessage(''); setEditing(true); }}>Edit</button>
+          <button className="btn" onClick={() => { setMessage(''); setEditing(true); }}>{NexLuckI18n.t("Edit")}</button>
         </div>
         <h2>{customer.name}</h2><p className="customer-id">{customer.id}</p>
-        <ol className="customer-pipeline" aria-label="CRM funnel">
+        <ol className="customer-pipeline" aria-label={NexLuckI18n.t("CRM funnel")}>
           {CUSTOMER_OPTIONS.funnel_status.map(status => <li key={status} aria-current={status === customer.funnel_status ? 'step' : undefined}><FunnelStatus value={status} /></li>)}
         </ol>
         <div className="profile-segments">
           <div className="profile-segment-actions">
-          <button type="button" className="btn" disabled={segmentState.loading || Boolean(segmentState.error)} onClick={viewSegments}>View customer segments</button>
-          <button type="button" className="btn" disabled={segmentState.loading || Boolean(segmentState.error)} onClick={() => setViewParameters(true)}>View segment parameters</button>
+          <button type="button" className="btn" disabled={segmentState.loading || Boolean(segmentState.error)} onClick={viewSegments}>{NexLuckI18n.t("View customer segments")}</button>
+          <button type="button" className="btn" disabled={segmentState.loading || Boolean(segmentState.error)} onClick={() => setViewParameters(true)}>{NexLuckI18n.t("View segment parameters")}</button>
           </div>
-          {segmentState.error && <p role="alert" className="error">{segmentState.error} <button className="btn" onClick={segmentState.load}>Retry segments</button></p>}
+          {segmentState.error && <p role="alert" className="error">{segmentState.error} <button className="btn" onClick={segmentState.load}>{NexLuckI18n.t("Retry segments")}</button></p>}
           {segmentCustomerError && <p role="alert" className="error">{segmentCustomerError}</p>}
         </div>
-        <dl className="detail-list">{profileFields.map(([key, label]) => <React.Fragment key={key}><dt>{label}</dt><dd>{key === 'country' ? COUNTRIES[customer.country][0] : key === 'risk_score' ? `${customer[key]} / 100` : ['kyc_status', 'aml_status'].includes(key) ? <CustomerStatus value={customer[key]} /> : customer[key] === '' ? '—' : customer[key]}</dd></React.Fragment>)}</dl>
-        <h3 className="activity-title">Activity info</h3>
+        <dl className="detail-list">{profileFields.map(([key, label]) => <React.Fragment key={key}><dt>{NexLuckI18n.t(label)}</dt><dd>{key === 'country' ? COUNTRIES[customer.country][0] : key === 'risk_score' ? `${customer[key]} / 100` : ['kyc_status', 'aml_status'].includes(key) ? <CustomerStatus value={customer[key]} /> : customer[key] === '' ? '—' : customer[key]}</dd></React.Fragment>)}</dl>
+        <h3 className="activity-title">{NexLuckI18n.t("Activity info")}</h3>
         <Stats items={[
           ['Last login', lastLoginDays === null ? 'No recorded login' : lastLoginDays === 0 ? 'Today' : `${lastLoginDays} day${lastLoginDays === 1 ? '' : 's'} ago`],
           ['Last session', `${customer.activity.last_session_hours} hours`],
           ['Overall game hours', new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(customer.activity.overall_game_hours).toUpperCase() + ' h'],
           ['Devices (demo)', customer.devices.join(', ')], ['Sessions per week (demo)', customer.sessions_per_week]
         ]} />
-        <p className="hint">Activity is seeded demo data. Last session shows duration.</p>
-        <p className="hint">Password: separate secured credential entity (never returned).</p>
+        <p className="hint">{NexLuckI18n.t("Activity is seeded demo data. Last session shows duration.")}</p>
+        <p className="hint">{NexLuckI18n.t("Password: separate secured credential entity (never returned).")}</p>
       </section>
       <section className="customer-card" style={{ gridArea: 'risk', '--c': '#ba0517' }}>
-        <h2>Risk indicators</h2>
-        <p className="hint">Demo review signals, not verified findings.</p>
+        <h2>{NexLuckI18n.t("Risk indicators")}</h2>
+        <p className="hint">{NexLuckI18n.t("Demo review signals, not verified findings.")}</p>
         <ul className="risk-indicators">{CUSTOMER_RISKS.map(([key, label, hint]) => {
           const flagged = customer.risk_indicators.includes(key);
           return <li key={key} className={flagged ? 'flagged' : ''}>
-            <span>{label} <button type="button" className="risk-help" aria-label={label + ': ' + hint}>?<span role="tooltip">{hint}</span></button></span>
+            <span>{NexLuckI18n.t(label)} <button type="button" className="risk-help" aria-label={label + ': ' + hint}>?<span role="tooltip">{NexLuckI18n.t(hint)}</span></button></span>
             <b className={'status ' + (flagged ? 'bad' : '')}>{flagged ? 'Flagged' : 'No demo flag'}</b>
           </li>;
         })}</ul>
       </section>
       <section className="customer-card" style={{ gridArea: 'wallets', '--c': '#0a7d8c' }}>
-        <h2>Wallets</h2>
+        <h2>{NexLuckI18n.t("Wallets")}</h2>
         {activity.wallets.length ? activity.stats.map(s => <div className="currency-stats" key={s.currency}><h3>{s.currency}</h3>
           <Stats items={activity.wallets.filter(w => w.currency === s.currency).map(w => [w.type + ' balance', amountText(w.balance, s.currency)])} />
-          <h3 style={{ marginTop: 14 }}>Deposit turnover</h3><Stats items={['1 day', '7 days', '1 month', '1 year'].map((period, i) => [period, amountText(s.deposits[i], s.currency)])} />
-        </div>) : <p className="hint">No wallets for this customer.</p>}
+          <h3 style={{ marginTop: 14 }}>{NexLuckI18n.t("Deposit turnover")}</h3><Stats items={['1 day', '7 days', '1 month', '1 year'].map((period, i) => [period, amountText(s.deposits[i], s.currency)])} />
+        </div>) : <p className="hint">{NexLuckI18n.t("No wallets for this customer.")}</p>}
       </section>
       <section className="customer-card" style={{ gridArea: 'gaming', '--c': '#e8590c' }}>
-        <h2>Gaming</h2>
+        <h2>{NexLuckI18n.t("Gaming")}</h2>
         <div className="gaming-favourites">
-          {[['games', 'Favourite games'], ['categories', 'Favourite categories'], ['providers', 'Favourite game providers']].map(([key, title]) => <div key={key}>
-            <h3>{title}</h3>
+          {[['games', NexLuckI18n.t("Favourite games")], ['categories', NexLuckI18n.t("Favourite categories")], ['providers', NexLuckI18n.t("Favourite game providers")]].map(([key, title]) => <div key={key}>
+            <h3>{NexLuckI18n.t(title)}</h3>
             {activity.favourites[key].length ? <ol>{activity.favourites[key].map(([name, rounds]) => <li key={name}><span>{name}</span><b>{rounds} {rounds === 1 ? 'round' : 'rounds'}</b></li>)}</ol>
-              : <p className="hint">No recorded real-wallet bets yet.</p>}
+              : <p className="hint">{NexLuckI18n.t("No recorded real-wallet bets yet.")}</p>}
           </div>)}
-          <p className="hint">Top 3 by recorded real-wallet bet rounds across currencies; ties sorted by name. Categories and providers use the demo game catalog.</p>
+          <p className="hint">{NexLuckI18n.t("Top 3 by recorded real-wallet bet rounds across currencies; ties sorted by name. Categories and providers use the demo game catalog.")}</p>
         </div>
-        {activity.stats.map(s => <div className="currency-stats" key={s.currency}><h3>{s.currency} · recorded demo activity</h3><Stats items={[
+        {activity.stats.map(s => <div className="currency-stats" key={s.currency}><h3>{s.currency}{NexLuckI18n.t(" · recorded demo activity")}</h3><Stats items={[
           ['Bets / losses (stakes)', amountText(s.bets, s.currency)], ['Wins (payouts)', amountText(s.wins, s.currency)],
           ['Gross gaming revenue', amountText(s.ggr, s.currency)], ['Wins minus losses', amountText(s.net, s.currency)],
           ['Bet rounds', s.rounds], ['RTP', s.rtp === null ? 'N/A' : s.rtp.toFixed(2) + '%']
         ]} /></div>)}
-        <p className="hint">GGR = bets − wins. Player net = wins − staked amounts. RTP = wins ÷ bets. Real-wallet gaming only.</p>
+        <p className="hint">{NexLuckI18n.t("GGR = bets − wins. Player net = wins − staked amounts. RTP = wins ÷ bets. Real-wallet gaming only.")}</p>
       </section>
       <section className="customer-card" style={{ gridArea: 'bonus', '--c': '#c23934' }}>
-        <h2>Bonus activity</h2>
+        <h2>{NexLuckI18n.t("Bonus activity")}</h2>
         <Stats items={[['Wagering completion (demo)', customer.bonus_wr_rate + '%']]} />
-        {activity.stats.map(s => <div className="currency-stats" key={s.currency}><h3>{s.currency} · recorded demo activity</h3><Stats items={[
+        {activity.stats.map(s => <div className="currency-stats" key={s.currency}><h3>{s.currency}{NexLuckI18n.t(" · recorded demo activity")}</h3><Stats items={[
           ['Bonuses granted', amountText(s.granted, s.currency)], ['Bonus wagering', amountText(s.wagered, s.currency)],
           ['Bonuses cancelled', amountText(s.cancelled, s.currency)], ['Bonus activity events', s.bonusEvents]
         ]} /></div>)}
-        <p className="hint">Wagering requirements and completion are not available in the demo ledger.</p>
+        <p className="hint">{NexLuckI18n.t("Wagering requirements and completion are not available in the demo ledger.")}</p>
       </section>
       <section className="customer-card" style={{ gridArea: 'loyalty', '--c': '#b8860b' }}>
-        <h2>Loyalty points</h2><div className="loyalty-grid">
-          <div><strong>{activity.points.toLocaleString()}</strong><small>Available demo points</small></div>
-          <div><strong>{activity.tier}</strong><small>Loyalty status</small></div>
-          <span className="status warn">{activity.tier} badge</span>
-          {customer.kyc_status === 'VERIFIED' && <span className="status good">Verified customer badge</span>}
-        </div><p className="hint">Demo rule: 100 points per recorded real-wallet bet; Silver at 200 points, Gold at 500 points.</p>
+        <h2>{NexLuckI18n.t("Loyalty points")}</h2><div className="loyalty-grid">
+          <div><strong>{activity.points.toLocaleString(NexLuckI18n.formatLocale)}</strong><small>{NexLuckI18n.t("Available demo points")}</small></div>
+          <div><strong>{activity.tier}</strong><small>{NexLuckI18n.t("Loyalty status")}</small></div>
+          <span className="status warn">{activity.tier}{NexLuckI18n.t(" badge")}</span>
+          {customer.kyc_status === 'VERIFIED' && <span className="status good">{NexLuckI18n.t("Verified customer badge")}</span>}
+        </div><p className="hint">{NexLuckI18n.t("Demo rule: 100 points per recorded real-wallet bet; Silver at 200 points, Gold at 500 points.")}</p>
       </section>
     </div>
     {editing && <CustomerEdit customer={customer} onClose={() => setEditing(false)} onSave={saved => { setCustomer(saved); setEditing(false); setMessage('Customer updated successfully.'); }} />}

@@ -1,9 +1,12 @@
-{% load static %}<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+{% load cms_i18n %}{% load static %}<!doctype html>
+<html lang="{{ cms_language }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{% block title %}NexLuck CMS{% endblock %}</title>
 <link rel="stylesheet" href="{% static 'cms/admin.css' %}">
-<link rel="stylesheet" href="{% static 'dropdowns.css' %}">{% block head %}{% endblock %}</head>
-<body><header class="cms-header"><a class="brand" href="/cms/"><span class="logo">N</span>NexLuck <small>CMS</small></a>
-<nav><a href="/crm/">Back to CRM</a>{% if user.is_superuser %}<a href="/cms/admin/">Administration</a>{% endif %}
-{% if user.is_authenticated %}<span>{{ user.username }}</span><form method="post" action="/cms/logout/">{% csrf_token %}<button>Sign out</button></form>{% endif %}</nav></header>
-{% block content %}{% endblock %}<footer class="cms-footer">NexLuck CMS · Draft, preview, publish</footer></body></html>
+<link rel="stylesheet" href="{% static 'dropdowns.css' %}">
+<script src="/cms/i18n/catalog.js"></script><script src="/cms/i18n/runtime.js"></script>
+{% block head %}{% endblock %}</head>
+<body><header class="cms-header"><a class="brand" href="/cms/"><span class="logo">N</span>{% cms_t "NexLuck" %}<small>{% cms_t "CMS" %}</small></a>
+<nav><span id="cms-language"></span><a href="/crm/">{% cms_t "Back to CRM" %}</a>{% if user.is_superuser %}<a href="/cms/admin/">{% cms_t "Administration" %}</a>{% endif %}
+{% if user.is_authenticated %}<span>{{ user.username }}</span><form method="post" action="/cms/logout/">{% csrf_token %}<button>{% cms_t "Sign out" %}</button></form>{% endif %}</nav></header>
+<script>window.NexLuckI18n.mountSelector(document.getElementById('cms-language'));</script>
+{% block content %}{% endblock %}<footer class="cms-footer">{% cms_t "NexLuck CMS · Draft, preview, publish" %}</footer></body></html>

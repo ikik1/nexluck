@@ -22,6 +22,7 @@ INSTALLED_APPS = [
 # Extensions are installed Python packages, not database-supplied imports.
 INSTALLED_APPS += list(filter(None, os.environ.get("CMS_PLUGIN_APPS", "").split(",")))
 MIDDLEWARE = [
+    "core.i18n.CMSLanguageMiddleware",
     "django.middleware.security.SecurityMiddleware", "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware", "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware", "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -32,6 +33,7 @@ TEMPLATES = [{
     "BACKEND": "django.template.backends.django.DjangoTemplates", "DIRS": [BASE_DIR / "templates"],
     "APP_DIRS": True, "OPTIONS": {"context_processors": [
         "django.template.context_processors.request", "django.contrib.auth.context_processors.auth",
+        "core.i18n.context",
         "django.contrib.messages.context_processors.messages",
     ]},
 }]
@@ -83,6 +85,7 @@ STORAGES = {"default": {"BACKEND": "django.core.files.storage.FileSystemStorage"
             "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage" if LOCAL and os.environ.get("CMS_USE_MANIFEST") != "1"
                             else "whitenoise.storage.CompressedManifestStaticFilesStorage"}}
 REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "core.i18n.exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAdminUser"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],

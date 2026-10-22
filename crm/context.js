@@ -28,7 +28,7 @@
       (document.getElementById('sub') || document.body).after(node);
     }
     node.className = 'crm-context-message ' + kind;
-    node.textContent = text;
+    node.textContent = NexLuckI18n.t(text);
     node.hidden = !text;
   }
 
@@ -58,19 +58,19 @@
     if (!box) return;
     box.replaceChildren();
     const label = document.createElement('label');
-    label.textContent = 'Context';
+    label.textContent = NexLuckI18n.t("Context");
     label.htmlFor = 'crm-context-select';
     const select = document.createElement('select');
     select.id = 'crm-context-select';
-    select.setAttribute('aria-label', 'Context');
+    select.setAttribute('aria-label', NexLuckI18n.t("Context"));
     select.disabled = !casinos.length;
     if (!casinos.some(casino => casino.id === active)) {
-      const empty = new Option(casinos.length ? 'Select a casino' : 'No casino available', '');
+      const empty = new Option(NexLuckI18n.t(casinos.length ? 'Select a casino' : 'No casino available'), '');
       select.add(empty);
     }
     casinos.forEach(casino => {
       const duplicate = casinos.filter(other => other.name === casino.name).length > 1;
-      select.add(new Option(casino.name + (duplicate ? ' (' + casino.id + ')' : '') + (casino.enabled ? '' : ' (disabled)'), casino.id));
+      select.add(new Option(casino.name + (duplicate ? ' (' + casino.id + ')' : '') + (casino.enabled ? '' : NexLuckI18n.t(' (disabled)')), casino.id));
     });
     select.value = active || '';
     select.onchange = async event => {
@@ -92,23 +92,24 @@
       disabled ? 'This casino website is disabled. CRM editing is still available.' : '',
       mode === 'demo' ? 'Demo CRM: authentication is not enabled. Do not use for production customer data.' : '',
       storageWarning
-    ].filter(Boolean).join(' ');
+    ].filter(Boolean).map(text => NexLuckI18n.t(text)).join(' ');
     warning.hidden = !warning.textContent;
     message(contextError);
     decorateLinks();
   }
 
   async function jsonFetch(path, options = {}) {
+    options = { ...options, headers: { ...options.headers, 'Accept-Language': NexLuckI18n.locale } };
     const response = await nativeFetch(path, options);
-    if (!response.headers.get('Content-Type')?.includes('application/json')) throw new Error('CRM API unavailable (HTTP ' + response.status + ').');
+    if (!response.headers.get('Content-Type')?.includes('application/json')) throw new Error(NexLuckI18n.t("CRM API unavailable (HTTP ") + response.status + ').');
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'CRM request failed (' + response.status + ').');
+    if (!response.ok) throw new Error(result.error || NexLuckI18n.t("CRM request failed (") + response.status + ').');
     return result;
   }
 
   async function refreshRegistry() {
     const result = await jsonFetch(api + 'casinos');
-    if (!Array.isArray(result.items)) throw new Error('Invalid casino registry response.');
+    if (!Array.isArray(result.items)) throw new Error(NexLuckI18n.t("Invalid casino registry response."));
     casinos = result.items.sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
     mode = result.mode;
     renderSelector();
@@ -145,11 +146,11 @@
       const dialog = document.createElement('dialog');
       dialog.className = 'crm-context-dialog';
       const title = document.createElement('p');
-      title.textContent = 'Discard unsaved changes and switch casino?';
+      title.textContent = NexLuckI18n.t("Discard unsaved changes and switch casino?");
       const stay = document.createElement('button');
-      stay.textContent = 'Stay'; stay.className = 'btn';
+      stay.textContent = NexLuckI18n.t("Stay"); stay.className = 'btn';
       const discard = document.createElement('button');
-      discard.textContent = 'Discard and switch'; discard.className = 'btn pri';
+      discard.textContent = NexLuckI18n.t("Discard and switch"); discard.className = 'btn pri';
       const finish = value => { dialog.close(); dialog.remove(); resolve(value); };
       stay.onclick = () => finish(false);
       discard.onclick = () => finish(true);
@@ -163,7 +164,7 @@
 
   async function switchTo(id) {
     if (!id || id === active) return;
-    if (writes) { message('A save is in progress. Wait for its result before changing casino.'); return; }
+    if (writes) { message(NexLuckI18n.t("A save is in progress. Wait for its result before changing casino.")); return; }
     if (!reporting && (dirty || [...dirtySources.values()].some(Boolean) || document.querySelector('[role="dialog"], .modal, dialog[open]'))) {
       if (!await confirmDiscard()) return;
     }
@@ -174,8 +175,8 @@
     if (main && !reporting) main.inert = true;
     try {
       await refreshRegistry();
-      if (!casinos.some(casino => casino.id === id)) throw new Error('This casino is unavailable or not permitted.');
-      if (writes) throw new Error('A save is in progress. Wait before changing casino.');
+      if (!casinos.some(casino => casino.id === id)) throw new Error(NexLuckI18n.t("This casino is unavailable or not permitted."));
+      if (writes) throw new Error(NexLuckI18n.t("A save is in progress. Wait before changing casino."));
       await jsonFetch(api + 'context-events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: active, to: id }) });
       generation++;
       reads.forEach(controller => controller.abort());
@@ -210,17 +211,18 @@
   async function scopedFetch(input, options = {}) {
     await ready;
     const target = new URL(input, location.href);
-    if (target.origin !== location.origin || !/^\/crm\/(?:ui-api|api)\/v1\//.test(target.pathname)) throw new Error('Invalid CRM API destination.');
+    if (target.origin !== location.origin || !/^\/crm\/(?:ui-api|api)\/v1\//.test(target.pathname)) throw new Error(NexLuckI18n.t("Invalid CRM API destination."));
     let rest = target.pathname.replace(/^\/crm\/(?:ui-api|api)\/v1\//, '');
     const method = (options.method || 'GET').toUpperCase();
-    if (transitioning && !['GET', 'HEAD'].includes(method)) throw new Error('Context is changing. Wait before saving.');
+    if (transitioning && !['GET', 'HEAD'].includes(method)) throw new Error(NexLuckI18n.t("Context is changing. Wait before saving."));
     const headers = new Headers(options.headers);
+    headers.set('Accept-Language', NexLuckI18n.locale);
     const isGlobal = rest === 'casinos' || rest.startsWith('casinos/') || rest === 'context-events' || rest.startsWith('reporting/');
     if (options.casinoId) {
-      if (!casinos.some(casino => casino.id === options.casinoId)) throw new Error('The selected owner casino is not operationally permitted.');
+      if (!casinos.some(casino => casino.id === options.casinoId)) throw new Error(NexLuckI18n.t("The selected owner casino is not operationally permitted."));
       headers.set('X-Casino-Id', options.casinoId);
     } else if (reporting && !isGlobal) {
-      if (method !== 'GET') throw new Error('Choose an explicit casino owner before editing from Analytics.');
+      if (method !== 'GET') throw new Error(NexLuckI18n.t("Choose an explicit casino owner before editing from Analytics."));
       target.pathname = target.pathname.replace('/v1/', '/v1/reporting/');
       rest = 'reporting/' + rest;
     } else if (!isGlobal) {
@@ -276,7 +278,7 @@
       if (root) {
         root.replaceChildren();
         const notice = document.createElement('p'); notice.className = 'error'; notice.setAttribute('role', 'alert'); notice.textContent = error.message;
-        const retry = document.createElement('button'); retry.className = 'btn'; retry.textContent = 'Retry'; retry.onclick = () => location.reload();
+        const retry = document.createElement('button'); retry.className = 'btn'; retry.textContent = NexLuckI18n.t("Retry"); retry.onclick = () => location.reload();
         root.append(notice, retry);
       }
       message(error.message);
@@ -296,6 +298,19 @@
   });
   window.addEventListener('beforeunload', event => {
     if (!discarding && !reporting && (writes || [...dirtySources.values()].some(Boolean) || document.querySelector('[role="dialog"], .modal'))) { event.preventDefault(); event.returnValue = ''; }
+  });
+  window.addEventListener('nexluck:before-language-change', event => {
+    if (writes) {
+      message(NexLuckI18n.t('A save is in progress. Wait before changing language.'));
+      event.preventDefault();
+      return;
+    }
+    if ((dirty || [...dirtySources.values()].some(Boolean) || document.querySelector('[role="dialog"], .modal, dialog[open]')) &&
+        !confirm(NexLuckI18n.t('Discard unsaved changes and change language?'))) {
+      event.preventDefault();
+      return;
+    }
+    discarding = true;
   });
   document.addEventListener('DOMContentLoaded', () => {
     renderSelector();

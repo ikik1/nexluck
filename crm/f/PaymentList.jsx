@@ -14,13 +14,13 @@ const ZONE_SHAPES = {
 
 function ZoneMap({ selected, toggle }) {
   return (
-    <svg viewBox="0 0 1000 480" role="group" aria-label="Geo zone map">
+    <svg viewBox="0 0 1000 480" role="group" aria-label={NexLuckI18n.t("Geo zone map")}>
       {ZONES.map(z => (
         <g key={z} className={'zg' + (selected.includes(z) ? ' on' : '')} onClick={() => toggle(z)} role="button" tabIndex={0} aria-pressed={selected.includes(z)} aria-label={z}
           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(z); } }}>
           {ZONE_SHAPES[z].pts.map((p, i) => <polygon key={i} className="z" points={p} />)}
-          <text className="zl" x={ZONE_SHAPES[z].label[0]} y={ZONE_SHAPES[z].label[1]}>{z === 'United States' ? 'USA' : z}</text>
-          <title>{z}</title>
+          <text className="zl" x={ZONE_SHAPES[z].label[0]} y={ZONE_SHAPES[z].label[1]}>{z === NexLuckI18n.t("United States") ? 'USA' : z}</text>
+          <title>{NexLuckI18n.t(z)}</title>
         </g>
       ))}
     </svg>
@@ -66,11 +66,11 @@ function BrandSearchPicker({ value, onChange }) {
       <input
         className="dropdown-control"
         type="text"
-        placeholder="Type to search brand, payment method, country…"
+        placeholder={NexLuckI18n.t("Type to search brand, payment method, country…")}
         value={open ? search : (value ? `${value} — ${selectedGw ? selectedGw.methods.slice(0, 3).join(', ') : ''}` : '')}
         onFocus={() => { setOpen(true); setSearch(''); }}
         onChange={e => { setSearch(e.target.value); setOpen(true); }}
-        aria-label="Payment company brand search"
+        aria-label={NexLuckI18n.t("Payment company brand search")}
       />
       {open && (
         <div className="brand-picker-drop" role="listbox">
@@ -87,10 +87,10 @@ function BrandSearchPicker({ value, onChange }) {
               }}
             >
               <b>{g.brand} <small style={{ color: '#444', fontWeight: 'normal' }}>({g.desc})</small></b>
-              <small>Methods: {g.methods.join(', ')} · Countries: {g.countries.slice(0, 5).join(', ')}{g.countries.length > 5 ? '…' : ''}</small>
+              <small>{NexLuckI18n.t("Methods: ")}{g.methods.join(', ')}{NexLuckI18n.t(" · Countries: ")}{g.countries.slice(0, 5).join(', ')}{g.countries.length > 5 ? '…' : ''}</small>
             </div>
           ))}
-          {!filtered.length && <div style={{ padding: '8px 10px', color: 'var(--muted)', fontSize: 12 }}>No matching brand found</div>}
+          {!filtered.length && <div style={{ padding: '8px 10px', color: 'var(--muted)', fontSize: 12 }}>{NexLuckI18n.t("No matching brand found")}</div>}
         </div>
       )}
     </div>
@@ -159,9 +159,9 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
   const currentZones = zonesOf(data.countries);
 
   const settingFields = BRAND_SETTINGS_FIELDS[data.brand] || [
-    { k: 'merchant_id', label: 'Merchant / Terminal ID', placeholder: 'mid_123' },
-    { k: 'api_key', label: 'API / Secret Key', placeholder: '••••••••', secret: true },
-    { k: 'endpoint_url', label: 'Gateway Endpoint', placeholder: 'https://api...' },
+    { k: 'merchant_id', label: NexLuckI18n.t("Merchant / Terminal ID"), placeholder: 'mid_123' },
+    { k: 'api_key', label: NexLuckI18n.t("API / Secret Key"), placeholder: '••••••••', secret: true },
+    { k: 'endpoint_url', label: NexLuckI18n.t("Gateway Endpoint"), placeholder: 'https://api...' },
   ];
 
   const updateSetting = (k, v) => {
@@ -202,52 +202,46 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
 
   return (
     <div className="modal" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="dlg wide" role="dialog" aria-modal="true" aria-label={isNew ? 'New payment connection' : 'Edit payment connection'}>
+      <div className="dlg wide" role="dialog" aria-modal="true" aria-label={isNew ? NexLuckI18n.t("New payment connection") : NexLuckI18n.t("Edit payment connection")}>
         <h2>
-          <span>{isNew ? '✦ New payment connection' : `Edit payment connection: ${data.name}`}</span>
-          <button className="x" onClick={onClose} aria-label="Close">×</button>
+          <span>{isNew ? NexLuckI18n.t("✦ New payment connection") : NexLuckI18n.t("Edit payment connection: {value1}", { value1: data.name })}</span>
+          <button className="x" onClick={onClose} aria-label={NexLuckI18n.t("Close")}>×</button>
         </h2>
 
         <div className="fld">
-          <label>Payment brand <small style={{ color: 'var(--muted)', fontWeight: 'normal' }}>(Search by brand name, method, or country)</small></label>
+          <label>{NexLuckI18n.t("Payment brand ")}<small style={{ color: 'var(--muted)', fontWeight: 'normal' }}>{NexLuckI18n.t("(Search by brand name, method, or country)")}</small></label>
           <BrandSearchPicker value={data.brand} onChange={handleBrandChange} />
         </div>
 
-        <label className="fld">
-          Connection name
-          <input
+        <label className="fld">{NexLuckI18n.t("Connection name")}<input
             type="text"
             value={data.name}
             maxLength={100}
             onChange={e => setData(d => ({ ...d, name: e.target.value }))}
-            placeholder="e.g. Stripe terminal 101 for highrisk"
+            placeholder={NexLuckI18n.t("e.g. Stripe terminal 101 for highrisk")}
           />
         </label>
 
         <div className="cfg">
-          <label className="fld">
-            Currency
-            <select value={data.currency} onChange={e => setData(d => ({ ...d, currency: e.target.value }))}>
-              {(brandGw ? brandGw.currencies : CURRENCIES).map(c => <option key={c} value={c}>{c}</option>)}
+          <label className="fld">{NexLuckI18n.t("Currency")}<select value={data.currency} onChange={e => setData(d => ({ ...d, currency: e.target.value }))}>
+              {(brandGw ? brandGw.currencies : CURRENCIES).map(c => <option key={c} value={c}>{NexLuckI18n.t(c)}</option>)}
             </select>
           </label>
 
-          <label className="fld">
-            Status
-            <select value={data.status} onChange={e => setData(d => ({ ...d, status: e.target.value }))}>
-              <option value="online">Connected (online)</option>
-              <option value="degraded">Degraded</option>
-              <option value="offline">Disconnected (offline)</option>
+          <label className="fld">{NexLuckI18n.t("Status")}<select value={data.status} onChange={e => setData(d => ({ ...d, status: e.target.value }))}>
+              <option value="online">{NexLuckI18n.t("Connected (online)")}</option>
+              <option value="degraded">{NexLuckI18n.t("Degraded")}</option>
+              <option value="offline">{NexLuckI18n.t("Disconnected (offline)")}</option>
             </select>
           </label>
         </div>
 
         <div className="fld" style={{ marginTop: 8 }}>
-          <label>Connection settings <span className="badge-prep">specific to {data.brand}</span></label>
+          <label>{NexLuckI18n.t("Connection settings ")}<span className="badge-prep">{NexLuckI18n.t("specific to ")}{data.brand}</span></label>
           <div className="set-grid">
             {settingFields.map(f => (
               <label key={f.k} className="fld" style={{ margin: 0 }}>
-                {f.label}
+                {NexLuckI18n.t(f.label)}
                 <input
                   type={f.secret ? 'password' : 'text'}
                   value={data.settings[f.k] || ''}
@@ -260,21 +254,20 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
         </div>
 
         <div className="fld" style={{ marginTop: 8 }}>
-          <label>Segments <small style={{ color: 'var(--muted)', fontWeight: 'normal' }}>(Player groups eligible for this connection)</small></label>
+          <label>{NexLuckI18n.t("Segments ")}<small style={{ color: 'var(--muted)', fontWeight: 'normal' }}>{NexLuckI18n.t("(Player groups eligible for this connection)")}</small></label>
           <div className="segs">
             {data.segments.map(s => <button type="button" key={s} className="tag-chk on"
-              aria-label={'Remove segment ' + s} title="Double-click to remove; press Delete or Backspace to remove"
+              aria-label={NexLuckI18n.t("Remove segment ") + s} title={NexLuckI18n.t("Double-click to remove; press Delete or Backspace to remove")}
               onDoubleClick={() => removeSegment(s)} onKeyDown={e => {
                 if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSegment(s); }
               }}>{s}</button>)}
-            <button type="button" className="new-btn" aria-label="Edit connection segments" onClick={() => setShowSegments(true)}>...</button>
+            <button type="button" className="new-btn" aria-label={NexLuckI18n.t("Edit connection segments")} onClick={() => setShowSegments(true)}>...</button>
           </div>
         </div>
 
         <div className="fld" style={{ marginTop: 8 }}>
-          <label>
-            Countries <span className="badge-prep">Pre-populated from {data.brand}</span>
-            <small style={{ color: 'var(--muted)', marginLeft: 8 }}>({data.countries.length} selected)</small>
+          <label>{NexLuckI18n.t("Countries ")}<span className="badge-prep">{NexLuckI18n.t("Pre-populated from ")}{data.brand}</span>
+            <small style={{ color: 'var(--muted)', marginLeft: 8 }}>({data.countries.length}{NexLuckI18n.t(" selected)")}</small>
           </label>
           <div className="cbox-grid">
             {brandCountries.map(code => (
@@ -287,9 +280,9 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
         </div>
 
         <div className="fld" style={{ marginTop: 8 }}>
-          <label>Geo zones <span className="badge-prep">Derived from chosen countries</span></label>
+          <label>{NexLuckI18n.t("Geo zones ")}<span className="badge-prep">{NexLuckI18n.t("Derived from chosen countries")}</span></label>
           <div style={{ marginTop: 4 }}>
-            {currentZones.length ? currentZones.map(z => <span key={z} className="tag z">{z}</span>) : <span style={{ color: 'var(--muted)', fontSize: 12 }}>None</span>}
+            {currentZones.length ? currentZones.map(z => <span key={z} className="tag z">{NexLuckI18n.t(z)}</span>) : <span style={{ color: 'var(--muted)', fontSize: 12 }}>{NexLuckI18n.t("None")}</span>}
           </div>
         </div>
 
@@ -303,11 +296,9 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
         {errs.map(e => <div key={e} className="err" role="alert">{e}</div>)}
 
         <div className="dfoot">
-          <button type="button" className="new-btn btn-left" onClick={runTest}>
-            ⚡ Test connection
-          </button>
-          <button type="button" className="new-btn" onClick={onClose}>Cancel</button>
-          <button type="button" className="new-btn pri" disabled={saving} onClick={handleSave}>{saving ? 'Saving…' : 'Save connection'}</button>
+          <button type="button" className="new-btn btn-left" onClick={runTest}>{NexLuckI18n.t("⚡ Test connection")}</button>
+          <button type="button" className="new-btn" onClick={onClose}>{NexLuckI18n.t("Cancel")}</button>
+          <button type="button" className="new-btn pri" disabled={saving} onClick={handleSave}>{saving ? NexLuckI18n.t("Saving…") : NexLuckI18n.t("Save connection")}</button>
         </div>
         {showSegments && <SegmentWidget state={segmentState} selected={data.segments}
           extraNames={[...ALL_SEGMENTS, ...data.segments]} selectionOwner="payment connection"
@@ -372,59 +363,59 @@ function PaymentList() {
         <input
           className="search"
           type="search"
-          placeholder="Search by connection name, brand, payment method, currency, country or geo zone…"
+          placeholder={NexLuckI18n.t("Search by connection name, brand, payment method, currency, country or geo zone…")}
           value={q}
           onChange={e => { setQ(e.target.value); if (!e.target.value) setApplied(''); }}
-          aria-label="Search payment connections"
+          aria-label={NexLuckI18n.t("Search payment connections")}
         />
-        <button type="submit" className="new-btn pri">Search</button>
-        <button type="button" className="new-btn pri" onClick={openNew} style={{ marginLeft: 'auto' }}>+ New connection</button>
+        <button type="submit" className="new-btn pri">{NexLuckI18n.t("Search")}</button>
+        <button type="button" className="new-btn pri" onClick={openNew} style={{ marginLeft: 'auto' }}>{NexLuckI18n.t("+ New connection")}</button>
       </form>
 
       <div className="mapbox">
         <ZoneMap selected={zones} toggle={toggle} />
         <div>
-          <div className="ftitle">Geo zone filter</div>
+          <div className="ftitle">{NexLuckI18n.t("Geo zone filter")}</div>
           <div className="fgroup" style={{ margin: '6px 0 10px' }}>
-            {ZONES.map(z => <button key={z} className={'chip' + (zones.includes(z) ? ' on' : '')} aria-pressed={zones.includes(z)} onClick={() => toggle(z)}>{z}</button>)}
+            {ZONES.map(z => <button key={z} className={'chip' + (zones.includes(z) ? ' on' : '')} aria-pressed={zones.includes(z)} onClick={() => toggle(z)}>{NexLuckI18n.t(z)}</button>)}
           </div>
           <p className="mapnote">{zones.length
-            ? <>Showing connections available in <b>{zones.join(', ')}</b> ({zones.flatMap(inZone).length} countries). <button className="link" onClick={() => setZones([])}>Clear</button></>
-            : 'Click a zone on the map to filter payment connections by the countries it includes.'}</p>
+            ? <>{NexLuckI18n.t("Showing connections available in ")}<b>{zones.join(', ')}</b> ({zones.flatMap(inZone).length}{NexLuckI18n.t(" countries). ")}<button className="link" onClick={() => setZones([])}>{NexLuckI18n.t("Clear")}</button></>
+            : NexLuckI18n.t("Click a zone on the map to filter payment connections by the countries it includes.")}</p>
         </div>
       </div>
 
-      <p className="count">{rows.length} of {connections.length} payment connections</p>
+      <p className="count">{rows.length}{NexLuckI18n.t(" of ")}{connections.length}{NexLuckI18n.t(" payment connections")}</p>
       <div className="wrap">
         <table className="bt">
-          <thead><tr><th>Payment Connection</th><th>Payment method</th><th>Currency</th><th>Country</th><th>Geo zone</th><th>Segments</th><th>Connectivity</th></tr></thead>
+          <thead><tr><th>{NexLuckI18n.t("Payment Connection")}</th><th>{NexLuckI18n.t("Payment method")}</th><th>{NexLuckI18n.t("Currency")}</th><th>{NexLuckI18n.t("Country")}</th><th>{NexLuckI18n.t("Geo zone")}</th><th>{NexLuckI18n.t("Segments")}</th><th>{NexLuckI18n.t("Connectivity")}</th></tr></thead>
           <tbody>
             {rows.map(c => (
               <tr key={c.id}>
                 <td>
                   <div className="brand-n">{c.name}</div>
-                  <div className="desc">Brand: <b>{c.brand}</b></div>
+                  <div className="desc">{NexLuckI18n.t("Brand: ")}<b>{c.brand}</b></div>
                 </td>
                 <td>{c.methods.map(m => <span key={m} className="tag m">{m}</span>)}</td>
                 <td><span className="tag g">{c.currency}</span></td>
                 <td><Countries codes={c.countries} /></td>
-                <td>{zonesOf(c.countries).map(z => <span key={z} className="tag z">{z}</span>)}</td>
+                <td>{zonesOf(c.countries).map(z => <span key={z} className="tag z">{NexLuckI18n.t(z)}</span>)}</td>
                 <td>{c.segments.map(s => <span key={s} className="tag">{s}</span>)}</td>
                 <td>
                   <button
                     className={'cn ' + c.conn}
                     onClick={() => openEdit(c)}
-                    title="Click to edit payment connection & test connectivity"
-                    aria-label={`${c.name} connectivity: ${CONN[c.conn]}. Click to edit.`}
+                    title={NexLuckI18n.t("Click to edit payment connection & test connectivity")}
+                    aria-label={NexLuckI18n.t("{value1} connectivity: {value2}. Click to edit.", { value1: c.name, value2: CONN[c.conn] })}
                   >
-                    <i></i>{CONN[c.conn]}
+                    <i></i>{NexLuckI18n.t(CONN[c.conn])}
                   </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {!rows.length && <div className="empty">No payment connections match your search.</div>}
+        {!rows.length && <div className="empty">{NexLuckI18n.t("No payment connections match your search.")}</div>}
       </div>
 
       {editConn && (

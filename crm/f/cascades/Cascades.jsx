@@ -18,7 +18,7 @@ function PspPicker({ onPick, onCancel }) {
   };
   return (
     <div className="pick">
-      <input className="dropdown-control" ref={ref} type="text" placeholder="Type to search payment connection by name, brand, method…" value={q} onChange={e => { setQ(e.target.value); setHl(0); }} onKeyDown={key} aria-label="Search payment connection" />
+      <input className="dropdown-control" ref={ref} type="text" placeholder={NexLuckI18n.t("Type to search payment connection by name, brand, method…")} value={q} onChange={e => { setQ(e.target.value); setHl(0); }} onKeyDown={key} aria-label={NexLuckI18n.t("Search payment connection")} />
       <ul role="listbox">
         {list.map((c, i) => (
           <li key={c.id} role="option" aria-selected={i === hl} className={i === hl ? 'hl' : ''} onMouseDown={e => { e.preventDefault(); onPick(c.name); }}>
@@ -26,9 +26,9 @@ function PspPicker({ onPick, onCancel }) {
             <small>{c.currency} · {c.methods ? c.methods.slice(0, 3).join(', ') : ''} · {c.countries ? c.countries.slice(0, 4).join(', ') : ''}</small>
           </li>
         ))}
-        {!list.length && <li style={{ cursor: 'default' }}>No payment connection found</li>}
+        {!list.length && <li style={{ cursor: 'default' }}>{NexLuckI18n.t("No payment connection found")}</li>}
       </ul>
-      <div style={{ marginTop: 6 }}><button className="link" onClick={onCancel}>Cancel</button></div>
+      <div style={{ marginTop: 6 }}><button className="link" onClick={onCancel}>{NexLuckI18n.t("Cancel")}</button></div>
     </div>
   );
 }
@@ -42,23 +42,23 @@ function Step({ s, i, n, type, onChange, onRemove, onMove, onInsert, picking, se
         <div>
           <div className="sname">{s.psp}</div>
           <div className="sval">
-            {type === 'success'
-              ? <><label>Success rate threshold</label><input type="number" min="0" max="100" step="1" value={s.value} onChange={e => onChange(e.target.value === '' ? '' : Number(e.target.value))} aria-label={'Success rate threshold for step ' + (i + 1)} />%</>
-              : <><label>Decline reason</label><select value={s.value} onChange={e => onChange(e.target.value)} aria-label={'Decline reason for step ' + (i + 1)}>{DECLINE_REASONS.map(r => <option key={r}>{r}</option>)}</select></>}
+            {type === "success"
+              ? <><label>{NexLuckI18n.t("Success rate threshold")}</label><input type="number" min="0" max="100" step="1" value={s.value} onChange={e => onChange(e.target.value === '' ? '' : Number(e.target.value))} aria-label={NexLuckI18n.t("Success rate threshold for step ") + (i + 1)} />%</>
+              : <><label>{NexLuckI18n.t("Decline reason")}</label><select value={s.value} onChange={e => onChange(e.target.value)} aria-label={NexLuckI18n.t("Decline reason for step ") + (i + 1)}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{NexLuckI18n.t(r)}</option>)}</select></>}
           </div>
         </div>
         <div className="sact">
-          <button className="ib" onClick={() => setPicking(cur ? null : i)} title="Insert a payment connection after this step">Insert</button>
-          <button className="ib del" onClick={onRemove} title="Remove this step">Remove</button>
-          <button className="ib" disabled={i === 0} onClick={() => onMove(-1)} aria-label="Move up">↑ Up</button>
-          <button className="ib" disabled={i === n - 1} onClick={() => onMove(1)} aria-label="Move down">↓ Down</button>
+          <button className="ib" onClick={() => setPicking(cur ? null : i)} title={NexLuckI18n.t("Insert a payment connection after this step")}>{NexLuckI18n.t("Insert")}</button>
+          <button className="ib del" onClick={onRemove} title={NexLuckI18n.t("Remove this step")}>{NexLuckI18n.t("Remove")}</button>
+          <button className="ib" disabled={i === 0} onClick={() => onMove(-1)} aria-label={NexLuckI18n.t("Move up")}>{NexLuckI18n.t("↑ Up")}</button>
+          <button className="ib" disabled={i === n - 1} onClick={() => onMove(1)} aria-label={NexLuckI18n.t("Move down")}>{NexLuckI18n.t("↓ Down")}</button>
         </div>
         {cur && <PspPicker onPick={onInsert} onCancel={() => setPicking(null)} />}
       </div>
       {i < n - 1 && (
         <div className="arrow" style={{ marginLeft: Math.min(i, 6) * 24 + 22 }}>
           <svg viewBox="0 0 18 26" aria-hidden="true"><path d="M9 0v20M3 15l6 7 6-7" fill="none" stroke="#0b5cab" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          {type === 'success' ? <>if success rate &lt; {s.value === '' ? '?' : s.value}% → next</> : <>on “{s.value}” → next</>}
+          {type === "success" ? <>{NexLuckI18n.t("if success rate < ")}{s.value === '' ? '?' : s.value}{NexLuckI18n.t("% → next")}</> : <>{NexLuckI18n.t("on “")}{s.value}{NexLuckI18n.t("” → next")}</>}
         </div>
       )}
     </>
@@ -100,34 +100,34 @@ function CascadeEditor({ cascade, onSave, onClose }) {
   };
   return (
     <div className="modal" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="dlg wide" role="dialog" aria-modal="true" aria-label="Edit cascade">
-        <h2>{cascade.id ? 'Edit cascade' : 'New cascade'} <button className="x" onClick={onClose} aria-label="Close">×</button></h2>
-        <label className="fld">Name<input type="text" value={c.name} maxLength={80} onChange={e => set('name', e.target.value)} /></label>
+      <div className="dlg wide" role="dialog" aria-modal="true" aria-label={NexLuckI18n.t("Edit cascade")}>
+        <h2>{cascade.id ? NexLuckI18n.t("Edit cascade") : NexLuckI18n.t("New cascade")} <button className="x" onClick={onClose} aria-label={NexLuckI18n.t("Close")}>×</button></h2>
+        <label className="fld">{NexLuckI18n.t("Name")}<input type="text" value={c.name} maxLength={80} onChange={e => set('name', e.target.value)} /></label>
         <div className="cfg">
-          <label className="fld">Type<select value={c.type} onChange={e => setType(e.target.value)}>{Object.keys(TYPE_LABEL).map(t => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}</select></label>
-          <label className="fld">Country (optional)<select value={c.country} onChange={e => setCountry(e.target.value)}><option value="">Any country</option>{COUNTRY_LIST.map(k => <option key={k} value={k}>{COUNTRIES[k][0]}</option>)}</select></label>
-          <label className="fld">Geo zone (optional)<select value={c.zone} onChange={e => setZone(e.target.value)}><option value="">Any zone</option>{ZONES.map(z => <option key={z}>{z}</option>)}</select></label>
-          <label className="fld">Payment method (optional)<select value={c.method} onChange={e => set('method', e.target.value)}><option value="">Any method</option>{METHODS.map(m => <option key={m}>{m}</option>)}</select></label>
-          <label className="fld">Currency (optional)<select value={c.currency} onChange={e => set('currency', e.target.value)}><option value="">Any currency</option>{CURRENCIES.map(m => <option key={m}>{m}</option>)}</select></label>
+          <label className="fld">{NexLuckI18n.t("Type")}<select value={c.type} onChange={e => setType(e.target.value)}>{Object.keys(TYPE_LABEL).map(t => <option key={t} value={t}>{NexLuckI18n.t(TYPE_LABEL[t])}</option>)}</select></label>
+          <label className="fld">{NexLuckI18n.t("Country (optional)")}<select value={c.country} onChange={e => setCountry(e.target.value)}><option value="">{NexLuckI18n.t("Any country")}</option>{COUNTRY_LIST.map(k => <option key={k} value={k}>{NexLuckI18n.t(COUNTRIES[k][0])}</option>)}</select></label>
+          <label className="fld">{NexLuckI18n.t("Geo zone (optional)")}<select value={c.zone} onChange={e => setZone(e.target.value)}><option value="">{NexLuckI18n.t("Any zone")}</option>{ZONES.map(z => <option key={z} value={z}>{NexLuckI18n.t(z)}</option>)}</select></label>
+          <label className="fld">{NexLuckI18n.t("Payment method (optional)")}<select value={c.method} onChange={e => set('method', e.target.value)}><option value="">{NexLuckI18n.t("Any method")}</option>{METHODS.map(m => <option key={m} value={m}>{NexLuckI18n.t(m)}</option>)}</select></label>
+          <label className="fld">{NexLuckI18n.t("Currency (optional)")}<select value={c.currency} onChange={e => set('currency', e.target.value)}><option value="">{NexLuckI18n.t("Any currency")}</option>{CURRENCIES.map(m => <option key={m} value={m}>{NexLuckI18n.t(m)}</option>)}</select></label>
         </div>
-        <div className="sec">Segments (optional)</div>
+        <div className="sec">{NexLuckI18n.t("Segments (optional)")}</div>
         <div className="segs">{ALL_SEGMENTS.map(s => (
           <label key={s} className={'tag-chk' + (c.segments.includes(s) ? ' on' : '')}>
             <input type="checkbox" checked={c.segments.includes(s)} onChange={() => toggleSeg(s)} />
             <span>{s}</span>
           </label>
         ))}</div>
-        <div className="sec">Waterfall: {c.type === 'success' ? 'a transaction falls to the next connection when the success rate drops below the threshold' : 'a transaction falls to the next connection on the selected decline reason'}</div>
+        <div className="sec">{NexLuckI18n.t("Waterfall: ")}{c.type === "success" ? NexLuckI18n.t("a transaction falls to the next connection when the success rate drops below the threshold") : NexLuckI18n.t("a transaction falls to the next connection on the selected decline reason")}</div>
         <div className="wf">
           {c.steps.map((s, i) => <Step key={i + s.psp} s={s} i={i} n={c.steps.length} type={c.type} picking={picking} setPicking={setPicking}
             onChange={v => patchStep(i, v)} onRemove={() => removeStep(i)} onMove={d => move(i, d)} onInsert={psp => insertAfter(i, psp)} />)}
           {!c.steps.length && <div style={{ margin: '4px 0 8px' }}>
             {picking === -1 ? <div className="pick" style={{ border: 0 }}><PspPicker onPick={psp => insertAfter(-1, psp)} onCancel={() => setPicking(null)} /></div>
-              : <button className="new-btn" onClick={() => setPicking(-1)}>+ Add the first payment connection</button>}
+              : <button className="new-btn" onClick={() => setPicking(-1)}>{NexLuckI18n.t("+ Add the first payment connection")}</button>}
           </div>}
         </div>
         {errs.map(e => <div key={e} className="err" role="alert">{e}</div>)}
-        <div className="dfoot"><button className="new-btn" onClick={onClose}>Cancel</button><button className="new-btn pri" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save cascade'}</button></div>
+        <div className="dfoot"><button className="new-btn" onClick={onClose}>{NexLuckI18n.t("Cancel")}</button><button className="new-btn pri" disabled={saving} onClick={save}>{saving ? NexLuckI18n.t("Saving…") : NexLuckI18n.t("Save cascade")}</button></div>
       </div>
     </div>
   );
@@ -157,32 +157,32 @@ function Cascades() {
     <>
       <div className="filters2">
         <FinanceMenu current="/crm/f/cascades/" />
-        <label className="fld">Country<select value={country} onChange={e => setCountry(e.target.value)}><option value="">All countries</option>{COUNTRY_LIST.map(k => <option key={k} value={k}>{COUNTRIES[k][0]}</option>)}</select></label>
-        <label className="fld">Geo zone<select value={zone} onChange={e => setZone(e.target.value)}><option value="">All zones</option>{ZONES.map(z => <option key={z}>{z}</option>)}</select></label>
-        {(country || zone) && <button className="link" onClick={() => { setCountry(''); setZone(''); }} style={{ paddingBottom: 10 }}>Clear filters</button>}
+        <label className="fld">{NexLuckI18n.t("Country")}<select value={country} onChange={e => setCountry(e.target.value)}><option value="">{NexLuckI18n.t("All countries")}</option>{COUNTRY_LIST.map(k => <option key={k} value={k}>{NexLuckI18n.t(COUNTRIES[k][0])}</option>)}</select></label>
+        <label className="fld">{NexLuckI18n.t("Geo zone")}<select value={zone} onChange={e => setZone(e.target.value)}><option value="">{NexLuckI18n.t("All zones")}</option>{ZONES.map(z => <option key={z} value={z}>{NexLuckI18n.t(z)}</option>)}</select></label>
+        {(country || zone) && <button className="link" onClick={() => { setCountry(''); setZone(''); }} style={{ paddingBottom: 10 }}>{NexLuckI18n.t("Clear filters")}</button>}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <button className="new-btn pri" onClick={() => setEdit(blank)}>+ New cascade</button>
+          <button className="new-btn pri" onClick={() => setEdit(blank)}>{NexLuckI18n.t("+ New cascade")}</button>
         </div>
       </div>
-      <p className="count">{rows.length} of {list.length} cascades</p>
+      <p className="count">{rows.length}{NexLuckI18n.t(" of ")}{list.length}{NexLuckI18n.t(" cascades")}</p>
       <div className="wrap">
         <table className="bt" style={{ minWidth: 860 }}>
-          <thead><tr><th>Name</th><th>Country</th><th>Segments</th><th>Geo zone</th><th>Edit</th></tr></thead>
+          <thead><tr><th>{NexLuckI18n.t("Name")}</th><th>{NexLuckI18n.t("Country")}</th><th>{NexLuckI18n.t("Segments")}</th><th>{NexLuckI18n.t("Geo zone")}</th><th>{NexLuckI18n.t("Edit")}</th></tr></thead>
           <tbody>
             {rows.map(c => (
               <tr key={c.id}>
                 <td><div className="brand-n">{c.name}</div><div className="desc">{TYPE_LABEL[c.type]} · {c.steps.map(s => s.psp).join(' → ') || 'no steps'}</div></td>
-                <td>{c.country ? COUNTRIES[c.country][0] : <span className="desc">All</span>}</td>
-                <td>{c.segments.length ? c.segments.map(s => <span key={s} className="tag">{s}</span>) : <span className="desc">All</span>}</td>
-                <td>{c.zone ? <span className="tag z">{c.zone}</span> : <span className="desc">All</span>}</td>
-                <td className="ed"><button className="edit" title="Edit" aria-label={'Edit ' + c.name} onClick={() => setEdit(c)}>
+                <td>{c.country ? COUNTRIES[c.country][0] : <span className="desc">{NexLuckI18n.t("All")}</span>}</td>
+                <td>{c.segments.length ? c.segments.map(s => <span key={s} className="tag">{s}</span>) : <span className="desc">{NexLuckI18n.t("All")}</span>}</td>
+                <td>{c.zone ? <span className="tag z">{c.zone}</span> : <span className="desc">{NexLuckI18n.t("All")}</span>}</td>
+                <td className="ed"><button className="edit" title={NexLuckI18n.t("Edit")} aria-label={NexLuckI18n.t("Edit ") + c.name} onClick={() => setEdit(c)}>
                   <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 14.75V17h2.25L15.9 6.35l-2.25-2.25L3 14.75Z" /><path d="m12.8 5.2 2.25 2.25M3 17h14" /></svg>
                 </button></td>
               </tr>
             ))}
           </tbody>
         </table>
-        {!rows.length && <div className="empty">No cascades match these filters.</div>}
+        {!rows.length && <div className="empty">{NexLuckI18n.t("No cascades match these filters.")}</div>}
       </div>
       {edit && <CascadeEditor cascade={edit} onSave={save} onClose={() => setEdit(null)} />}
     </>

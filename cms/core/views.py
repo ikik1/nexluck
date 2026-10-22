@@ -1,10 +1,12 @@
 import hashlib
 import secrets
+import json
 from copy import deepcopy
 from django.db import connection
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.http import Http404, HttpResponseNotModified
+from django.utils import translation
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -19,6 +21,7 @@ from .models import Layout, Page, Plugin, Publication, Site, Theme
 from .registry import registry
 from .services import document_for, publish_page, require_site, save_document, sites_for, validate_document
 from .starter import import_site
+from .i18n import DJANGO_LOCALES, catalog, localized_document, t, website_locale
 
 
 def page_query():
@@ -61,7 +64,7 @@ def import_crm(request):
     try:
         record = next((r for r in crm_get("casinos") if r["id"] == crm_id), None)
     except CRMUnavailable as exc:
-        return Response({"detail": str(exc)}, status=503)
+        return Response({"detail": t(str(exc))}, status=503)
     if record is None:
         raise Http404("CRM site not found.")
     site = import_site(record)
@@ -77,7 +80,7 @@ def crm_sites(request):
             "id": linked[r["id"]].id if r["id"] in linked else None}
             for r in crm_get("casinos") if request.user.is_superuser or r["id"] in linked]})
     except CRMUnavailable as exc:
-        return Response({"detail": str(exc)}, status=503)
+        return Response({"detail": t(str(exc))}, status=503)
 
 
 @never_cache
@@ -107,6 +110,8 @@ def publish(request, site_id):
 
 
 def render_document(request, doc, site, preview=False, publication=None, token=""):
+    locale = website_locale(request)
+    doc = localized_document(doc, locale)
     template = registry.layouts.get(doc["renderer"])
     if not template:
         raise Http404("Layout renderer is not installed.")
@@ -121,9 +126,11 @@ def render_document(request, doc, site, preview=False, publication=None, token="
             b["props"]["html"] = SEOProps().validate_html(b["props"].get("html", ""))
         b["async"] = bool(registry.modules[b["kind"]].data)
         b["data_url"] = (f"/cms/api/sites/{site.id}/widgets/{b['key']}/?preview={token}" if preview else
-                         f"/cms/api/public/{site.slug}/{publication.id}/widgets/{b['key']}/")
-    return render(request, template, {
+                         f"/cms/api/public/{site.slug}/{publication.id}/widgets/{b['key']}/?")
+        b["data_url"] += ("&" if preview else "") + f"lang={locale}"
+    response = render(request, template, {
         "doc": doc, "site": site, "preview": preview,
+        "website_language": locale, "website_messages": catalog().get(locale, {}),
         "editing": editing,
         "tokens": [(key, value) for key, value in theme_tokens(doc["tokens"]).items()],
         "islands": [{"key": b["key"], "kind": b["kind"], "url": b["data_url"], "props": b["props"]} for b in blocks if b["async"]],
@@ -133,6 +140,8 @@ def render_document(request, doc, site, preview=False, publication=None, token="
         "tab_blocks": [b for b in blocks if b["kind"] == "tab_menu"],
         "menu_blocks": [b for b in blocks if b["kind"] == "main_menu"],
     })
+    response["Content-Language"] = locale
+    return response
 
 
 @never_cache
@@ -163,24 +172,27 @@ def preview_document(request, site, token):
 @never_cache
 @api_view(["POST"])
 def create_preview(request, site_id):
+    locale = website_locale(request)
     site = require_site(request.user, site_id)
     doc, layout, theme = validate_document(request.data)
     doc.update(site_name=site.name, renderer=layout.renderer, tokens=theme.tokens, sections=layout_tree(layout, doc["blocks"]))
     token = secrets.token_urlsafe(32)
     cache.set("cms:preview:" + token, {"user_id": request.user.id, "site_id": site.id, "document": doc}, 300)
-    return Response({"url": f"/cms/preview/{site.id}/?token={token}"})
+    return Response({"url": f"/cms/preview/{site.id}/?token={token}&lang={locale}"})
 
 
 def public_page(request, slug):
+    locale = website_locale(request)
     page = get_object_or_404(Page.objects.select_related("site", "published").defer("published__document"),
         site__slug=slug, site__enabled=True, slug="home", published__isnull=False)
-    etag = '"' + hashlib.sha256(f"{page.published_id}:{page.published.revision}".encode()).hexdigest() + '"'
+    etag = '"' + hashlib.sha256(f"i18n-v1:{locale}:{page.published_id}:{page.published.revision}".encode()).hexdigest() + '"'
     if request.headers.get("If-None-Match") == etag:
         response = HttpResponseNotModified()
         response["ETag"] = etag
         response["Cache-Control"] = "public, max-age=0, must-revalidate"
+        response["Content-Language"] = locale
         return response
-    cache_key = f"cms:publication:v1:{page.published_id}"
+    cache_key = f"cms:publication:v2:{locale}:{page.published_id}"
     doc = cache.get(cache_key)
     if doc is None:
         doc = page.published.document
@@ -189,6 +201,7 @@ def public_page(request, slug):
     response = render_document(request, doc, page.site, publication=page.published)
     response["ETag"] = etag
     response["Cache-Control"] = "public, max-age=0, must-revalidate"
+    response["Content-Language"] = locale
     return response
 
 
@@ -204,7 +217,8 @@ def health(request):
     return JsonResponse({"status": "ok"})
 
 
-def widget_result(site, doc, key, *, include_hidden=False):
+def widget_result(site, doc, key, *, include_hidden=False, locale="en"):
+    doc = localized_document(doc, locale)
     block = next((b for b in doc["blocks"] if b["key"] == key and (b["enabled"] or include_hidden)), None)
     if not block:
         raise Http404("Block not found.")
@@ -212,29 +226,40 @@ def widget_result(site, doc, key, *, include_hidden=False):
     if not module or not module.data:
         raise Http404("Widget is not registered.")
     if Plugin.objects.filter(key=block["kind"].split(".")[0], enabled=False).exists():
-        return Response({"detail": "This plugin is disabled."}, status=503)
+        return Response({"detail": t("This plugin is disabled.", locale)}, status=503)
     try:
-        return Response(module.data(site, block["props"]))
+        with translation.override(DJANGO_LOCALES.get(locale, locale)):
+            return Response(module.data(site, block["props"]))
     except CRMUnavailable as exc:
-        return Response({"detail": str(exc)}, status=503)
+        return Response({"detail": t(str(exc), locale)}, status=503)
 
 
 @never_cache
 @api_view(["GET"])
 def draft_widget(request, site_id, key):
+    locale = website_locale(request)
     site = require_site(request.user, site_id)
     token = request.GET.get("preview")
     if token:
-        return widget_result(site, preview_document(request, site, token), key, include_hidden=True)
+        return widget_result(site, preview_document(request, site, token), key, include_hidden=True, locale=locale)
     page = get_object_or_404(page_query(), site=site, slug="home")
-    return widget_result(site, document_for(page), key, include_hidden=True)
+    return widget_result(site, document_for(page), key, include_hidden=True, locale=locale)
 
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def public_widget(request, slug, publication_id, key):
+    locale = website_locale(request)
     publication = get_object_or_404(Publication.objects.select_related("page__site"),
         pk=publication_id, page__site__slug=slug, page__site__enabled=True, page__published_id=publication_id)
-    response = widget_result(publication.page.site, publication.document, key)
-    response["Cache-Control"] = "public, max-age=0, must-revalidate"
+    response = widget_result(publication.page.site, publication.document, key, locale=locale)
+    if response.status_code == 200:
+        etag = '"' + hashlib.sha256((locale + json.dumps(response.data, sort_keys=True)).encode()).hexdigest() + '"'
+        if request.headers.get("If-None-Match") == etag:
+            response = HttpResponseNotModified()
+        response["ETag"] = etag
+        response["Cache-Control"] = "public, max-age=0, must-revalidate"
+    else:
+        response["Cache-Control"] = "no-store"
+    response["Content-Language"] = locale
     return response

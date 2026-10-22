@@ -65,6 +65,7 @@ class ContentBlock(models.Model):
     position = models.PositiveIntegerField()
     enabled = models.BooleanField(default=True)
     props = models.JSONField(default=dict)
+    translations = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ["position", "id"]

@@ -1,5 +1,6 @@
 import re
 from rest_framework import serializers
+from .i18n import LOCALES
 from .registry import registry
 
 
@@ -16,12 +17,24 @@ class BlockSerializer(StrictSerializer):
     slot = serializers.SlugField(default="main")
     enabled = serializers.BooleanField(default=True)
     props = serializers.JSONField()
+    translations = serializers.JSONField(required=False, default=dict)
 
     def validate(self, value):
         module = registry.modules.get(value["kind"])
         if not module:
             raise serializers.ValidationError("Unregistered module.")
         value["props"] = module.validate(value["props"])
+        translations = value["translations"]
+        supported = set(LOCALES) - {"en"}
+        if not isinstance(translations, dict) or set(translations) - supported:
+            raise serializers.ValidationError({"translations": "Localized values must use supported non-English language codes; English uses base properties."})
+        for locale, props in translations.items():
+            if not isinstance(props, dict):
+                raise serializers.ValidationError({"translations": "Localized module parameters must be an object."})
+            # Validate the merged values, but retain only explicit overrides so
+            # untranslated fields continue to follow their English base.
+            validated = module.validate({**value["props"], **props})
+            translations[locale] = {key: validated[key] for key in props}
         return value
 
 

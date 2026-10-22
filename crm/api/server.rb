@@ -9,6 +9,7 @@ require 'openssl'
 require 'base64'
 require 'securerandom'
 require 'net/http'
+require_relative 'localization'
 
 ROOT = File.expand_path('../../..', __FILE__)
 PORT = (ARGV[0] || 8080).to_i
@@ -195,7 +196,9 @@ def json(res, status, body)
   res.status = status
   res['Content-Type'] = 'application/json; charset=utf-8'
   res['Cache-Control'] = 'no-store'
-  res.body = JSON.generate(body)
+  locale = Thread.current[:crm_ui_language] || 'en'
+  res['Content-Language'] = locale
+  res.body = JSON.generate(status >= 400 ? CRMLocalization.errors(body, locale) : body)
 end
 
 # ---- Server-to-server auth: OAuth 2.0 client credentials (RFC 6749 §4.4) + JWT access tokens (RFC 9068 style) ----
@@ -754,6 +757,7 @@ scoped_handler = lambda do |req, res, rest, secured|
 end
 
 handler = lambda do |req, res, rest, secured|
+  Thread.current[:crm_ui_language] = CRMLocalization.locale_for(req)
   LOCK.synchronize do
     CASINO_CONTEXT.dispatch(req, res, rest, secured) { scoped_handler.call(req, res, rest, secured) }
     CASINO_CONTEXT.record_failure(req, res, rest)
@@ -767,6 +771,8 @@ rescue CasinoContext::InvalidReference => error
 rescue JSON::ParserError, KeyError, IOError, SystemCallError => error
   warn "CRM context request failed: #{error.class}: #{error.message}"
   json(res, 500, { error: 'CRM storage operation failed. No successful save was confirmed.' })
+ensure
+  Thread.current[:crm_ui_language] = nil
 end
 
 # WEBrick's proc handler only answers GET/POST by default.

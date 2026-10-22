@@ -19,7 +19,7 @@ payments, gambling engine, odds or player data are implemented.
 ```text
 cms/
   config/                  Django settings, URL composition, WSGI
-  api/                     Swagger/OpenAPI and frontend module/segment APIs
+  api/                     Localized API reference/OpenAPI and module/segment APIs
   core/
     models.py              Sites, membership, layouts, themes, blocks, menus,
                            plugins, pages and immutable publications
@@ -229,7 +229,7 @@ shared cache in production. Public endpoints never expose drafts.
 | `/cms/api/public/<slug>/<publication>/widgets/<key>/` | GET | Public; current publication widget only |
 | `/cms/api/plugins/announcements/<id>/` | GET, POST | Site editor read / publisher create |
 | `/cms/health/` | GET | Database + cache readiness (503/500 on failure) |
-| `/cms/api/` | GET | Staff; self-hosted Swagger UI |
+| `/cms/api/` | GET | Staff; localized interactive API reference; standard Swagger UI at `?view=swagger` |
 | `/cms/api/openapi.json` | GET | Staff; module API OpenAPI 3 specification |
 | `/cms/api/modules/` | GET | Staff; parameter schemas/defaults used in Properties dialogs |
 | `/cms/api/segments/?site_id=<id>` | GET | Site editor; saved casino-owned CRM segment IDs/names, no customer membership |
@@ -338,12 +338,46 @@ failure/recovery and backups, load test with representative traffic, integrate
 your authentication/compliance policies, and review plugin code. Pin container
 digests in your release system and maintain dependency patch updates.
 
-## Validation
+## Languages and localized content
+
+The management language selector shares `nexluck.ui.language` localStorage and
+the `nexluck_language` cookie with CRM. A dirty editor confirms before changing
+UI language. Login, editor, Properties, schema labels and validation messages
+support English, Russian, Portuguese (Portugal), Portuguese (Brazil) and Spanish
+(Spain); casino/player names and IDs remain unchanged.
+The explicit `/cms/i18n/runtime.js` and `/cms/i18n/catalog.js` routes serve the
+shared root localization assets. Run `python3 localization/build_catalog.py`
+from the repository root before building the deployment image. The Dockerfile
+automatically copies the root `localization/` directory (including
+`runtime.js`, generated `catalog.js`, and `cms.json`) to `/localization`;
+no manual container asset copy is required.
+
+Module Properties has an independent **Localization** selector. English edits
+the existing `props`; non-English edits are stored under their locale key in
+`translations` on each ContentBlock (for example `translations["pt-BR"]`).
+Overrides are persisted in draft saves and immutable publication snapshots.
+Each translated override is validated against the same module serializer as
+English (including SEO HTML sanitization); missing localized fields fall back
+to current English values. Existing documents without `translations` continue
+working. Apply migration `0003_contentblock_translations` before starting.
+
+The private preview follows the Properties language without changing the
+management language. Website visitors use the language switcher or
+`?lang=en|ru|pt-PT|pt-BR|es`; the default is English and unsupported languages
+return 400. Django's active locale is normalized to `pt`/`pt-br` while CMS
+content, cookie and response headers retain the explicit `pt-PT`/`pt-BR` codes.
+The website language is carried through widget URLs, static labels and async
+widget messages. Publication cache keys and page/widget ETags include language.
+Raw upstream CRM catalogs remain shared because their saved data is not
+translated; localized module filtering happens after raw-cache lookup.
+
+## Validation commands
 
 ```sh
 cd cms
 CMS_ENV=local .venv/bin/python manage.py test core
 CMS_ENV=local .venv/bin/python manage.py makemigrations --check --dry-run
+node tests/localization_runtime_test.cjs
 CMS_ENV=local CMS_USE_MANIFEST=1 .venv/bin/python manage.py collectstatic --noinput
 # Playwright + Google Chrome from the repository's existing test environment:
 python3 tests/browser_test.py

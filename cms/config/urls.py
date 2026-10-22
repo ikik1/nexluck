@@ -2,10 +2,12 @@ from django.contrib import admin
 from django.contrib.auth import views as auth
 from django.urls import include, path
 from core import views
+from core.i18n import asset
 from core.auth import CMSLoginView
 from core.registry import registry
 
 cms_urls = [
+    path("i18n/<str:name>", asset),
     path("", views.editor, name="cms-editor"),
     path("login/", CMSLoginView.as_view(), name="login"),
     path("logout/", auth.LogoutView.as_view(), name="logout"),

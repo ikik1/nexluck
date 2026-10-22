@@ -5,6 +5,13 @@ info:
   description: |
     REST API behind the CRM Bonuses (`/crm/b/`) and Customers (`/crm/c/list/`) pages.
 
+    ## Localization
+    Send `Accept-Language: en`, `ru`, `pt-PT`, `pt-BR` or `es` to select human-readable
+    error messages. Bare `pt` defaults to Portugal; `es-ES` selects Spanish for Spain.
+    English is the default for unsupported or omitted languages. Responses include
+    `Content-Language`. JSON field names, protocol codes, casino ownership and
+    successful business records remain unchanged.
+
     ## Casino ownership
     Operational endpoints require `X-Casino-Id: CS-...`. Missing or malformed context returns
     400, an unpermitted casino returns 403, and a foreign detail or nested object returns 404.

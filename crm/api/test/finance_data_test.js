@@ -6,6 +6,7 @@ let requests = [];
 let response = { ok: true, json: async () => ({ id: 27, name: 'Saved terminal' }) };
 const context = vm.createContext({
   window: {},
+  NexLuckI18n: { t: value => value },
   CRMContext: { fetch: async (...args) => { requests.push(args); return response; } },
 });
 vm.runInContext(fs.readFileSync('crm/f/data.js', 'utf8'), context);

@@ -5,7 +5,7 @@
       return h('div', { className: 'segment-library' }, entries.map(segment =>
         h('div', {
           className: 'segment-library-item' + (selected.includes(segment.id) ? ' selected' : ''),
-          key: segment.id, tabIndex: 0, 'aria-label': 'Select segment ' + segment.name,
+          key: segment.id, tabIndex: 0, 'aria-label': NexLuckI18n.t("Select segment ") + segment.name,
           onDoubleClick: e => { if (!e.target.closest('button,input')) onSelect(segment); },
           onKeyDown: e => {
             if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {

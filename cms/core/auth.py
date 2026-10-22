@@ -3,6 +3,7 @@ import time
 from django.contrib.auth.views import LoginView
 from django.core.cache import cache
 from django.http import HttpResponse
+from .i18n import t
 
 
 class CMSLoginView(LoginView):
@@ -17,7 +18,7 @@ class CMSLoginView(LoginView):
             bucket = f"cms:login:{int(time.time() // 300)}:{key}"
             cache.add(bucket, 0, 310)
             if cache.incr(bucket) > limit:
-                response = HttpResponse("Too many login attempts. Retry in five minutes.", status=429)
+                response = HttpResponse(t("Too many login attempts. Retry in five minutes."), status=429)
                 response["Retry-After"] = "300"
                 return response
         return super().post(request, *args, **kwargs)

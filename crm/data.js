@@ -1,31 +1,31 @@
 const SECTIONS=[
-{k:'analytics',href:'/crm/a/',n:'Analytics',i:'📈',c:'#0b5cab',big:['€482.3k','GGR (7d)'],kv:[['NGR','€391.8k','up'],['Active players','18,742','up'],['ARPU','€25.7','up'],['Retention D30','21.4%','down']]},
-{k:'casinos',href:'/crm/c/l/',n:'My casinos',i:'🏛️',c:'#7f3fbf',big:['6','Brands live'],kv:[['Jurisdictions','4',''],['Uptime','99.98%','up'],['Licences active','5 / 6',''],['Open incidents','1','down']]},
-{k:'customers',href:'/crm/c/list/',n:'Customers',i:'👥',c:'#2e844a',big:['126,480','Total players'],kv:[['New (7d)','1,356','up'],['VIP','842',''],['Pending KYC','87','down'],['Self-excluded','312','']]},
-{k:'games',href:'/crm/g/',n:'Games',i:'🎰',c:'#e8590c',big:['3,214','Games live'],kv:[['Providers','48',''],['Avg RTP','96.2%',''],['Top game','Gates of Olympus',''],['New this month','37','up']]},
-{k:'bonuses',href:'/crm/b/',n:'Bonuses / Promotion',i:'🎁',c:'#c23934',big:['24','Active campaigns'],kv:[['Bonus cost (7d)','€58.2k','down'],['Redemption rate','34%','up'],['Wagering done','61%',''],['Abuse flags','9','down']]},
-{k:'loyalty',n:'Loyalty',i:'⭐',c:'#b8860b',big:['12,904','Club members'],kv:[['Diamond tier','128',''],['Points issued','4.2M','up'],['Redeemed','1.1M',''],['Churn risk VIPs','23','down']]},
-{k:'finance',href:'/crm/f/',n:'Finance',i:'💶',c:'#0a7d8c',big:['€1.26M','Deposits (7d)'],kv:[['Withdrawals','€812k','down'],['Pending payouts','64',''],['Chargebacks','0.4%','up'],['PSP success rate','94.7%','up']]},
-{k:'compliance',n:'Compliance',i:'🛡️',c:'#5a4fcf',big:['87','KYC in queue'],kv:[['AML alerts','14','down'],['SAR filed (30d)','3',''],['RG interventions','41',''],['Reports due','2','down']]},
-{k:'audit',n:'Audit',i:'📋',c:'#444',big:['2,381','Events (24h)'],kv:[['Admin logins','96',''],['Permission changes','4',''],['Failed logins','17','down'],['Last export','Today 09:12','']]}
+{k:'analytics',href:'/crm/a/',n:NexLuckI18n.t("Analytics"),i:'📈',c:'#0b5cab'},
+{k:'casinos',href:'/crm/c/l/',n:NexLuckI18n.t("My casinos"),i:'🏛️',c:'#7f3fbf'},
+{k:'customers',href:'/crm/c/list/',n:NexLuckI18n.t("Customers"),i:'👥',c:'#2e844a'},
+{k:'games',href:'/crm/g/',n:NexLuckI18n.t("Games"),i:'🎰',c:'#e8590c'},
+{k:'bonuses',href:'/crm/b/',n:NexLuckI18n.t("Bonuses / Promotion"),i:'🎁',c:'#c23934'},
+{k:'loyalty',n:NexLuckI18n.t("Loyalty"),i:'⭐',c:'#b8860b'},
+{k:'finance',href:'/crm/f/',n:NexLuckI18n.t("Finance"),i:'💶',c:'#0a7d8c'},
+{k:'compliance',n:NexLuckI18n.t("Compliance"),i:'🛡️',c:'#5a4fcf'},
+{k:'audit',n:NexLuckI18n.t("Audit"),i:'📋',c:'#444'}
 ];
 const USER={name:'v.kovalevskiy',device:'MacBook · Chrome 126',last:'02 Oct 2026, 09:41',plan:'Enterprise · active'};
 const CRM_PAGE_INDEX = [
-  { key: 'games', name: 'List of games', href: '/crm/g/', aliases: ['game catalog', 'games', 'publishers', 'game categories'] },
-  { key: 'home', name: 'CRM home', href: '/crm/', aliases: ['home', 'dashboard', 'operator console'] },
+  { key: 'games', name: NexLuckI18n.t('List of games'), href: '/crm/g/', aliases: ['game catalog', 'games', 'publishers', 'game categories'] },
+  { key: 'home', name: NexLuckI18n.t('CRM home'), href: '/crm/', aliases: ['home', 'dashboard', 'operator console'] },
   ...SECTIONS.filter(s => s.k !== 'games').map(s => ({
-    key: s.k, name: s.k === 'customers' ? 'List of customers' : s.k === 'bonuses' ? 'List of bonuses' : s.k === 'finance' ? 'Payment connections' : s.n,
+    key: s.k, name: s.k === 'customers' ? NexLuckI18n.t('List of customers') : s.k === 'bonuses' ? NexLuckI18n.t('List of bonuses') : s.k === 'finance' ? NexLuckI18n.t('Payment connections') : s.n,
     href: s.href || '/crm/section.html?s=' + s.k,
     aliases: [s.n, s.k, ...(s.k === 'casinos' ? ['casino websites', 'websites', 'website settings', 'cms'] : []), ...(s.k === 'analytics' ? ['reports', 'management reports', 'casino dashboard', 'financial performance', 'retention', 'acquisition', 'risk reports'] : []), ...(s.k === 'finance' ? ['finance', 'payment methods', 'payment systems', 'connection editor'] : [])]
   })),
-  { key: 'new-bonus', name: 'New bonus', href: '/crm/b/e/?new=1', aliases: ['create bonus', 'add bonus', 'empty bonus'] },
-  { key: 'ai-bonus', name: 'New bonus with AI agent', href: '/crm/b/e/?new=1&ai=1', aliases: ['ai bonus', 'generate bonus'] },
-  { key: 'edit-bonus', name: 'Edit bonus', href: '/crm/b/', template: '/crm/b/e/?id=', aliases: ['bonus editor', 'modify bonus'], hint: 'Choose a bonus from the list, or include its BN-ID.' },
-  { key: 'customer-info', name: 'Customer profile', href: '/crm/c/list/', template: '/crm/c/i/?id=', aliases: ['customer info', 'customer details', 'edit customer'], hint: 'Choose a customer from the list, or include its CU-ID.' },
-  { key: 'wallets', name: 'List of wallets', href: '/crm/f/wallets/', aliases: ['wallets', 'wallet balances', 'balances'] },
-  { key: 'transactions', name: 'List of transactions', href: '/crm/f/transactions/', aliases: ['transactions', 'ledger', 'payments'] },
-  { key: 'cascades', name: 'Payment cascades', href: '/crm/f/cascades/', aliases: ['cascades', 'payment routing'] },
-  { key: 'api-docs', name: 'API documentation', href: '/crm/api-docs/', aliases: ['api docs', 'swagger', 'api documentation'] }
+  { key: 'new-bonus', name: NexLuckI18n.t('New bonus'), href: '/crm/b/e/?new=1', aliases: ['create bonus', 'add bonus', 'empty bonus'] },
+  { key: 'ai-bonus', name: NexLuckI18n.t('New bonus with AI agent'), href: '/crm/b/e/?new=1&ai=1', aliases: ['ai bonus', 'generate bonus'] },
+  { key: 'edit-bonus', name: NexLuckI18n.t('Edit bonus'), href: '/crm/b/', template: '/crm/b/e/?id=', aliases: ['bonus editor', 'modify bonus'], hint: NexLuckI18n.t("Choose a bonus from the list, or include its BN-ID.") },
+  { key: 'customer-info', name: NexLuckI18n.t('Customer profile'), href: '/crm/c/list/', template: '/crm/c/i/?id=', aliases: ['customer info', 'customer details', 'edit customer'], hint: NexLuckI18n.t("Choose a customer from the list, or include its CU-ID.") },
+  { key: 'wallets', name: NexLuckI18n.t('List of wallets'), href: '/crm/f/wallets/', aliases: ['wallets', 'wallet balances', 'balances'] },
+  { key: 'transactions', name: NexLuckI18n.t('List of transactions'), href: '/crm/f/transactions/', aliases: ['transactions', 'ledger', 'payments'] },
+  { key: 'cascades', name: NexLuckI18n.t('Payment cascades'), href: '/crm/f/cascades/', aliases: ['cascades', 'payment routing'] },
+  { key: 'api-docs', name: NexLuckI18n.t('API documentation'), href: '/crm/api-docs/', aliases: ['api docs', 'swagger', 'api documentation'] }
 ];
 
 function crmNavigationMatches(text) {
@@ -36,9 +36,13 @@ function crmNavigationMatches(text) {
     const id = (customerId || bonusId)[0].toUpperCase();
     return [{ ...page, href: page.template + id, name: (customerId ? 'Customer ' : 'Edit bonus ') + id, hint: '' }];
   }
+  const stem = word => word.replace(/(?:ами|ями|ов|ев|ы|и|а|я|ей|ой)$/u, '');
   const words = normalized.replace(/^(please\s+)?(show\s+me|take\s+me\s+to|navigate\s+to|go\s+to|open|find|view)\b\s*/, '')
-    .replace(/\b(the|a|an|list|of|page|please)\b/g, ' ').trim().split(/\s+/).filter(Boolean);
-  return CRM_PAGE_INDEX.filter(page => words.every(word => [page.name, ...page.aliases].join(' ').toLowerCase().split(/[\s/]+/).some(token => token.startsWith(word))));
+    .replace(/^(?:покажи(?:\s+мне)?|открой|перейди(?:\s+к)?|найди)\s+/u, '')
+    .replace(/\b(the|a|an|list|of|page|please)\b/g, ' ').replace(/(?:^|\s)(?:список|страницу|пожалуйста)(?=\s|$)/gu, ' ')
+    .trim().split(/\s+/).filter(Boolean).map(stem);
+  return CRM_PAGE_INDEX.filter(page => words.every(word => [page.name, NexLuckI18n.t(page.name), ...page.aliases]
+    .join(' ').toLowerCase().split(/[\s/]+/).some(token => stem(token).startsWith(word))));
 }
 
 function mountCRMNavigation() {
@@ -54,10 +58,10 @@ function mountCRMNavigation() {
     const saved = localStorage.getItem(storageKey);
     if (saved !== null) {
       const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || !parsed.every(validRequest)) throw new Error('Invalid recent requests');
+      if (!Array.isArray(parsed) || !parsed.every(validRequest)) throw new Error(NexLuckI18n.t("Invalid recent requests"));
       recent = parsed.slice(0, 8);
     }
-  } catch (error) { notify('Recent requests could not be loaded. Navigation is still available.'); }
+  } catch (error) { notify(NexLuckI18n.t("Recent requests could not be loaded. Navigation is still available.")); }
   const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); active = -1; };
   const navigate = (page, text) => {
     const request = { key: page.key, text: (text.trim() || page.name).slice(0, 200) };
@@ -78,10 +82,10 @@ function mountCRMNavigation() {
     });
     if (recent.length) {
       const clear = document.createElement('button');
-      clear.type = 'button'; clear.className = 'crm-nav-clear'; clear.textContent = 'Clear recent requests';
+      clear.type = 'button'; clear.className = 'crm-nav-clear'; clear.textContent = NexLuckI18n.t("Clear recent requests");
       clear.addEventListener('click', () => {
         try { localStorage.removeItem(storageKey); recent = []; renderRecent(); }
-        catch (error) { notify('Recent requests could not be cleared.'); }
+        catch (error) { notify(NexLuckI18n.t("Recent requests could not be cleared.")); }
       });
       history.append(clear);
     }
@@ -97,9 +101,10 @@ function mountCRMNavigation() {
   const complete = () => {
     if (active < 0 || !matches[active]) return;
     const page = matches[active], prefix = /^\s*show\s+me\b/i.test(typed) ? 'Show me ' : '';
-    input.value = prefix + page.name.charAt(0).toLowerCase() + page.name.slice(1);
+    const pageName = NexLuckI18n.t(page.name);
+    input.value = prefix + pageName.charAt(0).toLowerCase() + pageName.slice(1);
     typed = input.value; input.setSelectionRange(input.value.length, input.value.length);
-    notify('Completed: ' + input.value + '. Press Enter to navigate.');
+    notify(NexLuckI18n.t("Completed: ") + input.value + NexLuckI18n.t(". Press Enter to navigate."));
   };
   const suggest = () => {
     matches = crmNavigationMatches(typed);
@@ -107,8 +112,8 @@ function mountCRMNavigation() {
     matches.forEach((page, i) => {
       const option = document.createElement('li');
       option.id = 'crm-nav-option-' + i; option.role = 'option'; option.setAttribute('aria-selected', 'false');
-      const name = document.createElement('strong'); name.textContent = page.name;
-      const detail = document.createElement('small'); detail.textContent = page.hint || page.href;
+      const name = document.createElement('strong'); name.textContent = NexLuckI18n.t(page.name);
+      const detail = document.createElement('small'); detail.textContent = NexLuckI18n.t(page.hint || page.href);
       option.append(name, detail);
       option.addEventListener('mousedown', e => e.preventDefault());
       option.addEventListener('mouseenter', () => highlight(i));
@@ -118,12 +123,12 @@ function mountCRMNavigation() {
     list.hidden = !matches.length;
     input.setAttribute('aria-expanded', String(Boolean(matches.length)));
     highlight(matches.length ? 0 : -1);
-    notify(matches.length ? matches.length + ' destinations. Use arrows, Tab to complete, Enter to open.' : 'No CRM page matches. Try games, customers, bonuses, or API docs.');
+    notify(matches.length ? matches.length + NexLuckI18n.t(" destinations. Use arrows, Tab to complete, Enter to open.") : 'No CRM page matches. Try games, customers, bonuses, or API docs.');
   };
   input.addEventListener('focus', () => { typed = input.value; suggest(); });
   input.addEventListener('input', () => { typed = input.value; suggest(); });
   input.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { close(); notify('Suggestions closed.'); }
+    if (e.key === 'Escape') { close(); notify(NexLuckI18n.t("Suggestions closed.")); }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault(); if (list.hidden) suggest();
       if (matches.length) highlight((active + (e.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length);
@@ -132,10 +137,10 @@ function mountCRMNavigation() {
   });
   form.addEventListener('submit', e => {
     e.preventDefault();
-    if (!input.value.trim()) { notify('Type a request or choose a destination first.'); input.focus(); return; }
+    if (!input.value.trim()) { notify(NexLuckI18n.t("Type a request or choose a destination first.")); input.focus(); return; }
     const page = matches[active] || crmNavigationMatches(input.value)[0];
     if (page) navigate(page, typed);
-    else notify('No CRM page matches this request. Choose a suggestion.');
+    else notify(NexLuckI18n.t("No CRM page matches this request. Choose a suggestion."));
   });
   document.addEventListener('click', e => { if (!form.contains(e.target)) close(); });
   form.addEventListener('focusout', e => { if (!form.contains(e.relatedTarget)) close(); });
@@ -147,7 +152,7 @@ function mountCRMNavigation() {
   const pinKey = 'nexluck.crm.navigation.pinned.v1';
   let pinned = false;
   try { pinned = localStorage.getItem(pinKey) === 'true'; }
-  catch (error) { notify('Navigation pin preference could not be loaded.'); }
+  catch (error) { notify(NexLuckI18n.t("Navigation pin preference could not be loaded.")); }
   const renderPin = () => {
     pin.setAttribute('aria-pressed', String(pinned));
     pin.setAttribute('aria-label', pinned ? 'Unpin navigation' : 'Pin navigation');
@@ -199,23 +204,24 @@ function mountCRMNavigation() {
     pinned = !pinned;
     renderPin();
     try { localStorage.setItem(pinKey, String(pinned)); }
-    catch (error) { notify('Navigation pin changed, but the preference could not be saved.'); }
+    catch (error) { notify(NexLuckI18n.t("Navigation pin changed, but the preference could not be saved.")); }
     showNavigation();
   });
 }
 
 function chrome(crumb){
-document.getElementById('hdr').innerHTML=`<a class="brand" href="/crm/"><div class="logo">N</div>NexLuck</a>
+document.getElementById('hdr').innerHTML=`<a class="brand" href="/crm/"><div class="logo">${NexLuckI18n.html("N")}</div>${NexLuckI18n.html("NexLuck")}</a>
 <div class="crm-context" id="crm-context"></div>
-<div class="right"><div class="meta"><span>User <b>${USER.name}</b></span><i class="sep"></i><span>Device <b>${USER.device}</b></span><i class="sep"></i><span>Last login <b>${USER.last}</b></span><i class="sep"></i><span>Subscription <b class="badge">${USER.plan}</b></span></div>
-<button class="gear" title="Settings" aria-label="Settings">⚙️</button></div>`;
-document.getElementById('sub').innerHTML=`<button id="crm-nav-reveal" type="button" aria-label="AI navigation" title="AI navigation" aria-controls="crm-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h12M3 12h9M3 19h12M18 8l1.2 2.8L22 12l-2.8 1.2L18 16l-1.2-2.8L14 12l2.8-1.2L18 8Z"/></svg></button><div class="crm-navigation" id="crm-navigation" hidden>
-<div class="crm-nav-caption"><label for="nav">Navigate to</label><button id="crm-nav-pin" type="button" aria-label="Pin navigation" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3 6 0-1 6 4 4v2H6v-2l4-4-1-6ZM12 15v7"/></svg></button><div id="crm-nav-recent" aria-label="Recent navigation requests"></div></div>
-<form id="crm-nav-form" role="search" aria-label="Conversational CRM navigation">
-<div class="crm-nav-input"><input id="nav" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="crm-nav-options" aria-describedby="crm-nav-status" autocomplete="off" maxlength="200" placeholder="Show me list of games, or list of customers...">
-<ul id="crm-nav-options" role="listbox" aria-label="CRM destinations" hidden></ul></div><button type="submit">Go</button></form>
-<p id="crm-nav-status" role="status">Local navigation: type a request, then choose a suggestion. Tab completes.</p></div>${crumb||''}`;
+<div class="right"><div class="meta"><span>${NexLuckI18n.html("User ")}<b>${USER.name}</b></span><i class="sep"></i><span>${NexLuckI18n.html("Device ")}<b>${USER.device}</b></span><i class="sep"></i><span>${NexLuckI18n.html("Last login ")}<b>${USER.last}</b></span><i class="sep"></i><span>${NexLuckI18n.html("Subscription ")}<b class="badge">${USER.plan}</b></span></div>
+<button class="gear" title="${NexLuckI18n.html("Settings")}" aria-label="${NexLuckI18n.html("Settings")}">⚙️</button></div>`;
+document.getElementById('sub').innerHTML=`<button id="crm-nav-reveal" type="button" aria-label="${NexLuckI18n.html("AI navigation")}" title="${NexLuckI18n.html("AI navigation")}" aria-controls="crm-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h12M3 12h9M3 19h12M18 8l1.2 2.8L22 12l-2.8 1.2L18 16l-1.2-2.8L14 12l2.8-1.2L18 8Z"/></svg></button><div class="crm-navigation" id="crm-navigation" hidden>
+<div class="crm-nav-caption"><label for="nav">${NexLuckI18n.html("Navigate to")}</label><button id="crm-nav-pin" type="button" aria-label="${NexLuckI18n.html("Pin navigation")}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3 6 0-1 6 4 4v2H6v-2l4-4-1-6ZM12 15v7"/></svg></button><div id="crm-nav-recent" aria-label="${NexLuckI18n.html("Recent navigation requests")}"></div></div>
+<form id="crm-nav-form" role="search" aria-label="${NexLuckI18n.html("Conversational CRM navigation")}">
+<div class="crm-nav-input"><input id="nav" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="crm-nav-options" aria-describedby="crm-nav-status" autocomplete="off" maxlength="200" placeholder="${NexLuckI18n.html("Show me list of games, or list of customers...")}">
+<ul id="crm-nav-options" role="listbox" aria-label="${NexLuckI18n.html("CRM destinations")}" hidden></ul></div><button type="submit">${NexLuckI18n.html("Go")}</button></form>
+<p id="crm-nav-status" role="status">${NexLuckI18n.html("Local navigation: type a request, then choose a suggestion. Tab completes.")}</p></div>${crumb||''}`;
 mountCRMNavigation();
-document.getElementById('ftr').innerHTML=`<span>Powered by NexLuck</span>|<a href="#">Terms of Services</a>|<a href="#">Privacy Policy</a>`;
+NexLuckI18n.mountSelector(document.querySelector('#hdr .right'));
+document.getElementById('ftr').innerHTML=`<span>${NexLuckI18n.html("Powered by NexLuck")}</span>|<a href="#">${NexLuckI18n.html("Terms of Services")}</a>|<a href="#">${NexLuckI18n.html("Privacy Policy")}</a>`;
 CRMContext.attach();
 }

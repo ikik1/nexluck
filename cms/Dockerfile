@@ -15,6 +15,7 @@ WORKDIR /app
 COPY cms/requirements.lock ./
 RUN pip install --no-cache-dir -r requirements.lock && useradd --create-home --uid 10001 cms
 COPY cms/ .
+COPY localization /localization
 COPY --from=frontend /source/cms/frontend/dist ./frontend/dist
 RUN CMS_ENV=local CMS_USE_MANIFEST=1 python manage.py collectstatic --noinput && chown -R cms:cms /app
 USER cms

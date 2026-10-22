@@ -1,0 +1,6 @@
+{% extends "admin/base.html" %}
+{% load cms_i18n %}
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+{% block branding %}<div id="site-name"><a href="{% url 'admin:index' %}">{{ site_header }}</a></div><span id="cms-admin-language"></span>
+<script>window.NexLuckI18n.mountSelector(document.getElementById('cms-admin-language'));</script>{% endblock %}
+{% block extrahead %}{{ block.super }}{% load static %}<link rel="stylesheet" href="{% static 'dropdowns.css' %}"><script src="/cms/i18n/catalog.js"></script><script src="/cms/i18n/runtime.js"></script>{% endblock %}

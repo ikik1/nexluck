@@ -2,11 +2,11 @@ const SEGMENT_API = '/crm/ui-api/v1/segments';
 async function apiRequest(url, options = {}) {
   const response = await CRMContext.fetch(url, options);
   if (!response.headers.get('Content-Type')?.includes('application/json')) {
-    throw new Error(`CRM API unavailable (HTTP ${response.status}). Start or update the CRM API server.`);
+    throw new Error(NexLuckI18n.t("CRM API unavailable (HTTP {value1}). Start or update the CRM API server.", { value1: response.status }));
   }
   const body = await response.json();
   if (!response.ok) {
-    const error = new Error(body.error || `Request failed (${response.status})`);
+    const error = new Error(body.error || NexLuckI18n.t("Request failed ({value1})", { value1: response.status }));
     error.status = response.status;
     error.fields = body.fields || {};
     throw error;
@@ -59,9 +59,9 @@ function segmentFacts(customer, now = Date.now()) {
       case 'average_bet': return bets.length ? stakes / bets.length : null;
       case 'real_balance': return wallets.filter(w => w.type === 'Real').reduce((sum, w) => sum + w.balance, 0);
       case 'bonus_balance': return wallets.filter(w => w.type === 'Bonus').reduce((sum, w) => sum + w.balance, 0);
-      case 'net_cash_flow': return tx.filter(t => ['Deposit', 'Withdrawal'].includes(t.type) && t.ts >= now - rule.days * 86400000)
+      case 'net_cash_flow': return tx.filter(t => ['Deposit', "Withdrawal"].includes(t.type) && t.ts >= now - rule.days * 86400000)
         .reduce((sum, t) => sum + (t.type === 'Deposit' ? Math.abs(t.amount) : -Math.abs(t.amount)), 0);
-      default: throw new Error('Unknown monetary segmentation parameter: ' + rule.field);
+      default: throw new Error(NexLuckI18n.t("Unknown monetary segmentation parameter: ") + rule.field);
     }
   };
   return { values, monetary };
@@ -76,7 +76,7 @@ function evaluateSegment(node, facts, parameters) {
       : children.includes(true) ? true : children.includes(null) ? null : false;
   } else {
     const parameter = parameters.find(p => p.key === node.field);
-    if (!parameter) throw new Error('Unknown segmentation parameter: ' + node.field);
+    if (!parameter) throw new Error(NexLuckI18n.t("Unknown segmentation parameter: ") + node.field);
     const actual = parameter.money ? facts.monetary(node) : facts.values[node.field];
     if (actual === undefined || actual === null || (typeof actual === 'number' && !Number.isFinite(actual))) return null;
     const equal = parameter.type === 'list'
@@ -88,7 +88,7 @@ function evaluateSegment(node, facts, parameters) {
       case '>': result = actual > node.value; break;
       case '>=': result = actual >= node.value; break;
       case '=<': case '<=': result = actual <= node.value; break;
-      default: throw new Error('Unknown segment operator: ' + node.operator);
+      default: throw new Error(NexLuckI18n.t("Unknown segment operator: ") + node.operator);
     }
   }
   return node.not && result !== null ? !result : result;
@@ -141,7 +141,7 @@ function useCustomerSegments() {
 
 function SegmentTags({ segments, onRemove }) {
   return <div className="segment-tags">{segments.map(segment => <span className="segment-tag" key={segment.id} title={segment.name}>
-    {segment.name}{onRemove && <button type="button" aria-label={'Remove segment filter ' + segment.name} onClick={() => onRemove(segment.id)}>×</button>}
+    {segment.name}{onRemove && <button type="button" aria-label={NexLuckI18n.t("Remove segment filter ") + segment.name} onClick={() => onRemove(segment.id)}>×</button>}
   </span>)}</div>;
 }
 
@@ -155,16 +155,16 @@ function SegmentParameters({ customer, parameters, onClose }) {
     if (value === undefined || value === null || (typeof value === 'number' && !Number.isFinite(value))) return 'Unavailable';
     if (Array.isArray(value)) return value.length ? value.join(' / ') : 'None recorded';
     if (typeof value === 'boolean') return value ? 'True' : 'False';
-    return typeof value === 'number' ? value.toLocaleString('en-GB', { maximumFractionDigits: 4 }) : value;
+    return typeof value === 'number' ? value.toLocaleString(NexLuckI18n.formatLocale, { maximumFractionDigits: 4 }) : value;
   };
-  return <SegmentDialog title="Customer segment parameters" wide onClose={onClose}>
-    <p className="notice">{customer.name} · {customer.id}. Current values used by segment rules. Activity, devices, session frequency, bonus completion and risk signals include demo data.</p>
-    <label className="field parameter-days">Net cash flow days<input aria-label="Parameter cash flow days" type="number" min="1" max="36500" value={days}
+  return <SegmentDialog title={NexLuckI18n.t("Customer segment parameters")} wide onClose={onClose}>
+    <p className="notice">{customer.name} · {customer.id}{NexLuckI18n.t(". Current values used by segment rules. Activity, devices, session frequency, bonus completion and risk signals include demo data.")}</p>
+    <label className="field parameter-days">{NexLuckI18n.t("Net cash flow days")}<input aria-label={NexLuckI18n.t("Parameter cash flow days")} type="number" min="1" max="36500" value={days}
       onChange={e => setDays(e.target.value === '' ? '' : Number(e.target.value))} /></label>
-    {!validDays && <p className="error" role="alert">Enter a whole number of days between 1 and 36500.</p>}
+    {!validDays && <p className="error" role="alert">{NexLuckI18n.t("Enter a whole number of days between 1 and 36500.")}</p>}
     <div className="parameter-groups">{groups.map(group => <section className="parameter-group" key={group}>
-      <h3>{group}</h3><dl>{parameters.filter(p => p.group === group).map(parameter => <React.Fragment key={parameter.key}>
-        <dt>{parameter.label}{parameter.hint && <small>{parameter.hint}</small>}</dt>
+      <h3>{NexLuckI18n.t(group)}</h3><dl>{parameters.filter(p => p.group === group).map(parameter => <React.Fragment key={parameter.key}>
+        <dt>{NexLuckI18n.t(parameter.label)}{parameter.hint && <small>{NexLuckI18n.t(parameter.hint)}</small>}</dt>
         <dd data-parameter={parameter.key}>{parameter.money
           ? currencies.length ? currencies.map(currency => <div key={currency}>
             <b>{currency}</b>: {parameter.key === 'net_cash_flow' && !validDays ? 'Invalid period' : format(facts.monetary({ field: parameter.key, currency, days }))}
@@ -172,7 +172,7 @@ function SegmentParameters({ customer, parameters, onClose }) {
           : format(facts.values[parameter.key])}</dd>
       </React.Fragment>)}</dl>
     </section>)}</div>
-    <div className="customer-actions"><button type="button" className="btn" onClick={onClose}>Done</button></div>
+    <div className="customer-actions"><button type="button" className="btn" onClick={onClose}>{NexLuckI18n.t("Done")}</button></div>
   </SegmentDialog>;
 }
 
@@ -197,8 +197,8 @@ function SegmentDialog({ title, titleActions, children, onClose, busy = false, w
     document.addEventListener('keydown', keyboard);
     return () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', keyboard); previous?.focus(); };
   }, [busy]);
-  return <div className="segment-overlay"><section className={'segment-dialog' + (wide ? ' wide' : '')} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
-    <h2>{title}{titleActions}<button className="btn" type="button" aria-label={'Close ' + title} disabled={busy} onClick={onClose}>×</button></h2>{children}
+  return <div className="segment-overlay"><section className={'segment-dialog' + (wide ? ' wide' : '')} role="dialog" aria-modal="true" aria-label={NexLuckI18n.t(title)} ref={ref}>
+    <h2>{NexLuckI18n.t(title)}{titleActions}<button className="btn" type="button" aria-label={NexLuckI18n.t("Close ") + title} disabled={busy} onClick={onClose}>×</button></h2>{children}
   </section></div>;
 }
 
@@ -207,15 +207,15 @@ function SegmentValuePicker({ parameter, initial, onSave, onClose }) {
   const [query, setQuery] = React.useState('');
   const label = value => parameter.key === 'country' ? value + ' · ' + COUNTRIES[value][0] : value;
   const options = parameter.options.filter(value => label(value).toLowerCase().includes(query.trim().toLowerCase()));
-  return <SegmentDialog title={parameter.label + ' list editor'} onClose={onClose}>
-    <label className="field">Search values<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label>
-    <p className="hint">{values.length} selected · values in this list are matched with OR.</p>
+  return <SegmentDialog title={parameter.label + NexLuckI18n.t(" list editor")} onClose={onClose}>
+    <label className="field">{NexLuckI18n.t("Search values")}<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label>
+    <p className="hint">{values.length}{NexLuckI18n.t(" selected · values in this list are matched with OR.")}</p>
     <div className="segment-options">{options.map(value => <label key={value} className={'segment-choice' + (values.includes(value) ? ' on' : '')}>
       <input type="checkbox" checked={values.includes(value)} onChange={() => setValues(old => old.includes(value) ? old.filter(v => v !== value) : [...old, value])} />{label(value)}
     </label>)}</div>
-    {!options.length && <p className="hint">No values match this search.</p>}
-    <div className="customer-actions"><button type="button" className="btn" onClick={onClose}>Cancel</button>
-      <button type="button" className="btn pri" disabled={!values.length} onClick={() => onSave(parameter.options.filter(v => values.includes(v)))}>Apply values</button></div>
+    {!options.length && <p className="hint">{NexLuckI18n.t("No values match this search.")}</p>}
+    <div className="customer-actions"><button type="button" className="btn" onClick={onClose}>{NexLuckI18n.t("Cancel")}</button>
+      <button type="button" className="btn pri" disabled={!values.length} onClick={() => onSave(parameter.options.filter(v => values.includes(v)))}>{NexLuckI18n.t("Apply values")}</button></div>
   </SegmentDialog>;
 }
 
@@ -230,11 +230,11 @@ function SegmentRuleNode({ node, parameters, onChange, onRemove, onPick, depth =
   const groups = [...new Set(parameters.map(p => p.group))];
   const countNodes = n => n.kind === 'group' ? 1 + n.children.reduce((sum, child) => sum + countNodes(child), 0) : 1;
   if (node.kind === 'group') return <fieldset className="segment-rule-group" disabled={busy}>
-    <legend>{depth ? 'Rule group' : 'Segment rules'}</legend>
+    <legend>{depth ? NexLuckI18n.t("Rule group") : NexLuckI18n.t("Segment rules")}</legend>
     <div className="segment-rule-toolbar">
-      <label className="segment-not"><input type="checkbox" checked={node.not} onChange={e => onChange({ ...node, not: e.target.checked })} />NOT</label>
-      <label className="field">Combine rules<select aria-label={'Combine rules at level ' + depth} value={node.operator} onChange={e => onChange({ ...node, operator: e.target.value })}><option>AND</option><option>OR</option></select></label>
-      {onRemove && <button type="button" className="btn" onClick={onRemove}>Remove group</button>}
+      <label className="segment-not"><input type="checkbox" checked={node.not} onChange={e => onChange({ ...node, not: e.target.checked })} />{NexLuckI18n.t("NOT")}</label>
+      <label className="field">{NexLuckI18n.t("Combine rules")}<select aria-label={NexLuckI18n.t("Combine rules at level ") + depth} value={node.operator} onChange={e => onChange({ ...node, operator: e.target.value })}><option value={"AND"}>{NexLuckI18n.t("AND")}</option><option value={"OR"}>{NexLuckI18n.t("OR")}</option></select></label>
+      {onRemove && <button type="button" className="btn" onClick={onRemove}>{NexLuckI18n.t("Remove group")}</button>}
     </div>
     {node.children.map((child, i) => <React.Fragment key={i}>
       {i > 0 && <div className="segment-join">{node.operator}</div>}
@@ -244,44 +244,44 @@ function SegmentRuleNode({ node, parameters, onChange, onRemove, onPick, depth =
         onPick={onPick} />
     </React.Fragment>)}
     <div className="segment-rule-toolbar">
-      <button type="button" className="btn" disabled={depth >= 5 || countNodes(node) >= 100} onClick={() => onChange({ ...node, children: [...node.children, newSegmentRule(parameters[0])] })}>+ Add rule</button>
-      <button type="button" className="btn" disabled={depth >= 4 || countNodes(node) >= 99} onClick={() => onChange({ ...node, children: [...node.children, { kind: 'group', operator: 'OR', not: false, children: [newSegmentRule(parameters[0])] }] })}>+ Add AND/OR group</button>
+      <button type="button" className="btn" disabled={depth >= 5 || countNodes(node) >= 100} onClick={() => onChange({ ...node, children: [...node.children, newSegmentRule(parameters[0])] })}>{NexLuckI18n.t("+ Add rule")}</button>
+      <button type="button" className="btn" disabled={depth >= 4 || countNodes(node) >= 99} onClick={() => onChange({ ...node, children: [...node.children, { kind: 'group', operator: 'OR', not: false, children: [newSegmentRule(parameters[0])] }] })}>{NexLuckI18n.t("+ Add AND/OR group")}</button>
     </div>
   </fieldset>;
   const parameter = parameters.find(p => p.key === node.field);
   const valuesText = Array.isArray(node.value) ? node.value.slice(0, 2).join('/') : '';
   return <fieldset className="segment-rule" disabled={busy}>
-    <legend>Condition</legend>
-    <label className="segment-not"><input type="checkbox" checked={node.not} onChange={e => onChange({ ...node, not: e.target.checked })} />NOT</label>
-    <label className="field">Parameter<select aria-label="Segmentation parameter" value={node.field} onChange={e => onChange(newSegmentRule(parameters.find(p => p.key === e.target.value)))}>
-      {groups.map(group => <optgroup label={group} key={group}>{parameters.filter(p => p.group === group).map(p => <option value={p.key} key={p.key}>{p.label}</option>)}</optgroup>)}
+    <legend>{NexLuckI18n.t("Condition")}</legend>
+    <label className="segment-not"><input type="checkbox" checked={node.not} onChange={e => onChange({ ...node, not: e.target.checked })} />{NexLuckI18n.t("NOT")}</label>
+    <label className="field">{NexLuckI18n.t("Parameter")}<select aria-label={NexLuckI18n.t("Segmentation parameter")} value={node.field} onChange={e => onChange(newSegmentRule(parameters.find(p => p.key === e.target.value)))}>
+      {groups.map(group => <optgroup label={NexLuckI18n.t(group)} key={group}>{parameters.filter(p => p.group === group).map(p => <option value={p.key} key={p.key}>{NexLuckI18n.t(p.label)}</option>)}</optgroup>)}
     </select></label>
-    <label className="field">Operator<select aria-label="Rule operator" value={node.operator} onChange={e => onChange({ ...node, operator: e.target.value })}>{SEGMENT_OPS[parameter.type].map(op => <option key={op}>{op}</option>)}</select></label>
-    {parameter.type === 'list' ? <div className="field">Values<button type="button" className="btn segment-value" aria-label={'Edit ' + parameter.label + ' values'} onClick={() => onPick(parameter, node.value, values => onChange({ ...node, value: values }))}>
-      <span>{valuesText || 'Select values'}</span><span>…</span>
-    </button></div> : parameter.type === 'boolean' ? <label className="segment-boolean"><input type="checkbox" checked={node.value} onChange={e => onChange({ ...node, value: e.target.checked })} />{node.value ? 'True' : 'False'}</label>
-      : <label className="field">Value<input aria-label="Rule value" type={parameter.type === 'date' ? 'date' : 'number'} step="any" value={node.value}
+    <label className="field">{NexLuckI18n.t("Operator")}<select aria-label={NexLuckI18n.t("Rule operator")} value={node.operator} onChange={e => onChange({ ...node, operator: e.target.value })}>{SEGMENT_OPS[parameter.type].map(op => <option key={op} value={op}>{NexLuckI18n.t(op)}</option>)}</select></label>
+    {parameter.type === "list" ? <div className="field">{NexLuckI18n.t("Values")}<button type="button" className="btn segment-value" aria-label={NexLuckI18n.t("Edit ") + parameter.label + NexLuckI18n.t(" values")} onClick={() => onPick(parameter, node.value, values => onChange({ ...node, value: values }))}>
+      <span>{valuesText || NexLuckI18n.t("Select values")}</span><span>…</span>
+    </button></div> : parameter.type === "boolean" ? <label className="segment-boolean"><input type="checkbox" checked={node.value} onChange={e => onChange({ ...node, value: e.target.checked })} />{node.value ? NexLuckI18n.t("True") : NexLuckI18n.t("False")}</label>
+      : <label className="field">{NexLuckI18n.t("Value")}<input aria-label={NexLuckI18n.t("Rule value")} type={parameter.type === 'date' ? 'date' : 'number'} step="any" value={node.value}
         onChange={e => onChange({ ...node, value: parameter.type === 'date' || e.target.value === '' ? e.target.value : Number(e.target.value) })} /></label>}
-    {parameter.money && <label className="field">Wallet currency<select aria-label="Rule currency" value={node.currency} onChange={e => onChange({ ...node, currency: e.target.value })}>{CURRENCIES.map(currency => <option key={currency}>{currency}</option>)}</select></label>}
-    {node.field === 'net_cash_flow' && <label className="field">Net cash flow days<input aria-label="Net cash flow period" type="number" min="1" max="36500" value={node.days} onChange={e => onChange({ ...node, days: e.target.value === '' ? '' : Number(e.target.value) })} /></label>}
-    <button type="button" className="btn" onClick={onRemove} aria-label={'Remove ' + parameter.label + ' rule'}>Remove</button>
-    {parameter.hint && <p className="hint segment-rule-hint">{parameter.hint}</p>}
+    {parameter.money && <label className="field">{NexLuckI18n.t("Wallet currency")}<select aria-label={NexLuckI18n.t("Rule currency")} value={node.currency} onChange={e => onChange({ ...node, currency: e.target.value })}>{CURRENCIES.map(currency => <option key={currency} value={currency}>{NexLuckI18n.t(currency)}</option>)}</select></label>}
+    {node.field === 'net_cash_flow' && <label className="field">{NexLuckI18n.t("Net cash flow days")}<input aria-label={NexLuckI18n.t("Net cash flow period")} type="number" min="1" max="36500" value={node.days} onChange={e => onChange({ ...node, days: e.target.value === '' ? '' : Number(e.target.value) })} /></label>}
+    <button type="button" className="btn" onClick={onRemove} aria-label={NexLuckI18n.t("Remove ") + parameter.label + NexLuckI18n.t(" rule")}>{NexLuckI18n.t("Remove")}</button>
+    {parameter.hint && <p className="hint segment-rule-hint">{NexLuckI18n.t(parameter.hint)}</p>}
   </fieldset>;
 }
 
 function segmentDraftError(node, parameters) {
   let count = 0;
   const visit = (n, depth) => {
-    if (++count > 100 || depth > 5) return 'Use at most 100 conditions/groups and 5 nesting levels.';
+    if (++count > 100 || depth > 5) return NexLuckI18n.t("Use at most 100 conditions/groups and 5 nesting levels.");
     if (n.kind === 'group') {
-      if (!n.children.length) return 'Every group needs at least one rule.';
+      if (!n.children.length) return NexLuckI18n.t("Every group needs at least one rule.");
       return n.children.map(child => visit(child, depth + 1)).find(Boolean);
     }
     const p = parameters.find(p => p.key === n.field);
-    if (p.type === 'list' && !n.value.length) return 'Choose at least one value for ' + p.label + '.';
-    if (p.type === 'number' && (typeof n.value !== 'number' || !Number.isFinite(n.value))) return 'Enter a number for ' + p.label + '.';
-    if (p.type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(n.value)) return 'Enter a date for ' + p.label + '.';
-    if (n.field === 'net_cash_flow' && (!Number.isInteger(n.days) || n.days < 1 || n.days > 36500)) return 'Net cash flow period must be a whole number from 1 to 36500.';
+    if (p.type === 'list' && !n.value.length) return NexLuckI18n.t("Choose at least one value for ") + p.label + '.';
+    if (p.type === 'number' && (typeof n.value !== 'number' || !Number.isFinite(n.value))) return NexLuckI18n.t("Enter a number for ") + p.label + '.';
+    if (p.type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(n.value)) return NexLuckI18n.t("Enter a date for ") + p.label + '.';
+    if (n.field === 'net_cash_flow' && (!Number.isInteger(n.days) || n.days < 1 || n.days > 36500)) return NexLuckI18n.t("Net cash flow period must be a whole number from 1 to 36500.");
     return null;
   };
   return visit(node, 0);
@@ -315,17 +315,17 @@ function SegmentEditor({ segment, parameters, customers, ownerId, onSave, onClos
     } catch (e) { setError(e.fields && Object.keys(e.fields).length ? Object.entries(e.fields).map(([key, value]) => key + ': ' + value).join('; ') : e.message); }
     finally { setBusy(false); }
   };
-  return <SegmentDialog title={segment ? 'Edit segment' : 'New segment'} wide busy={busy} onClose={onClose}>
+  return <SegmentDialog title={segment ? NexLuckI18n.t("Edit segment") : NexLuckI18n.t("New segment")} wide busy={busy} onClose={onClose}>
     <form onSubmit={save}>
-      {ownerId && <p className="notice">Owner casino: {CRMContext.casinos.find(site => site.id === ownerId)?.name} ({ownerId}). This saves operational configuration, not report filters.</p>}
-      <label className="field">Segment name<input aria-label="Segment name" value={currentName} maxLength={200} required disabled={busy} onChange={e => { setName(e.target.value); setManualName(true); }} /></label>
-      <button type="button" className="btn" disabled={busy} onClick={() => setManualName(false)}>Use automatic name</button>
-      <p className="notice">Membership is calculated from current demo customer and wallet data. Money rules use their selected currency. Missing data does not match, including under NOT.</p>
+      {ownerId && <p className="notice">{NexLuckI18n.t("Owner casino: ")}{CRMContext.casinos.find(site => site.id === ownerId)?.name} ({ownerId}{NexLuckI18n.t("). This saves operational configuration, not report filters.")}</p>}
+      <label className="field">{NexLuckI18n.t("Segment name")}<input aria-label={NexLuckI18n.t("Segment name")} value={currentName} maxLength={200} required disabled={busy} onChange={e => { setName(e.target.value); setManualName(true); }} /></label>
+      <button type="button" className="btn" disabled={busy} onClick={() => setManualName(false)}>{NexLuckI18n.t("Use automatic name")}</button>
+      <p className="notice">{NexLuckI18n.t("Membership is calculated from current demo customer and wallet data. Money rules use their selected currency. Missing data does not match, including under NOT.")}</p>
       <SegmentRuleNode node={rules} parameters={parameters} onChange={setRules} busy={busy} onPick={(parameter, initial, apply) => setPicker({ parameter, initial, apply })} />
       <p className="segment-preview">{segmentRuleText(rules, parameters)}</p>
-      {(validation || matching) && <p role="status" className="hint">{validation || `${matching.length} of ${customers.length} customers match`}</p>}
+      {(validation || matching) && <p role="status" className="hint">{validation || NexLuckI18n.t("{value1} of {value2} customers match", { value1: matching.length, value2: customers.length })}</p>}
       {error && <p role="alert" className="error">{error}</p>}
-      <div className="customer-actions"><button type="button" className="btn" disabled={busy} onClick={onClose}>Cancel</button><button className="btn pri" disabled={busy || Boolean(validation)}>{busy ? 'Saving…' : 'Save segment'}</button></div>
+      <div className="customer-actions"><button type="button" className="btn" disabled={busy} onClick={onClose}>{NexLuckI18n.t("Cancel")}</button><button className="btn pri" disabled={busy || Boolean(validation)}>{busy ? NexLuckI18n.t("Saving…") : NexLuckI18n.t("Save segment")}</button></div>
     </form>
     {picker && <SegmentValuePicker parameter={picker.parameter} initial={picker.initial} onClose={() => setPicker(null)} onSave={values => { picker.apply(values); setPicker(null); }} />}
   </SegmentDialog>;
@@ -358,23 +358,23 @@ function SegmentWidget({ state, customers = null, customer = null, selected = []
     (s.name + ' ' + (s.rules ? segmentRuleText(s.rules, state.parameters) : '')).toLowerCase().includes(query.toLowerCase().trim()));
   const isSelected = segment => selected.includes(onSelect ? segment.name : segment.id);
   const select = segment => onSelect ? onSelect(segment) : onToggle?.(segment.id);
-  return <SegmentDialog title={customer ? customer.name + ' segments' : 'Segments'} wide onClose={onClose}>
-    {CRMContext.reporting && <label className="field">Owner casino for segment changes<select aria-label="Owner casino for segment changes" value={ownerId} onChange={e => setOwnerId(e.target.value)}>
-      <option value="">Select owner explicitly</option>{CRMContext.casinos.map(site => <option value={site.id} key={site.id}>{site.name} ({site.id})</option>)}
+  return <SegmentDialog title={customer ? customer.name + NexLuckI18n.t(" segments") : NexLuckI18n.t("Segments")} wide onClose={onClose}>
+    {CRMContext.reporting && <label className="field">{NexLuckI18n.t("Owner casino for segment changes")}<select aria-label={NexLuckI18n.t("Owner casino for segment changes")} value={ownerId} onChange={e => setOwnerId(e.target.value)}>
+      <option value="">{NexLuckI18n.t("Select owner explicitly")}</option>{CRMContext.casinos.map(site => <option value={site.id} key={site.id}>{site.name} ({site.id})</option>)}
     </select></label>}
     {ownerError && <p role="alert" className="error">{ownerError}</p>}
-    <div className="segment-widget-tools"><label className="field">Search segments<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label><button type="button" className="btn pri" disabled={state.loading || Boolean(state.error) || (CRMContext.reporting && (!ownerId || ownerLoading || !ownerParameters.length))} onClick={() => setEditor({ segment: null })}>+ New segment</button></div>
-    {state.loading && <p role="status" className="hint">Loading segments...</p>}
-    {state.error && <p role="alert" className="error">{state.error} <button type="button" className="btn" onClick={state.load}>Retry</button></p>}
-    {onSelect && <p className="hint">Double-click a row to toggle selection. Keyboard: focus a row and press Enter or Space. Selections are saved with the {selectionOwner}.</p>}
-    {customer && <p className="hint">Only segments currently matching this customer are shown. Membership is calculated, not manually assigned.</p>}
+    <div className="segment-widget-tools"><label className="field">{NexLuckI18n.t("Search segments")}<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label><button type="button" className="btn pri" disabled={state.loading || Boolean(state.error) || (CRMContext.reporting && (!ownerId || ownerLoading || !ownerParameters.length))} onClick={() => setEditor({ segment: null })}>{NexLuckI18n.t("+ New segment")}</button></div>
+    {state.loading && <p role="status" className="hint">{NexLuckI18n.t("Loading segments...")}</p>}
+    {state.error && <p role="alert" className="error">{state.error} <button type="button" className="btn" onClick={state.load}>{NexLuckI18n.t("Retry")}</button></p>}
+    {onSelect && <p className="hint">{NexLuckI18n.t("Double-click a row to toggle selection. Keyboard: focus a row and press Enter or Space. Selections are saved with the ")}{selectionOwner}.</p>}
+    {customer && <p className="hint">{NexLuckI18n.t("Only segments currently matching this customer are shown. Membership is calculated, not manually assigned.")}</p>}
     {!state.loading && !state.error && <SegmentSelection entries={shown}
       selected={shown.filter(isSelected).map(s => s.id)} onSelect={select} checkbox={Boolean(onToggle)}
-      renderDetails={segment => <>{segment.rules ? <p className="segment-preview">{segmentRuleText(segment.rules, state.parameters)}</p> : <p className="segment-preview">Existing {selectionOwner} segment</p>}
-        {segment.members && <p className="hint">{segment.members.length} matching {segment.members.length === 1 ? 'customer' : 'customers'}</p>}</>}
-      renderActions={segment => segment.rules && <button type="button" className="btn" disabled={CRMContext.reporting && (ownerId !== segment.casino_id || ownerLoading || !ownerParameters.length)} onClick={() => setEditor({ segment })} aria-label={'Edit segment ' + segment.name}>Edit</button>} />}
-    {!state.loading && !state.error && !shown.length && <p className="hint">No matching segments.</p>}
-    <div className="customer-actions"><button type="button" className="btn" onClick={onClose}>Done</button></div>
+      renderDetails={segment => <>{segment.rules ? <p className="segment-preview">{segmentRuleText(segment.rules, state.parameters)}</p> : <p className="segment-preview">{NexLuckI18n.t("Existing ")}{selectionOwner}{NexLuckI18n.t(" segment")}</p>}
+        {segment.members && <p className="hint">{segment.members.length}{NexLuckI18n.t(" matching ")}{segment.members.length === 1 ? 'customer' : 'customers'}</p>}</>}
+      renderActions={segment => segment.rules && <button type="button" className="btn" disabled={CRMContext.reporting && (ownerId !== segment.casino_id || ownerLoading || !ownerParameters.length)} onClick={() => setEditor({ segment })} aria-label={NexLuckI18n.t("Edit segment ") + segment.name}>{NexLuckI18n.t("Edit")}</button>} />}
+    {!state.loading && !state.error && !shown.length && <p className="hint">{NexLuckI18n.t("No matching segments.")}</p>}
+    <div className="customer-actions"><button type="button" className="btn" onClick={onClose}>{NexLuckI18n.t("Done")}</button></div>
     {editor && <SegmentEditor segment={editor.segment && CRMContext.reporting ? { ...editor.segment, name: editor.segment.original_name } : editor.segment} ownerId={CRMContext.reporting ? ownerId : undefined} parameters={CRMContext.reporting ? ownerParameters : state.parameters} customers={customers}
       onClose={() => setEditor(null)} onSave={segment => { state.saved(segment); setEditor(null); }} />}
   </SegmentDialog>;

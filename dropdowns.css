@@ -11,6 +11,24 @@ select:not([multiple]):not([size]), select[size="1"], .dropdown-control {
   background-repeat: no-repeat !important;
 }
 select:disabled { cursor: not-allowed; }
+.language-choice {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  margin: 0;
+}
+.language-choice select[data-language-selector] {
+  --dropdown-inset: 8px;
+  box-sizing: border-box;
+  width: 68px;
+  min-width: 68px;
+  max-width: 68px;
+  height: 30px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  font-size: 12px;
+  line-height: 20px;
+}
 @media (forced-colors: active) {
   select:not([multiple]):not([size]), select[size="1"] {
     appearance: auto !important;

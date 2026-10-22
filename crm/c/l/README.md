@@ -37,6 +37,13 @@ success. The list request can be retried.
 
 ## API
 
+The header includes a compact EN/RU/PT/BR/ES interface selector shared with CMS
+(English, Russian, Portuguese for Portugal/Brazil and Spanish for Spain). Its remembered
+browser preference does not change casino context, stored identifiers or
+user-entered names. Unsaved changes require confirmation before switching.
+See the [localization guide](../../../localization/README.md) for catalogs,
+website content localization and publishing requirements.
+
 The browser prototype uses `/crm/ui-api/v1/casinos`. Server-to-server clients use
 `/crm/api/v1/casinos` with `casinos:read` / `casinos:write` scopes.
 

@@ -1,3 +1,4 @@
+import { t } from './i18n';
 export async function api(url, options = {}) {
   const csrf = document.cookie.split('; ').find(c => c.startsWith('nexluck_cms_csrf='))?.split('=')[1];
   const response = await fetch(url, {
@@ -7,7 +8,7 @@ export async function api(url, options = {}) {
   const body = await response.json();
   if (!response.ok) {
     const message = body.detail || JSON.stringify(body);
-    throw new Error(response.status === 409 ? 'Another editor changed this draft. Reload to avoid overwriting it.' : message);
+    throw new Error(response.status === 409 ? t("Another editor changed this draft. Reload to avoid overwriting it.") : message);
   }
   return body;
 }

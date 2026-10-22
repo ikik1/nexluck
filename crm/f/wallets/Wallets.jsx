@@ -1,9 +1,9 @@
 const { useState, useMemo } = React;
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const p2 = n => String(n).padStart(2, '0');
-const fmt = ts => { const d = new Date(ts); return `${d.getDate()} ${MONTHS[d.getMonth()]} ${p2(d.getFullYear() % 100)}, ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
-const money = (n, c) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + c;
+const fmt = ts => new Intl.DateTimeFormat(NexLuckI18n.formatLocale, {
+  day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
+}).format(new Date(ts));
+const money = (n, c) => n.toLocaleString(NexLuckI18n.formatLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + c;
 const signed = (n, c) => (n >= 0 ? '+' : '−') + money(Math.abs(n), c);
 const PAGE = 25;
 
@@ -31,22 +31,22 @@ function Wallets() {
     <>
       <div className="tools" style={{ margin: '8px 0 0' }}><FinanceMenu current="/crm/f/wallets/" /></div>
       <div className="ff">
-        <label className="fld q">Player<input type="text" placeholder="Search by player name…" value={f.player} onChange={e => set('player', e.target.value)} /></label>
-        <label className="fld">Segment<select value={f.segment} onChange={e => set('segment', e.target.value)}><option value="">All segments</option>{ALL_SEGMENTS.map(s => <option key={s}>{s}</option>)}</select></label>
-        <label className="fld">Country<select value={f.country} onChange={e => set('country', e.target.value)}><option value="">All countries</option>{countryList.map(c => <option key={c} value={c}>{(COUNTRIES[c] || [c])[0]}</option>)}</select></label>
-        <label className="fld">Wallet type<select value={f.type} onChange={e => set('type', e.target.value)}><option value="">All wallet types</option>{WALLET_TYPES.map(t => <option key={t}>{t}</option>)}</select></label>
-        {dirty && <button className="link" style={{ paddingBottom: 10 }} onClick={() => { setF(empty); setShown(PAGE); }}>Clear filters</button>}
+        <label className="fld q">{NexLuckI18n.t("Player")}<input type="text" placeholder={NexLuckI18n.t("Search by player name…")} value={f.player} onChange={e => set('player', e.target.value)} /></label>
+        <label className="fld">{NexLuckI18n.t("Segment")}<select value={f.segment} onChange={e => set('segment', e.target.value)}><option value="">{NexLuckI18n.t("All segments")}</option>{ALL_SEGMENTS.map(s => <option key={s} value={s}>{NexLuckI18n.t(s)}</option>)}</select></label>
+        <label className="fld">{NexLuckI18n.t("Country")}<select value={f.country} onChange={e => set('country', e.target.value)}><option value="">{NexLuckI18n.t("All countries")}</option>{countryList.map(c => <option key={c} value={c}>{NexLuckI18n.t((COUNTRIES[c] || [c])[0])}</option>)}</select></label>
+        <label className="fld">{NexLuckI18n.t("Wallet type")}<select value={f.type} onChange={e => set('type', e.target.value)}><option value="">{NexLuckI18n.t("All wallet types")}</option>{WALLET_TYPES.map(t => <option key={t} value={t}>{NexLuckI18n.t(t)}</option>)}</select></label>
+        {dirty && <button className="link" style={{ paddingBottom: 10 }} onClick={() => { setF(empty); setShown(PAGE); }}>{NexLuckI18n.t("Clear filters")}</button>}
       </div>
       <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'wallets'} className={'tab' + (tab === 'wallets' ? ' on' : '')} onClick={() => setTab('wallets')}>Wallets ({wallets.length})</button>
-        <button role="tab" aria-selected={tab === 'tx'} className={'tab' + (tab === 'tx' ? ' on' : '')} onClick={() => { setTab('tx'); setShown(PAGE); }}>Wallet transactions ({txs.length})</button>
+        <button role="tab" aria-selected={tab === 'wallets'} className={'tab' + (tab === 'wallets' ? ' on' : '')} onClick={() => setTab('wallets')}>{NexLuckI18n.t("Wallets (")}{wallets.length})</button>
+        <button role="tab" aria-selected={tab === 'tx'} className={'tab' + (tab === 'tx' ? ' on' : '')} onClick={() => { setTab('tx'); setShown(PAGE); }}>{NexLuckI18n.t("Wallet transactions (")}{txs.length})</button>
       </div>
-      {tab === 'wallets' && (
+      {tab === "wallets" && (
         <>
-          <div className="tot">{Object.keys(byCur).sort().map(c => <div key={c}>Total {c}<b>{money(byCur[c], c)}</b></div>)}</div>
+          <div className="tot">{Object.keys(byCur).sort().map(c => <div key={c}>{NexLuckI18n.t("Total ")}{c}<b>{money(byCur[c], c)}</b></div>)}</div>
           <div className="wrap">
             <table className="bt" style={{ minWidth: 820 }}>
-              <thead><tr><th>Player</th><th>Country</th><th>Segments</th><th>Wallet</th><th>Wallet type</th><th style={{ textAlign: 'right' }}>Balance</th></tr></thead>
+              <thead><tr><th>{NexLuckI18n.t("Player")}</th><th>{NexLuckI18n.t("Country")}</th><th>{NexLuckI18n.t("Segments")}</th><th>{NexLuckI18n.t("Wallet")}</th><th>{NexLuckI18n.t("Wallet type")}</th><th style={{ textAlign: 'right' }}>{NexLuckI18n.t("Balance")}</th></tr></thead>
               <tbody>
                 {wallets.map(w => (
                   <tr key={w.id} className="clk" onClick={() => open(w)} tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') open(w); }} aria-label={`${w.player} ${w.type} wallet, ${money(w.balance, w.currency)}`}>
@@ -54,39 +54,39 @@ function Wallets() {
                     <td><span className="tag c" title={COUNTRIES[w.country][0]}>{w.country}</span></td>
                     <td>{w.segments.map(s => <span key={s} className="tag">{s}</span>)}</td>
                     <td>{w.id}</td>
-                    <td><span className={'wt ' + w.type}>{w.type}</span></td>
+                    <td><span className={'wt ' + w.type}>{NexLuckI18n.t(w.type)}</span></td>
                     <td className="num"><b>{money(w.balance, w.currency)}</b></td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {!wallets.length && <div className="empty">No wallets match these filters.</div>}
+            {!wallets.length && <div className="empty">{NexLuckI18n.t("No wallets match these filters.")}</div>}
           </div>
         </>
       )}
-      {tab === 'tx' && (
+      {tab === "tx" && (
         <>
           {wallet && (
             <div className="sel">
               <span><b>{wallet.player}</b> · {wallet.id}</span>
-              <span className={'wt ' + wallet.type}>{wallet.type}</span>
-              <span>Balance <b>{money(wallet.balance, wallet.currency)}</b></span>
-              <button className="link" onClick={() => { setWallet(null); setShown(PAGE); }}>Show all wallets</button>
+              <span className={'wt ' + wallet.type}>{NexLuckI18n.t(wallet.type)}</span>
+              <span>{NexLuckI18n.t("Balance ")}<b>{money(wallet.balance, wallet.currency)}</b></span>
+              <button className="link" onClick={() => { setWallet(null); setShown(PAGE); }}>{NexLuckI18n.t("Show all wallets")}</button>
             </div>
           )}
           <div className="ff" style={{ margin: '0 0 8px' }}>
-            <label className="fld">Transaction type<select value={txType} onChange={e => { setTxType(e.target.value); setShown(PAGE); }}><option value="">All types</option>{WALLET_TX_TYPES.map(t => <option key={t}>{t}</option>)}</select></label>
+            <label className="fld">{NexLuckI18n.t("Transaction type")}<select value={txType} onChange={e => { setTxType(e.target.value); setShown(PAGE); }}><option value="">{NexLuckI18n.t("All types")}</option>{WALLET_TX_TYPES.map(t => <option key={t} value={t}>{NexLuckI18n.t(t)}</option>)}</select></label>
           </div>
           <div className="wrap">
             <table className="bt" style={{ minWidth: 900 }}>
-              <thead><tr><th>Date</th><th>Player</th><th>Wallet</th><th>Type</th><th>Details</th><th style={{ textAlign: 'right' }}>Amount</th><th style={{ textAlign: 'right' }}>Balance after</th></tr></thead>
+              <thead><tr><th>{NexLuckI18n.t("Date")}</th><th>{NexLuckI18n.t("Player")}</th><th>{NexLuckI18n.t("Wallet")}</th><th>{NexLuckI18n.t("Type")}</th><th>{NexLuckI18n.t("Details")}</th><th style={{ textAlign: 'right' }}>{NexLuckI18n.t("Amount")}</th><th style={{ textAlign: 'right' }}>{NexLuckI18n.t("Balance after")}</th></tr></thead>
               <tbody>
                 {txs.slice(0, shown).map(t => (
                   <tr key={t.id}>
                     <td style={{ whiteSpace: 'nowrap' }}>{fmt(t.ts)}</td>
                     <td>{t.player}</td>
-                    <td><span className={'wt ' + t.walletType}>{t.walletType}</span></td>
-                    <td>{t.type}</td>
+                    <td><span className={'wt ' + t.walletType}>{NexLuckI18n.t(t.walletType)}</span></td>
+                    <td>{NexLuckI18n.t(t.type)}</td>
                     <td>{t.note}</td>
                     <td className={'num ' + (t.amount >= 0 ? 'pos' : 'neg')}>{signed(t.amount, t.currency)}</td>
                     <td className="num">{money(t.balance, t.currency)}</td>
@@ -94,9 +94,9 @@ function Wallets() {
                 ))}
               </tbody>
             </table>
-            {!txs.length && <div className="empty">No wallet transactions match these filters.</div>}
+            {!txs.length && <div className="empty">{NexLuckI18n.t("No wallet transactions match these filters.")}</div>}
           </div>
-          {txs.length > shown && <div className="pg"><button className="new-btn" onClick={() => setShown(s => s + PAGE)}>Show more ({txs.length - shown})</button></div>}
+          {txs.length > shown && <div className="pg"><button className="new-btn" onClick={() => setShown(s => s + PAGE)}>{NexLuckI18n.t("Show more (")}{txs.length - shown})</button></div>}
         </>
       )}
     </>

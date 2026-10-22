@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import Layout, NavigationMenu, Plugin, Site, SiteMember, Theme
+from .i18n import lazy_t
 
 # Page/ContentBlock/Publication writes go through the revision-aware editor.
 class SuperuserAdmin(admin.ModelAdmin):
@@ -16,4 +17,4 @@ class SuperuserAdmin(admin.ModelAdmin):
 
 for model in [Theme, Layout, Site, SiteMember, Plugin, NavigationMenu]:
     admin.site.register(model, SuperuserAdmin)
-admin.site.site_header = "NexLuck CMS administration"
+admin.site.site_header = lazy_t("NexLuck CMS administration")

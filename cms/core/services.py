@@ -29,7 +29,8 @@ def document_for(page):
     return {
         "revision": page.revision, "title": page.title, "layout": page.layout.key, "theme": page.site.theme.key,
         "menu": menu,
-        "blocks": [{"key": b.key, "kind": b.kind, "slot": b.slot, "enabled": b.enabled, "props": b.props}
+        "blocks": [{"key": b.key, "kind": b.kind, "slot": b.slot, "enabled": b.enabled, "props": b.props,
+                    "translations": b.translations}
                    for b in page.blocks.all()],
     }
 

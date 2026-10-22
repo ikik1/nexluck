@@ -2,13 +2,13 @@ const ANALYTICS_DAY = 86400000;
 const analyticsDate = ms => new Date(ms).toISOString().slice(0, 10);
 const analyticsSum = (rows, key) => rows.reduce((total, row) => total + row[key], 0);
 const analyticsRatio = (a, b) => b ? a / b : null;
-const ANALYTICS_SITES = ['NexLuck Aurora · aurora.example', 'NexLuck Coast · coast.example', 'NexLuck Crown · crown.example'];
+const ANALYTICS_SITES = ['NexLuck Aurora · aurora.example', "NexLuck Coast · coast.example", 'NexLuck Crown · crown.example'];
 const ANALYTICS_DIMENSIONS = [
-  ['site', 'Casino website'], ['country', 'Country'], ['currency', 'Original currency'],
-  ['channel', 'Acquisition channel'], ['campaign', 'Campaign'], ['device', 'Device'],
-  ['segment', 'Segments'], ['status', 'Funnel status'], ['kyc', 'KYC status'], ['aml', 'AML status'],
-  ['risk', 'Risk flag'], ['provider', 'Provider'], ['game', 'Game'], ['category', 'Game category'],
-  ['payment', 'Payment method']
+  ['site', NexLuckI18n.t("Casino website")], ['country', NexLuckI18n.t("Country")], ['currency', NexLuckI18n.t("Original currency")],
+  ['channel', NexLuckI18n.t("Acquisition channel")], ['campaign', NexLuckI18n.t("Campaign")], ['device', NexLuckI18n.t("Device")],
+  ['segment', NexLuckI18n.t("Segments")], ['status', NexLuckI18n.t("Funnel status")], ['kyc', NexLuckI18n.t("KYC status")], ['aml', NexLuckI18n.t("AML status")],
+  ['risk', NexLuckI18n.t("Risk flag")], ['provider', NexLuckI18n.t("Provider")], ['game', NexLuckI18n.t("Game")], ['category', NexLuckI18n.t("Game category")],
+  ['payment', NexLuckI18n.t("Payment method")]
 ];
 
 function createAnalyticsDemo(games, categories, publishers, statuses, today = Date.now()) {
@@ -33,19 +33,19 @@ function createAnalyticsDemo(games, categories, publishers, statuses, today = Da
       id: 'DEMO-' + (i + 1), site: ANALYTICS_SITES[i % 3],
       country: ['DE', 'GB', 'CA', 'SE', 'BR'][Math.floor(i / 3) % 5],
       currency: currencies[Math.floor(i / 5) % 3],
-      channel: ['Organic', 'Affiliate', 'Paid search', 'CRM'][Math.floor(i / 7) % 4],
-      campaign: ['Evergreen', 'Autumn launch', 'VIP return'][Math.floor(i / 11) % 3],
-      device: ['Desktop', 'Mobile', 'Tablet'][Math.floor(i / 13) % 3],
+      channel: ['Organic', "Affiliate", 'Paid search', 'CRM'][Math.floor(i / 7) % 4],
+      campaign: ['Evergreen', "Autumn launch", 'VIP return'][Math.floor(i / 11) % 3],
+      device: ['Desktop', "Mobile", 'Tablet'][Math.floor(i / 13) % 3],
       kyc: ['VERIFIED', 'PENDING', 'NOT_STARTED', 'REJECTED'][Math.floor(i / 17) % 4],
       aml: ['CLEAR', 'REVIEW', 'BLOCKED'][Math.floor(i / 23) % 3],
-      risk: ['None', 'Bonus abuse', 'Multi-accounting', 'Payment risk'][Math.floor(i / 19) % 4],
+      risk: ['None', "Bonus abuse", 'Multi-accounting', 'Payment risk'][Math.floor(i / 19) % 4],
       provider: publishers.find(p => p.id === game.publisher_id).name,
       game: game.name, category: category?.name || 'Uncategorized',
       catalogCasinoId: game.casino_id,
       businessGame: game.original_name || game.name,
       businessCategory: category?.original_name || category?.name || 'Uncategorized',
       businessProvider: publishers.find(p => p.id === game.publisher_id).original_name || publishers.find(p => p.id === game.publisher_id).name,
-      payment: ['Card', 'Bank transfer', 'E-wallet'][Math.floor(i / 29) % 3],
+      payment: ['Card', "Bank transfer", 'E-wallet'][Math.floor(i / 29) % 3],
       theoreticalRtp: game.rtp,
       lead: registration - ANALYTICS_DAY, registered, ftd, trusted, vip, dormant,
       acquisitionCost: 20 + i % 80,
@@ -128,7 +128,7 @@ function analyticsScope(data, filters) {
 }
 
 function analyticsSummary(scope) {
-  const totals = Object.fromEntries(['stake', 'wins', 'ggr', 'bonus', 'tax', 'fees', 'providerFee', 'chargebackLoss', 'ngr',
+  const totals = Object.fromEntries(['stake', "wins", 'ggr', 'bonus', 'tax', 'fees', 'providerFee', 'chargebackLoss', 'ngr',
     'attempts', 'approved', 'deposits', 'withdrawals', 'chargebacks', 'rounds', 'sessions', 'claims', 'abusiveClaims'].map(key => [key, analyticsSum(scope.rows, key)]));
   const active = new Set(scope.rows.map(r => r.player)).size;
   const acquired = scope.players.filter(p => p.ftd !== null && p.ftd >= scope.from && p.ftd <= scope.asOf);
@@ -184,12 +184,21 @@ function analyticsRetentionGrowth(scope) {
 }
 
 function analyticsAsk(data, currentFilters, request) {
-  const text = request.toLowerCase().trim();
-  if (!text) return { error: 'Enter a request about GGR, highest-GGR customers, or affiliate campaign results.' };
-  if (text.length > 500) return { error: 'Keep requests within 500 characters.' };
+  const originalText = request.toLowerCase().trim();
+  const text = originalText
+    .replace(/сегодня/gu, 'today').replace(/вчера/gu, 'yesterday')
+    .replace(/завтра/gu, 'tomorrow').replace(/недел[а-яё]*/gu, 'week')
+    .replace(/месяц[а-яё]*/gu, 'month').replace(/год[а-яё]*/gu, 'year')
+    .replace(/последние\s+(7|30)\s+дн[а-яё]*/gu, 'last $1 days')
+    .replace(/(?:наибольш|высок|лучши)[а-яё]*/gu, 'highest')
+    .replace(/клиент[а-яё]*|игрок[а-яё]*/gu, 'customers')
+    .replace(/партн[её]рск[а-яё]*/gu, 'affiliate').replace(/кампани[а-яё]*/gu, 'campaign')
+    .replace(/последн[а-яё]*|недавн[а-яё]*/gu, 'recent').replace(/сегмент[а-яё]*/gu, 'segment');
+  if (!text) return { error: NexLuckI18n.t("Enter a request about GGR, highest-GGR customers, or affiliate campaign results.") };
+  if (request.trim().length > 500) return { error: NexLuckI18n.t("Keep requests within 500 characters.") };
   const top = /\b(highest|higherst|top|best)\b/.test(text) && /\b(customer|customers|cusomers|players?)\b/.test(text) && /\bggr\b/.test(text);
   const campaign = /\b(affiliate|campaign|compaign)\b/.test(text);
-  if (!top && !campaign && !/\bggr\b/.test(text)) return { error: 'Supported locally: GGR by named segment/date, highest-GGR customers, and affiliate campaign results. No external AI is connected.' };
+  if (!top && !campaign && !/\bggr\b/.test(text)) return { error: NexLuckI18n.t("Supported locally: GGR by named segment/date, highest-GGR customers, and affiliate campaign results. No external AI is connected.") };
   const filters = { ...currentFilters, segment: [...(currentFilters.segment || [])] };
   if (/\btoday\b/.test(text)) filters.from = filters.to = data.end;
   else if (/\byesterday\b/.test(text)) filters.from = filters.to = analyticsDate(Date.parse(data.end) - ANALYTICS_DAY);
@@ -198,41 +207,41 @@ function analyticsAsk(data, currentFilters, request) {
     const dates = text.match(/\b\d{4}-\d{2}-\d{2}\b/g);
     if (window) { filters.to = data.end; filters.from = analyticsDate(Date.parse(data.end) - (Number(window[1]) - 1) * ANALYTICS_DAY); }
     else if (dates) {
-      if (dates.length > 2 || dates.some(date => !Number.isFinite(Date.parse(date)) || analyticsDate(Date.parse(date)) !== date)) return { error: 'Use one valid YYYY-MM-DD date, or two dates for a range.' };
+      if (dates.length > 2 || dates.some(date => !Number.isFinite(Date.parse(date)) || analyticsDate(Date.parse(date)) !== date)) return { error: NexLuckI18n.t("Use one valid YYYY-MM-DD date, or two dates for a range.") };
       [filters.from, filters.to] = [dates[0], dates[1] || dates[0]];
-    } else if (/\b(tomorrow|week|month|year|days)\b/.test(text)) return { error: 'Supported dates: today, yesterday, last 7 days, last 30 days, or YYYY-MM-DD ranges.' };
+    } else if (/\b(tomorrow|week|month|year|days)\b/.test(text)) return { error: NexLuckI18n.t("Supported dates: today, yesterday, last 7 days, last 30 days, or YYYY-MM-DD ranges.") };
   }
-  if (!filters.from || !filters.to || filters.from < data.start || filters.to > data.end || filters.from > filters.to) return { error: 'Requested dates must be within ' + data.start + ' — ' + data.end + '.' };
+  if (!filters.from || !filters.to || filters.from < data.start || filters.to > data.end || filters.from > filters.to) return { error: NexLuckI18n.t("Requested dates must be within ") + data.start + ' — ' + data.end + '.' };
   const matchesName = name => {
     const escaped = name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp('(^|[^a-z0-9_])' + escaped + '($|[^a-z0-9_])').test(text);
+    return new RegExp('(^|[^\\p{L}\\p{N}_])' + escaped + '($|[^\\p{L}\\p{N}_])', 'u').test(originalText);
   };
   const qualifiedSegments = data.segmentDefinitions.filter(segment => matchesName(segment.name));
   const matchedSegments = qualifiedSegments.length ? qualifiedSegments :
     data.segmentDefinitions.filter(segment => matchesName(segment.original_name || segment.name));
-  if (/\bsegments?\b/.test(text) && !matchedSegments.length) return { error: 'Name a saved Customer segment, e.g. VIP, or choose segments in the dashboard filters.' };
+  if (/\bsegments?\b/.test(text) && !matchedSegments.length) return { error: NexLuckI18n.t("Name a saved Customer segment, e.g. VIP, or choose segments in the dashboard filters.") };
   if (matchedSegments.length && (/\bsegments?\b/.test(text) || !campaign)) filters.segment = matchedSegments.map(s => s.id);
   let campaignName = '';
   if (campaign) {
     filters.channel = 'Affiliate';
-    const named = [...new Set(data.players.map(p => p.campaign))].filter(name => text.includes(name.toLowerCase()));
-    if (named.length > 1) return { error: 'Choose one campaign per request.' };
+    const named = [...new Set(data.players.map(p => p.campaign))].filter(name => originalText.includes(name.toLowerCase()));
+    if (named.length > 1) return { error: NexLuckI18n.t("Choose one campaign per request.") };
     if (named.length) filters.campaign = named[0];
     else if (/\b(recent|latest)\b/.test(text)) {
       const candidates = analyticsScope(data, { ...filters, campaign: '' }).players;
       const latest = candidates.sort((a, b) => b.lead - a.lead || a.campaign.localeCompare(b.campaign))[0];
-      if (!latest) return { error: 'No affiliate campaign matches the current scope.' };
+      if (!latest) return { error: NexLuckI18n.t("No affiliate campaign matches the current scope.") };
       filters.campaign = latest.campaign;
-    } else if (/\b(campaign|compaign)\b/.test(text) || !/\baffiliate\b/.test(text)) return { error: 'Name a campaign from the filter list, or ask for the recent affiliate campaign.' };
-    campaignName = filters.campaign || 'All affiliate campaigns';
+    } else if (/\b(campaign|compaign)\b/.test(text) || !/\baffiliate\b/.test(text)) return { error: NexLuckI18n.t("Name a campaign from the filter list, or ask for the recent affiliate campaign.") };
+    campaignName = filters.campaign || NexLuckI18n.t('All affiliate campaigns');
   }
   const scope = analyticsScope(data, filters);
   const totals = analyticsSummary(scope);
   const rows = top ? analyticsGroups(scope, 'id').filter(g => g.active).sort((a, b) => b.ggr - a.ggr || a.name.localeCompare(b.name)).slice(0, 10) : [];
-  return { filters, totals, rows, title: top ? 'Customers with highest GGR' : campaign ? 'Affiliate results: ' + campaignName : 'GGR result',
-    context: filters.from + ' — ' + filters.to + ' · ' + (filters.site || 'All casino websites') + ' · ' +
-      (filters.segment.length ? 'Segments (OR): ' + data.segmentDefinitions.filter(s => filters.segment.includes(s.id)).map(s => s.name).join(', ') : 'All segments') +
-      (filters.to === data.partialDate ? ' · TODAY IS PARTIAL; no period comparison' : '') };
+  return { filters, totals, rows, title: top ? NexLuckI18n.t('Customers with highest GGR') : campaign ? NexLuckI18n.t("Affiliate results: ") + campaignName : NexLuckI18n.t('GGR result'),
+    context: filters.from + ' — ' + filters.to + ' · ' + (filters.site || NexLuckI18n.t('All casino websites')) + ' · ' +
+      (filters.segment.length ? NexLuckI18n.t("Segments (OR): ") + data.segmentDefinitions.filter(s => filters.segment.includes(s.id)).map(s => s.name).join(', ') : NexLuckI18n.t('All segments')) +
+      (filters.to === data.partialDate ? NexLuckI18n.t(' · TODAY IS PARTIAL; no period comparison') : '') };
 }
 
 function analyticsChange(value, previous, percentage = false) {
@@ -248,22 +257,22 @@ function analyticsHealth(value, rule) {
 }
 
 const ANALYTICS_SIGNALS = {
-  revenue: { label: 'NGR margin', direction: 'high', good: 0.02, bad: 0, percentage: true },
+  revenue: { label: NexLuckI18n.t("NGR margin"), direction: 'high', good: 0.02, bad: 0, percentage: true },
   trend: { label: 'NGR', direction: 'high', good: 0, bad: 0 },
-  cash: { label: 'Net cash flow', direction: 'high', good: 0, bad: 0 },
-  payments: { label: 'Deposit approval', direction: 'high', good: 0.95, bad: 0.9, percentage: true },
-  bonuses: { label: 'Suspected abusive claim rate', direction: 'low', good: 0.05, bad: 0.15, percentage: true },
-  concentration: { label: 'Top 10 NGR share', direction: 'low', good: 0.3, bad: 0.5, percentage: true },
-  pipeline: { label: 'Lead to FTD', direction: 'high', good: 0.2, bad: 0.1, percentage: true },
-  lifecycle: { label: 'Dormant profile share', direction: 'low', good: 0.15, bad: 0.3, percentage: true },
-  channels: { label: 'CAC / FTD', direction: 'low', good: 50, bad: 80, money: true },
-  retention: { label: 'D7 retention', direction: 'high', good: 0.25, bad: 0.1, percentage: true },
-  value: { label: 'NGR ARPU', direction: 'high', good: 0, bad: 0, money: true },
-  exposure: { label: 'Flagged profile share', direction: 'low', good: 0.1, bad: 0.3, percentage: true },
-  verification: { label: 'KYC pending share', direction: 'low', good: 0.1, bad: 0.25, percentage: true },
-  protection: { label: 'Excluded wagering facts', direction: 'low', good: 0, bad: 0 },
-  products: { label: 'Gaming hold', direction: 'high', good: 0.03, bad: 0, percentage: true },
-  engagement: { label: 'Sessions / active player', direction: 'high', good: 3, bad: 1 }
+  cash: { label: NexLuckI18n.t("Net cash flow"), direction: 'high', good: 0, bad: 0 },
+  payments: { label: NexLuckI18n.t("Deposit approval"), direction: 'high', good: 0.95, bad: 0.9, percentage: true },
+  bonuses: { label: NexLuckI18n.t("Suspected abusive claim rate"), direction: 'low', good: 0.05, bad: 0.15, percentage: true },
+  concentration: { label: NexLuckI18n.t("Top 10 NGR share"), direction: 'low', good: 0.3, bad: 0.5, percentage: true },
+  pipeline: { label: NexLuckI18n.t("Lead to FTD"), direction: 'high', good: 0.2, bad: 0.1, percentage: true },
+  lifecycle: { label: NexLuckI18n.t("Dormant profile share"), direction: 'low', good: 0.15, bad: 0.3, percentage: true },
+  channels: { label: NexLuckI18n.t("CAC / FTD"), direction: 'low', good: 50, bad: 80, money: true },
+  retention: { label: NexLuckI18n.t("D7 retention"), direction: 'high', good: 0.25, bad: 0.1, percentage: true },
+  value: { label: NexLuckI18n.t("NGR ARPU"), direction: 'high', good: 0, bad: 0, money: true },
+  exposure: { label: NexLuckI18n.t("Flagged profile share"), direction: 'low', good: 0.1, bad: 0.3, percentage: true },
+  verification: { label: NexLuckI18n.t("KYC pending share"), direction: 'low', good: 0.1, bad: 0.25, percentage: true },
+  protection: { label: NexLuckI18n.t("Excluded wagering facts"), direction: 'low', good: 0, bad: 0 },
+  products: { label: NexLuckI18n.t("Gaming hold"), direction: 'high', good: 0.03, bad: 0, percentage: true },
+  engagement: { label: NexLuckI18n.t("Sessions / active player"), direction: 'high', good: 3, bad: 1 }
 };
 
 function analyticsReportValues(scope) {

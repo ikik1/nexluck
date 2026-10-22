@@ -7,8 +7,9 @@ import secrets
 import socket
 import subprocess
 import sys
-import tempfile
+import shutil
 import time
+from contextlib import contextmanager
 import urllib.error
 import urllib.request
 
@@ -16,14 +17,51 @@ from playwright.async_api import async_playwright
 
 CMS = Path(__file__).resolve().parents[1]
 ROOT = CMS.parent
-sys.path.insert(0, str(ROOT / "crm/api/test"))
-from segment_browser_test import start
 
 
 def free_port():
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
+
+@contextmanager
+def browser_files():
+    path = CMS / "tests" / ".browser-fixture"
+    path.mkdir()
+    previous = os.environ.get("TMPDIR")
+    os.environ["TMPDIR"] = str(path)
+    try:
+        yield str(path)
+    finally:
+        if previous is None:
+            os.environ.pop("TMPDIR", None)
+        else:
+            os.environ["TMPDIR"] = previous
+        shutil.rmtree(path)
+
+
+def start_fixture(port, env, directory):
+    web = Path(directory) / "web"
+    web.mkdir()
+    for name in ("crm", "h", "deposit", "localization"):
+        shutil.copytree(ROOT / name, web / name, symlinks=True)
+    for name in ("styles.css", "landing.css", "dropdowns.css", "index.html"):
+        shutil.copy2(ROOT / name, web / name)
+    # Customer data sits outside this copied web root, never beside live data.
+    process = subprocess.Popen(["ruby", "crm/api/server.rb", str(port)], cwd=web, env=env,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    for _ in range(100):
+        if process.poll() is not None:
+            raise RuntimeError(process.stderr.read().decode())
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/crm/ui-api/v1/casinos", timeout=1).close()
+            return process
+        except urllib.error.URLError:
+            time.sleep(.05)
+    process.terminate()
+    process.wait(timeout=10)
+    raise RuntimeError("Isolated CRM fixture did not become ready")
 
 
 async def browser_check(base, password):
@@ -35,8 +73,31 @@ async def browser_check(base, password):
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.on("dialog", lambda dialog: dialog.accept())
-        # Exercise the actual Ruby proxy, session cookies and CSRF roundtrip.
+        # The actual CRM selector preference carries into CMS login and UI.
+        await page.goto(base + "/crm/")
+        await page.get_by_label("UI language", exact=True).select_option("ru")
+        await page.wait_for_function("document.documentElement.lang === 'ru'")
         await page.goto(base + "/cms/")
+        await page.get_by_role("heading", name="Войти в CMS", exact=True).wait_for()
+        await page.locator('[name="username"]').fill("cms-browser")
+        await page.locator('[name="password"]').fill("incorrect-browser-password")
+        await page.get_by_role("button", name="Войти", exact=True).click()
+        await page.locator(".errorlist").wait_for()
+        assert "Please enter" not in await page.locator(".errorlist").inner_text()
+        assert any("а" <= letter.lower() <= "я" for letter in await page.locator(".errorlist").inner_text())
+        await page.locator('[name="password"]').fill(password)
+        await page.get_by_role("button", name="Войти", exact=True).click()
+        await page.get_by_role("heading", name="Визуальный редактор страниц", exact=True).wait_for()
+        await page.get_by_label("Язык интерфейса", exact=True).select_option("en")
+        await page.get_by_role("heading", name="Visual page editor", exact=True).wait_for()
+        # The management-language selector accepts each new CMS locale and
+        # preserves its explicit locale code across the page reload.
+        for locale in ("pt-PT", "pt-BR", "es", "en"):
+            await page.locator("[data-language-selector]").select_option(locale)
+            await page.wait_for_function("(locale) => document.documentElement.lang === locale", arg=locale)
+            assert await page.locator("[data-language-selector]").input_value() == locale
+        # Exercise logout/login through the proxy, session cookies and CSRF.
+        await page.get_by_role("button", name="Sign out", exact=True).click()
         await page.get_by_label("Username:", exact=True).fill("cms-browser")
         await page.get_by_label("Password:", exact=True).fill(password)
         await page.get_by_role("button", name="Sign in", exact=True).click()
@@ -137,12 +198,12 @@ async def browser_check(base, password):
         assert await ssr.locator("#games-3 .catalog-card").count() == 0
         await nojs.close()
         # Independent widget failure and retry do not prevent SSR.
-        await public.route("**/widgets/games-3/", lambda route: route.fulfill(
+        await public.route("**/widgets/games-3/**", lambda route: route.fulfill(
             status=503, content_type="application/json", body='{"detail":"CRM temporarily unavailable"}'))
         await public.reload()
         await public.get_by_role("alert").filter(has_text="CRM temporarily unavailable").wait_for()
         await public.get_by_role("heading", name="Private new heading", exact=True).wait_for()
-        await public.unroute("**/widgets/games-3/")
+        await public.unroute("**/widgets/games-3/**")
         await public.get_by_role("button", name="Retry", exact=True).click()
         await public.locator("#games-3 .catalog-card").first.wait_for()
         # Actual /h navigation module interactions and external unsaved preview.
@@ -221,29 +282,154 @@ async def browser_check(base, password):
         await added.click(button="right")
         await page.get_by_role("menuitem", name="Remove", exact=True).click()
         assert await page.locator("[data-module-key]").count() == 15
-        # Swagger UI is self-hosted, with executable GET endpoint documentation.
+        # The localized API reference has executable GET endpoint documentation.
         docs = await page.context.new_page()
         await docs.goto(base + "/cms/api/")
+        await docs.locator(".api-endpoint").first.wait_for()
+        assert await docs.locator(".api-endpoint").count() == 3
+        await docs.locator(".api-endpoint").first.get_by_role("button", name="Try request", exact=True).click()
+        await docs.locator(".api-endpoint").first.get_by_role("status").filter(has_text='"items"').wait_for()
+        await docs.get_by_role("link", name="Swagger UI", exact=True).click()
         await docs.locator(".swagger-ui .opblock").first.wait_for()
         assert await docs.locator(".opblock").count() == 3
+        await docs.get_by_role("button", name="Authorize", exact=True).wait_for()
+        modules_endpoint = docs.locator(".opblock").filter(has=docs.locator('[data-path="/modules/"]'))
+        await modules_endpoint.locator(".opblock-summary").click()
+        await modules_endpoint.get_by_role("button", name="Try it out", exact=True).click()
+        await modules_endpoint.get_by_role("button", name="Execute", exact=True).click()
+        await modules_endpoint.locator(".responses-wrapper").filter(has_text='"items"').wait_for()
+        assert "200" in await modules_endpoint.locator(".responses-wrapper").inner_text()
+        bonuses_endpoint = docs.locator(".opblock").filter(has=docs.locator('[data-path="/get_promotion_bonuses/"]'))
+        await bonuses_endpoint.locator(".opblock-summary").click()
+        await bonuses_endpoint.get_by_role("tab", name="Schema", exact=True).click()
+        await bonuses_endpoint.locator(".model-box").filter(has_text="external_id").wait_for()
+        await docs.get_by_role("link", name="Localized API reference", exact=True).click()
+        await docs.locator(".api-endpoint").first.wait_for()
         await docs.close()
+        # Content language is independent of management UI language and persists.
+        widget_requests = []
+        public.on("request", lambda request: widget_requests.append(request.url)
+                  if "/widgets/games-3/" in request.url else None)
+        await page.locator('[data-module-key="games-3"]').click(button="right")
+        await page.get_by_role("menuitem", name="Properties ...", exact=True).click()
+        await page.get_by_label("Localization", exact=True).select_option("pt-BR")
+        await page.get_by_label("Module heading", exact=True).fill("Jogos brasileiros")
+        await preview.get_by_role("heading", name="Jogos brasileiros", exact=True).wait_for()
+        await page.get_by_label("Localization", exact=True).select_option("pt-PT")
+        await page.get_by_label("Module heading", exact=True).fill("Jogos portugueses")
+        await preview.get_by_role("heading", name="Jogos portugueses", exact=True).wait_for()
+        await page.get_by_label("Localization", exact=True).select_option("es")
+        await page.get_by_label("Module heading", exact=True).fill("Juegos españoles")
+        await preview.get_by_role("heading", name="Juegos españoles", exact=True).wait_for()
+        await page.get_by_label("Localization", exact=True).select_option("ru")
+        await page.get_by_label("Module heading", exact=True).fill("Русские игры")
+        await preview.get_by_role("heading", name="Русские игры", exact=True).wait_for()
+        await page.get_by_label("Localization", exact=True).select_option("pt-BR")
+        assert await page.get_by_label("Module heading", exact=True).input_value() == "Jogos brasileiros"
+        await page.get_by_role("button", name="Reset Portuguese (Brazil) overrides", exact=True).click()
+        await preview.get_by_role("heading", name="Private new heading", exact=True).wait_for()
+        await page.get_by_label("Localization", exact=True).select_option("es")
+        assert await page.get_by_label("Module heading", exact=True).input_value() == "Juegos españoles"
+        await page.get_by_role("button", name="Reset Spanish (Spain) overrides", exact=True).click()
+        await preview.get_by_role("heading", name="Private new heading", exact=True).wait_for()
+        await page.get_by_label("Localization", exact=True).select_option("pt-PT")
+        assert await page.get_by_label("Module heading", exact=True).input_value() == "Jogos portugueses"
+        await page.get_by_label("Localization", exact=True).select_option("ru")
+        assert await page.get_by_label("Module heading", exact=True).input_value() == "Русские игры"
+        await preview.get_by_role("heading", name="Русские игры", exact=True).wait_for()
+        await preview.get_by_role("searchbox", name="Поиск игр", exact=True).wait_for()
+        await page.get_by_role("button", name="Done", exact=True).click()
+        await page.locator('[data-module-key="seo-default"]').click(button="right")
+        await page.get_by_role("menuitem", name="Properties ...", exact=True).click()
+        await page.get_by_label("SEO HTML", exact=True).fill('<h2>Русская SEO информация</h2><p onclick="evil()">Безопасный текст</p><script>evil()</script>')
+        await page.get_by_role("button", name="Done", exact=True).click()
+        await preview.get_by_role("heading", name="Русская SEO информация", exact=True).wait_for()
+        assert await preview.locator(".seo-content [onclick],.seo-content script").count() == 0
+        await page.get_by_role("button", name="Save draft & preview", exact=True).click()
+        await page.get_by_role("status").filter(has_text="Draft saved").wait_for()
+        await page.get_by_role("button", name="Publish", exact=True).click()
+        await page.get_by_role("status").filter(has_text="Published revision").wait_for()
+        await public.goto(base + published_url + "?lang=ru")
+        await public.get_by_role("heading", name="Русские игры", exact=True).wait_for()
+        await public.get_by_role("heading", name="Русская SEO информация", exact=True).wait_for()
+        assert await public.locator(".seo-content [onclick],.seo-content script").count() == 0
+        await public.locator("#games-3 .catalog-card").first.wait_for()
+        assert await public.locator("html").get_attribute("lang") == "ru"
+        await public.locator("#website-language").select_option("pt-PT")
+        await public.wait_for_url("**lang=pt-PT")
+        await public.get_by_role("heading", name="Jogos portugueses", exact=True).wait_for()
+        assert await public.locator("html").get_attribute("lang") == "pt-PT"
+        await public.locator("#games-3 .catalog-card").first.wait_for()
+        assert any("lang=pt-PT" in request for request in widget_requests), widget_requests
+        await public.locator("#website-language").select_option("pt-BR")
+        await public.wait_for_url("**lang=pt-BR")
+        await public.get_by_role("heading", name="Private new heading", exact=True).wait_for()
+        assert await public.locator("html").get_attribute("lang") == "pt-BR"
+        await public.locator("#games-3 .catalog-card").first.wait_for()
+        assert any("lang=pt-BR" in request for request in widget_requests), widget_requests
+        await public.locator("#website-language").select_option("es")
+        await public.wait_for_url("**lang=es")
+        assert await public.locator("html").get_attribute("lang") == "es"
+        await public.get_by_role("heading", name="Private new heading", exact=True).wait_for()
+        await public.locator("#games-3 .catalog-card").first.wait_for()
+        assert any("lang=es" in request for request in widget_requests), widget_requests
+        await public.locator("#website-language").select_option("ru")
+        await public.wait_for_url("**lang=ru")
+        await public.locator("#website-language").select_option("en")
+        await public.wait_for_url("**lang=en")
+        await public.get_by_role("heading", name="Private new heading", exact=True).wait_for()
+        await public.get_by_role("heading", name="Searchable casino information", exact=True).wait_for()
+        await page.get_by_label("UI language", exact=True).select_option("ru")
+        await page.get_by_role("heading", name="Визуальный редактор страниц", exact=True).wait_for()
+        await page.locator('[data-module-key="games-3"]').click(button="right")
+        await page.get_by_role("menuitem", name="Свойства ...", exact=True).click()
+        await page.get_by_label("Локализация", exact=True).select_option("ru")
+        assert await page.get_by_label("Заголовок модуля", exact=True).input_value() == "Русские игры"
+        await page.get_by_label("Максимум элементов", exact=True).fill("0")
+        await page.get_by_role("button", name="Готово", exact=True).click()
+        await page.get_by_role("button", name="Сохранить черновик и предпросмотр", exact=True).click()
+        await page.locator(".error-panel").filter(has_text="больше либо равно").first.wait_for()
+        await page.locator('[data-module-key="games-3"]').click(button="right")
+        await page.get_by_role("menuitem", name="Свойства ...", exact=True).click()
+        await page.get_by_label("Максимум элементов", exact=True).fill("3")
+        await page.get_by_role("button", name="Готово", exact=True).click()
+        await page.get_by_role("button", name="Сохранить черновик и предпросмотр", exact=True).click()
+        await page.get_by_role("status").filter(has_text="Черновик сохранён").wait_for()
+        await page.get_by_label("Язык интерфейса", exact=True).select_option("en")
+        await page.get_by_role("heading", name="Visual page editor", exact=True).wait_for()
+        dialogs = []
+        collect_dialog = lambda dialog: dialogs.append(dialog.type)
+        page.on("dialog", collect_dialog)
+        await page.get_by_label("Page title", exact=True).fill("Unsaved language guard")
+        await page.get_by_label("UI language", exact=True).select_option("ru")
+        await page.get_by_role("heading", name="Визуальный редактор страниц", exact=True).wait_for()
+        assert dialogs == ["confirm"], dialogs
+        page.remove_listener("dialog", collect_dialog)
+        await page.get_by_label("Язык интерфейса", exact=True).select_option("en")
+        await page.get_by_role("heading", name="Visual page editor", exact=True).wait_for()
         for width in [320, 768, 1440]:
             await page.set_viewport_size({"width": width, "height": 900})
-            assert await page.evaluate("document.documentElement.scrollWidth<=innerWidth"), width
+            assert await page.evaluate("document.documentElement.scrollWidth<=innerWidth"), (
+                width, await page.evaluate("""() => [...document.querySelectorAll('body *')]
+                  .filter(e => e.getBoundingClientRect().right > innerWidth + 1)
+                  .slice(0, 8).map(e => [e.tagName, e.className, e.getBoundingClientRect().right])"""))
             await public.set_viewport_size({"width": width, "height": 900})
-            assert await public.evaluate("document.documentElement.scrollWidth<=innerWidth"), width
+            assert await public.evaluate("document.documentElement.scrollWidth<=innerWidth"), (
+                width, await public.evaluate("""() => [...document.querySelectorAll('body *')]
+                  .filter(e => e.getBoundingClientRect().right > innerWidth + 1)
+                  .slice(0, 8).map(e => [e.tagName, e.className, e.getBoundingClientRect().right])"""))
         await page.get_by_role("button", name="Sign out", exact=True).click()
         await page.get_by_role("heading", name="Sign in to CMS", exact=True).wait_for()
         assert not errors, errors
         await browser.close()
-        print("CMS browser: proxy login/CSRF, actual /h styles/navigation, API-driven context properties, CRM segment picker, hide/show grey disabled preview and published omission, remove, drag/drop + keyboard ordering, safe SEO HTML, external preview, Swagger UI, catalog hydration, draft/publication isolation, plugin, no-JS SSR, retries and responsive views passed")
+        print("CMS browser: login/CSRF, API-driven properties, segment picker, hide/show, ordering, safe SEO, API reference, hydration, publication isolation, five-language UI and persisted content, language switchers, no-JS SSR, retries and responsive views passed")
 
 
 def main():
     if not (CMS / "frontend/dist/editor.js").exists():
         raise SystemExit("Build frontend first: cd cms/frontend && npm ci && npm run build")
     crm_port, cms_port = free_port(), free_port()
-    with tempfile.TemporaryDirectory(prefix="nexluck-cms-browser-") as temp:
+    with browser_files() as temp:
         password = secrets.token_urlsafe(24)
         env = dict(os.environ, CMS_ENV="local", CMS_SQLITE_PATH=str(Path(temp) / "cms.sqlite3"),
                    CRM_DEMO_UI="1", CRM_API_BASE=f"http://127.0.0.1:{crm_port}/crm/api/v1",
@@ -251,7 +437,7 @@ def main():
                    CMS_UPSTREAM=f"http://127.0.0.1:{cms_port}",
                    CRM_CLIENT_SECRET=secrets.token_hex(32), CRM_JWT_SECRET=secrets.token_hex(32),
                    CMS_BROWSER_PASSWORD=password)
-        crm = start(crm_port, env)
+        crm = start_fixture(crm_port, env, temp)
         server = None
         try:
             for args in [

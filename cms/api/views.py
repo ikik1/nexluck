@@ -9,6 +9,7 @@ from core.documents import StrictSerializer
 from core.modules import Props
 from core.registry import registry
 from core.services import require_site
+from core.i18n import t
 
 
 class SiteQuery(StrictSerializer):
@@ -23,7 +24,7 @@ class PromotionQuery(SiteQuery):
 
 
 def field_schema(name, field):
-    value = {"title": field.label or name.replace("_", " ").title()}
+    value = {"title": t(field.label or name.replace("_", " ").title())}
     if isinstance(field, serializers.ListField):
         value.update(type="array", items=field_schema("value", field.child), maxItems=field.max_length)
     elif isinstance(field, serializers.IntegerField):
@@ -62,7 +63,7 @@ def module_schema(module):
         visible = {"title"}
     if "." in module.key and module.properties:
         visible = set(fields)
-    return {"key": module.key, "label": module.label, "type": "object",
+    return {"key": module.key, "label": t(module.label), "type": "object",
             "properties": {name: field_schema(name, field) for name, field in fields.items() if name in visible},
             "defaults": {"title": module.label, **{name: field.get_default() for name, field in fields.items()
                          if field.default is not serializers.empty}}}
@@ -83,7 +84,7 @@ def segments(request):
     try:
         return Response({"items": segment_catalog(casino_id=site.crm_id)})
     except CRMUnavailable as exc:
-        return Response({"detail": str(exc)}, status=503)
+        return Response({"detail": t(str(exc))}, status=503)
 
 
 @never_cache
@@ -98,7 +99,7 @@ def get_promotion_bonuses(request):
     try:
         return Response(promotion_bonuses(props, casino_id=site.crm_id))
     except CRMUnavailable as exc:
-        return Response({"detail": str(exc)}, status=503)
+        return Response({"detail": t(str(exc))}, status=503)
 
 
 @never_cache

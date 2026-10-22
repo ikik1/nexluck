@@ -18,10 +18,10 @@ const APPLIES_HINT =
   'BONUS_PLUS_DEPOSIT - The wagering multiplier applies to the sum of the Deposit Amount + Bonus Amount.\n' +
   'WINNINGS_ONLY - Common in Free Spins campaigns where no fixed bonus amount is awarded upfront.';
 const DMP_HINT = (
-  <><b>100 (Standard Match):</b> If a player deposits <b>$100</b>, the casino adds <b>$100</b> in bonus funds ($100 × 100%). Total balance: <b>$200</b>.</>
+  <><b>{NexLuckI18n.t("100 (Standard Match):")}</b>{NexLuckI18n.t(" If a player deposits ")}<b>$100</b>{NexLuckI18n.t(", the casino adds ")}<b>$100</b>{NexLuckI18n.t(" in bonus funds ($100 × 100%). Total balance: ")}<b>$200</b>.</>
 );
 const BONUS_AMOUNT_HINT = (
-  <>Bonus Amount = min(deposit amount × DMP / 100, MBA)<br />If DMP = 0, Bonus Amount = MBA.</>
+  <>{NexLuckI18n.t("Bonus Amount = min(deposit amount × DMP / 100, MBA)")}<br />{NexLuckI18n.t("If DMP = 0, Bonus Amount = MBA.")}</>
 );
 
 const ANTI_HEDGING_HINT = 'Applicable to Roulette/Baccarat - doesn\'t allow you to bet on 50/50.';
@@ -62,16 +62,17 @@ const emptyBonus = () => ({
     maxBetPerRound: '', maxBetPercentageOfBonus: '', restrictZeroRiskBetting: false,
     minEvenMoneyCoveragePercentage: '' },
 });
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 // 'YYYY-MM-DD', 'YYYY-MM-DDTHH:MM' or an ISO timestamp -> '31 Dec 26' (with ', 23:59' when withTime)
 const fmtDate = (v, withTime) => {
   if (!v) return '';
   const d = /Z$|[+-]\d\d:\d\d$/.test(v) ? new Date(v) : new Date(v.length === 10 ? v + 'T00:00' : v);
   if (isNaN(d)) return v;
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${pad(d.getFullYear() % 100)}` + (withTime ? `, ${pad(d.getHours())}:${pad(d.getMinutes())}` : '');
+  return new Intl.DateTimeFormat(NexLuckI18n.formatLocale, {
+    day: 'numeric', month: 'short', year: '2-digit',
+    ...(withTime ? { hour: '2-digit', minute: '2-digit', hour12: false } : {})
+  }).format(d);
 };
-const fmt = (n) => (Math.round(n * 100) / 100).toLocaleString('en-US');
+const fmt = (n) => (Math.round(n * 100) / 100).toLocaleString(NexLuckI18n.formatLocale);
 const api = async (path, opts) => {
   const r = await CRMContext.fetch(API + path, opts && opts.body ? { ...opts, headers: { 'Content-Type': 'application/json' } } : opts);
   const body = await r.json().catch(() => ({}));
@@ -80,13 +81,13 @@ const api = async (path, opts) => {
 };
 
 function Hint({ text }) {
-  return <button type="button" className="hint" aria-label="Hint">?<span className="tip" style={{ whiteSpace: 'pre-line' }}>{text}</span></button>;
+  return <button type="button" className="hint" aria-label={NexLuckI18n.t("Hint")}>?<span className="tip" style={{ whiteSpace: 'pre-line' }}>{NexLuckI18n.t(text)}</span></button>;
 }
 
 function Field({ label, hint, error, children }) {
   return (
     <div className={'f' + (error ? ' err' : '')}>
-      <span className="lbl">{label}{hint && <Hint text={hint} />}</span>
+      <span className="lbl">{NexLuckI18n.t(label)}{hint && <Hint text={hint} />}</span>
       {children}
       {error && <span className="emsg">{error}</span>}
     </div>
@@ -96,15 +97,15 @@ function Field({ label, hint, error, children }) {
 function AvailabilitySegments({ label, path, form, set, errors, onOpen }) {
   const values = get(form, path) || [];
   const remove = value => set(path, values.filter(v => v !== value));
-  return <Field label={label} error={errors[path]}>
+  return <Field label={NexLuckI18n.t(label)} error={errors[path]}>
     <div className="availability-segments">
       {values.map(value => <button type="button" className="availability-tag" key={value}
-        title="Double-click to remove; press Delete or Backspace to remove"
-        aria-label={'Remove ' + value + ' from ' + label.toLowerCase()}
+        title={NexLuckI18n.t("Double-click to remove; press Delete or Backspace to remove")}
+        aria-label={NexLuckI18n.t("Remove ") + value + NexLuckI18n.t(" from ") + label.toLowerCase()}
         onDoubleClick={() => remove(value)} onKeyDown={e => {
           if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); remove(value); }
-        }}>{value}</button>)}
-      <button type="button" className="btn segment-more" aria-label={'Edit ' + label.toLowerCase()}
+        }}>{NexLuckI18n.t(value)}</button>)}
+      <button type="button" className="btn segment-more" aria-label={NexLuckI18n.t("Edit ") + label.toLowerCase()}
         onClick={() => onOpen({ path, label })}>...</button>
     </div>
   </Field>;
@@ -118,8 +119,8 @@ function Modal({ title, onClose, children, actions, className = '' }) {
   }, []);
   return (
     <div className="ovl" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={'modal ' + className} role="dialog" aria-label={title}>
-        <h2>{title}</h2>
+      <div className={'modal ' + className} role="dialog" aria-label={NexLuckI18n.t(title)}>
+        <h2>{NexLuckI18n.t(title)}</h2>
         {children}
         <div className="acts">{actions}</div>
       </div>
@@ -132,9 +133,9 @@ function DateTime({ value, onChange }) {
   const open = () => { try { input.current.showPicker(); } catch (err) { input.current.focus(); } };
   return (
     <div className="dt" onClick={open}>
-      <span className={value ? '' : 'ph'}>{value ? fmtDate(value, true) : 'Select date…'}</span>
+      <span className={value ? '' : 'ph'}>{value ? fmtDate(value, true) : NexLuckI18n.t("Select date…")}</span>
       <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2v2M13 2v2M2 6h12M3 3h10a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-      <input ref={input} type="datetime-local" value={value} tabIndex={-1} aria-label="Pick date and time" onChange={(ev) => onChange(ev.target.value)} />
+      <input ref={input} type="datetime-local" value={value} tabIndex={-1} aria-label={NexLuckI18n.t("Pick date and time")} onChange={(ev) => onChange(ev.target.value)} />
     </div>
   );
 }
@@ -142,10 +143,10 @@ function DateTime({ value, onChange }) {
 function Money({ label, hint, path, form, set, errors, openRates }) {
   const v = get(form, path);
   return (
-    <Field label={label} hint={hint} error={errors[path]}>
+    <Field label={NexLuckI18n.t(label)} hint={hint} error={errors[path]}>
       <div className="money">
         <input type="number" min="0" step="any" value={v ?? ''} onChange={(e) => set(path, e.target.value === '' ? '' : Number(e.target.value))} />
-        <button type="button" className="cur" title="Adjust exchange rates" onClick={() => openRates(Number(v) || 0)}>EUR</button>
+        <button type="button" className="cur" title={NexLuckI18n.t("Adjust exchange rates")} onClick={() => openRates(Number(v) || 0)}>{NexLuckI18n.t("EUR")}</button>
       </div>
     </Field>
   );
@@ -153,7 +154,7 @@ function Money({ label, hint, path, form, set, errors, openRates }) {
 
 function Num({ label, hint, path, form, set, errors, int, suffix }) {
   return (
-    <Field label={label} hint={hint} error={errors[path]}>
+    <Field label={NexLuckI18n.t(label)} hint={hint} error={errors[path]}>
       <input type="number" min="0" step={int ? 1 : 'any'} value={get(form, path) ?? ''} onChange={(e) => set(path, e.target.value === '' ? '' : Number(e.target.value))} />
     </Field>
   );
@@ -161,10 +162,10 @@ function Num({ label, hint, path, form, set, errors, int, suffix }) {
 
 function Select({ label, hint, path, form, set, errors, options, labels }) {
   return (
-    <Field label={label} hint={hint} error={errors[path]}>
+    <Field label={NexLuckI18n.t(label)} hint={hint} error={errors[path]}>
       <select value={get(form, path) ?? ''} onChange={(e) => set(path, e.target.value)}>
-        <option value="">Select…</option>
-        {options.map((o) => <option key={o} value={o}>{labels ? labels[o] : o}</option>)}
+        <option value="">{NexLuckI18n.t("Select…")}</option>
+        {options.map((o) => <option key={o} value={o}>{NexLuckI18n.t(labels ? labels[o] : o)}</option>)}
       </select>
     </Field>
   );
@@ -174,11 +175,11 @@ function Multi({ label, path, form, set, errors, options }) {
   const sel = get(form, path) || [];
   const toggle = (o) => set(path, sel.includes(o) ? sel.filter((x) => x !== o) : [...sel, o]);
   return (
-    <Field label={label} error={errors[path]}>
+    <Field label={NexLuckI18n.t(label)} error={errors[path]}>
       <div className="chips">
         {options.map((o) => (
           <label key={o} className={'chk' + (sel.includes(o) ? ' on' : '')}>
-            <input type="checkbox" checked={sel.includes(o)} onChange={() => toggle(o)} />{o}
+            <input type="checkbox" checked={sel.includes(o)} onChange={() => toggle(o)} />{NexLuckI18n.t(o)}
           </label>
         ))}
       </div>
@@ -190,7 +191,7 @@ function Check({ label, path, form, set }) {
   const on = !!get(form, path);
   return (
     <label className={'chk rect' + (on ? ' on' : '')} style={{ marginBottom: 8, display: 'flex' }}>
-      <input type="checkbox" checked={on} onChange={(e) => set(path, e.target.checked)} />{label}
+      <input type="checkbox" checked={on} onChange={(e) => set(path, e.target.checked)} />{NexLuckI18n.t(label)}
     </label>
   );
 }
@@ -214,14 +215,14 @@ function RatesModal({ amount, onClose }) {
     }
   };
   return (
-    <Modal title="Exchange rates (per 1 EUR)" onClose={onClose}
-      actions={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn pri" disabled={!rates || busy} onClick={save}>Save rates</button></>}>
+    <Modal title={NexLuckI18n.t("Exchange rates (per 1 EUR)")} onClose={onClose}
+      actions={<><button className="btn" onClick={onClose}>{NexLuckI18n.t("Cancel")}</button><button className="btn pri" disabled={!rates || busy} onClick={save}>{NexLuckI18n.t("Save rates")}</button></>}>
       {err && <div className="msg bad" style={{ marginBottom: 8 }}>{err}</div>}
-      {!rates ? 'Loading…' : (
+      {!rates ? NexLuckI18n.t("Loading…") : (
         <>
-          <p className="kvl">Rates apply to all bonuses. Amounts are stored in EUR; other currencies are converted with these rates.{amount ? <> Current value: <b>{fmt(amount)} EUR</b>.</> : null}</p>
+          <p className="kvl">{NexLuckI18n.t("Rates apply to all bonuses. Amounts are stored in EUR; other currencies are converted with these rates.")}{amount ? <>{NexLuckI18n.t(" Current value: ")}<b>{fmt(amount)}{NexLuckI18n.t(" EUR")}</b>.</> : null}</p>
           <table className="rt">
-            <thead><tr><th>Currency</th><th>Rate</th><th>{fmt(amount || 1)} EUR =</th></tr></thead>
+            <thead><tr><th>{NexLuckI18n.t("Currency")}</th><th>{NexLuckI18n.t("Rate")}</th><th>{fmt(amount || 1)}{NexLuckI18n.t(" EUR =")}</th></tr></thead>
             <tbody>
               {Object.keys(draft).map((c) => (
                 <tr key={c}>
@@ -232,7 +233,7 @@ function RatesModal({ amount, onClose }) {
               ))}
             </tbody>
           </table>
-          <p className="kvl" style={{ marginTop: 8 }}>Last updated {fmtDate(rates.updatedAt, true)} by {rates.updatedBy}.</p>
+          <p className="kvl" style={{ marginTop: 8 }}>{NexLuckI18n.t("Last updated ")}{fmtDate(rates.updatedAt, true)}{NexLuckI18n.t(" by ")}{rates.updatedBy}.</p>
         </>
       )}
     </Modal>
@@ -241,7 +242,7 @@ function RatesModal({ amount, onClose }) {
 
 function CategoryModal({ value, onPick, onClose }) {
   return (
-    <Modal title="Category" onClose={onClose} actions={<button className="btn" onClick={onClose}>Close</button>}>
+    <Modal title={NexLuckI18n.t("Category")} onClose={onClose} actions={<button className="btn" onClick={onClose}>{NexLuckI18n.t("Close")}</button>}>
       {CATEGORIES.map(([c, h]) => (
         <div key={c} className={'opt' + (value === c ? ' on' : '')} onClick={() => { onPick(c); onClose(); }}>
           <input type="radio" readOnly checked={value === c} />
@@ -258,9 +259,9 @@ function ChangelogModal({ id, onClose }) {
   useEffect(() => { api(`/bonuses/${id}/changelog`).then((r) => setItems(r.items)).catch((e) => setErr(e.message)); }, [id]);
   const show = (v) => (v === undefined || v === null || v === '' ? '∅' : Array.isArray(v) ? '[' + v.join(', ') + ']' : String(v));
   return (
-    <Modal title={'Changelog — ' + id} onClose={onClose} actions={<button className="btn" onClick={onClose}>Close</button>}>
+    <Modal title={NexLuckI18n.t("Changelog — ") + id} onClose={onClose} actions={<button className="btn" onClick={onClose}>{NexLuckI18n.t("Close")}</button>}>
       {err && <div className="msg bad">{err}</div>}
-      {!items && !err && 'Loading…'}
+      {!items && !err && NexLuckI18n.t("Loading…")}
       {items && items.map((c, i) => (
         <div className="cl" key={i}>
           <b>{c.summary}</b> <small>· {fmtDate(c.at, true)} · {c.by}</small>
@@ -275,10 +276,10 @@ function AIAgentModal({ onClose }) {
   const [prompt, setPrompt] = useState('');
   const [notice, setNotice] = useState('');
   return (
-    <Modal title="AI bonus agent" onClose={onClose}
-      actions={<><button className="btn" onClick={onClose}>Continue manually</button><button className="btn pri" disabled={!prompt.trim()} onClick={() => setNotice('AI agent integration is not connected yet. Your bonus form remains empty and ready to edit.')}>Ask AI agent</button></>}>
-      <p className="kvl">Tell the AI agent what kind of bonus you want to create.</p>
-      <textarea autoFocus value={prompt} onChange={(e) => { setPrompt(e.target.value); setNotice(''); }} placeholder="For example: a 100% first-deposit match for registered players…" style={{ width: '100%', minHeight: 100, border: '1px solid var(--line)', borderRadius: 6, padding: 10, font: 'inherit' }} />
+    <Modal title={NexLuckI18n.t("AI bonus agent")} onClose={onClose}
+      actions={<><button className="btn" onClick={onClose}>{NexLuckI18n.t("Continue manually")}</button><button className="btn pri" disabled={!prompt.trim()} onClick={() => setNotice('AI agent integration is not connected yet. Your bonus form remains empty and ready to edit.')}>{NexLuckI18n.t("Ask AI agent")}</button></>}>
+      <p className="kvl">{NexLuckI18n.t("Tell the AI agent what kind of bonus you want to create.")}</p>
+      <textarea autoFocus value={prompt} onChange={(e) => { setPrompt(e.target.value); setNotice(''); }} placeholder={NexLuckI18n.t("For example: a 100% first-deposit match for registered players…")} style={{ width: '100%', minHeight: 100, border: '1px solid var(--line)', borderRadius: 6, padding: 10, font: 'inherit' }} />
       {notice && <div className="msg bad" style={{ marginTop: 10 }}>{notice}</div>}
     </Modal>
   );
@@ -297,8 +298,8 @@ function PromoCodes({ bonus, dates, setDates, codes, setCodes }) {
   const generate = async () => {
     setError('');
     if (draft) {
-      if (!dates.startTime || !dates.endTime) return setError('Set both Valid from and Valid until');
-      if (dates.endTime <= dates.startTime) return setError('endTime: End time must be after start time');
+      if (!dates.startTime || !dates.endTime) return setError(NexLuckI18n.t("Set both Valid from and Valid until"));
+      if (dates.endTime <= dates.startTime) return setError(NexLuckI18n.t("endTime: End time must be after start time"));
       const code = 'PROMO-' + Array.from({ length: 8 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
       setCodes((items) => [...items, { code, startTime: dates.startTime, endTime: dates.endTime }]);
       return;
@@ -317,7 +318,7 @@ function PromoCodes({ bonus, dates, setDates, codes, setCodes }) {
     }
   };
   const remove = async (code) => {
-    if (!window.confirm(`Delete promo code ${code}?`)) return;
+    if (!window.confirm(NexLuckI18n.t("Delete promo code {value1}?", { value1: code }))) return;
     if (draft) return setCodes((items) => items.filter((item) => item.code !== code));
     setBusy(true);
     setError('');
@@ -337,7 +338,7 @@ function PromoCodes({ bonus, dates, setDates, codes, setCodes }) {
     const invalid = renames.find(([, next]) => !CODE_RE.test(next));
     if (invalid) return setError(`${invalid[1] || 'Code'}: use 4-32 characters: A-Z, 0-9, _ or -`);
     const finals = codes.map((c) => (renames.find(([old]) => old === c.code) || [0, c.code])[1]);
-    if (new Set(finals).size !== finals.length) return setError('Promo codes must be unique');
+    if (new Set(finals).size !== finals.length) return setError(NexLuckI18n.t("Promo codes must be unique"));
     const apply = (old, next) => {
       setCodes((items) => items.map((x) => (x.code === old ? { ...x, code: next } : x)));
       setEdits((e) => { const { [old]: _, ...rest } = e; return rest; });
@@ -363,40 +364,40 @@ function PromoCodes({ bonus, dates, setDates, codes, setCodes }) {
   return (
     <>
       <div className="promo-add">
-        <Field label="Valid from">
+        <Field label={NexLuckI18n.t("Valid from")}>
           <DateTime value={dates.startTime} onChange={(v) => setDates((d) => ({ ...d, startTime: v }))} />
         </Field>
-        <Field label="Valid until">
+        <Field label={NexLuckI18n.t("Valid until")}>
           <DateTime value={dates.endTime} onChange={(v) => setDates((d) => ({ ...d, endTime: v }))} />
         </Field>
-        <button type="button" className="btn pri" disabled={busy} onClick={generate}>Generate promo code</button>
+        <button type="button" className="btn pri" disabled={busy} onClick={generate}>{NexLuckI18n.t("Generate promo code")}</button>
       </div>
       {error && <div className="msg bad" style={{ marginTop: 10 }}>{error}</div>}
       {codes.length ? (
         <table className="promo-list">
-          <thead><tr><th>Promo code</th><th>Starts</th><th>Ends</th><th></th></tr></thead>
+          <thead><tr><th>{NexLuckI18n.t("Promo code")}</th><th>{NexLuckI18n.t("Starts")}</th><th>{NexLuckI18n.t("Ends")}</th><th></th></tr></thead>
           <tbody>{codes.map((item) => (
             <tr key={item.code}>
               <td>
                 <input type="text" className={'promo-code-input' + (edits[item.code] !== undefined && edits[item.code] !== item.code ? ' changed' : '')}
-                  aria-label={`Promo code ${item.code}`} maxLength={32} spellCheck="false" disabled={busy}
+                  aria-label={NexLuckI18n.t("Promo code {value1}", { value1: item.code })} maxLength={32} spellCheck="false" disabled={busy}
                   value={edits[item.code] ?? item.code}
                   onChange={(e) => { const v = e.target.value.toUpperCase().replace(/\s/g, ''); setEdits((m) => ({ ...m, [item.code]: v })); }} />
               </td>
               <td>{fmtDate(item.startTime, true)}</td>
               <td>{fmtDate(item.endTime, true)}</td>
-              <td><button type="button" className="btn" disabled={busy} onClick={() => remove(item.code)}>Delete</button></td>
+              <td><button type="button" className="btn" disabled={busy} onClick={() => remove(item.code)}>{NexLuckI18n.t("Delete")}</button></td>
             </tr>
           ))}</tbody>
         </table>
-      ) : <div className="promo-empty">No promo codes have been generated for this bonus.</div>}
+      ) : <div className="promo-empty">{NexLuckI18n.t("No promo codes have been generated for this bonus.")}</div>}
       {modified.length > 0 && (
         <div className="promo-save">
-          <button type="button" className="btn pri" disabled={busy} onClick={saveEdits}>Save promo codes</button>
-          <button type="button" className="btn" disabled={busy} onClick={() => { setEdits({}); setError(''); }}>Discard</button>
+          <button type="button" className="btn pri" disabled={busy} onClick={saveEdits}>{NexLuckI18n.t("Save promo codes")}</button>
+          <button type="button" className="btn" disabled={busy} onClick={() => { setEdits({}); setError(''); }}>{NexLuckI18n.t("Discard")}</button>
         </div>
       )}
-      {draft && codes.length > 0 && <div className="promo-empty">These codes are created together with the bonus.</div>}
+      {draft && codes.length > 0 && <div className="promo-empty">{NexLuckI18n.t("These codes are created together with the bonus.")}</div>}
     </>
   );
 }
@@ -435,15 +436,15 @@ function SatelliteMap({ title, items, centerInfo, onSelect, onClose }) {
   }, [items, title]);
 
   return (
-    <Modal title="Bonus satellite map" onClose={onClose} className="map-modal"
-      actions={<button type="button" className="btn pri" onClick={onClose}>Close map</button>}>
-      <p className="kvl">Choose a block to jump to it in the editor.</p>
+    <Modal title={NexLuckI18n.t("Bonus satellite map")} onClose={onClose} className="map-modal"
+      actions={<button type="button" className="btn pri" onClick={onClose}>{NexLuckI18n.t("Close map")}</button>}>
+      <p className="kvl">{NexLuckI18n.t("Choose a block to jump to it in the editor.")}</p>
       <div className="map-grid" ref={root}>
         <svg aria-hidden="true">{lines.map((line) => (
           <line key={line.id} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} />
         ))}</svg>
         <button type="button" className="map-node map-center" ref={center} onClick={() => onSelect('ce')}>
-          <small>Bonus</small><strong>{title || 'Untitled bonus'}</strong><span>{centerInfo}</span>
+          <small>{NexLuckI18n.t("Bonus")}</small><strong>{title || NexLuckI18n.t("Untitled bonus")}</strong><span>{NexLuckI18n.t(centerInfo)}</span>
         </button>
         {items.map((item) => (
           <button
@@ -464,7 +465,7 @@ const emptyBanner = () => ({
   buttons: { depositForSignedUsers: false, signUpForAnonymous: false },
   pages: { home: false, welcome: false },
 });
-const BANNER_IMAGES = [['web', 'Web'], ['tablet', 'Tablet'], ['mobile', 'Mobile']];
+const BANNER_IMAGES = [['web', NexLuckI18n.t("Web")], ['tablet', NexLuckI18n.t("Tablet")], ['mobile', NexLuckI18n.t("Mobile")]];
 const MAX_IMAGE_BYTES = 2_000_000;
 
 function PromoModal({ initial, segments, onSave, onClose }) {
@@ -493,46 +494,46 @@ function PromoModal({ initial, segments, onSave, onClose }) {
     }
   };
   return (
-    <Modal title="🖼️ Promo banner" className="promo-modal" onClose={onClose} actions={<>
-      <button className="btn" type="button" onClick={onClose}>Cancel</button>
-      <button className="btn pri" type="button" disabled={busy} onClick={save}>Save promo</button>
+    <Modal title={NexLuckI18n.t("🖼️ Promo banner")} className="promo-modal" onClose={onClose} actions={<>
+      <button className="btn" type="button" onClick={onClose}>{NexLuckI18n.t("Cancel")}</button>
+      <button className="btn pri" type="button" disabled={busy} onClick={save}>{NexLuckI18n.t("Save promo")}</button>
     </>}>
-      <p className="kvl">The banner that is shown on the casino web site for this bonus.</p>
+      <p className="kvl">{NexLuckI18n.t("The banner that is shown on the casino web site for this bonus.")}</p>
       <div className="promo-imgs">
         {BANNER_IMAGES.map(([k, label]) => (
-          <Field key={k} label={'Banner image: ' + label} error={errors['images.' + k]}>
+          <Field key={k} label={NexLuckI18n.t("Banner image: ") + label} error={errors['images.' + k]}>
             <div className={'img-prev img-' + k}>
-              {b.images[k] ? <img src={b.images[k]} alt={label + ' banner preview'} /> : <span>No image</span>}
+              {b.images[k] ? <img src={b.images[k]} alt={label + NexLuckI18n.t(" banner preview")} /> : <span>{NexLuckI18n.t("No image")}</span>}
             </div>
             <div className="img-acts">
               <label className="btn">
                 {b.images[k] ? 'Replace' : 'Upload'}
                 <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(e) => { upload(k, e.target.files[0]); e.target.value = ''; }} />
               </label>
-              {b.images[k] && <button type="button" className="btn" onClick={() => upd('images.' + k, null)}>Remove</button>}
+              {b.images[k] && <button type="button" className="btn" onClick={() => upd('images.' + k, null)}>{NexLuckI18n.t("Remove")}</button>}
             </div>
           </Field>
         ))}
       </div>
-      <Field label="Title (HTML)" error={errors.title}>
+      <Field label={NexLuckI18n.t("Title (HTML)")} error={errors.title}>
         <textarea className="code" rows="3" value={b.title} onChange={(e) => upd('title', e.target.value)} placeholder="<h2>Welcome bonus</h2>" />
       </Field>
-      <Field label="Full description (HTML)" error={errors.description}>
+      <Field label={NexLuckI18n.t("Full description (HTML)")} error={errors.description}>
         <textarea className="code" rows="6" value={b.description} onChange={(e) => upd('description', e.target.value)} placeholder="<p>Deposit and get 100% up to 100 EUR…</p>" />
       </Field>
-      <Field label="Show for segments" hint="Taken from the bonus Availability → Include segments.">
-        <div className="seg-ro">{segments.length ? segments.map((x) => <span key={x} className="chk on">{x}</span>) : <span className="kvl">No segments selected: shown to everyone.</span>}</div>
+      <Field label={NexLuckI18n.t("Show for segments")} hint={NexLuckI18n.t("Taken from the bonus Availability → Include segments.")}>
+        <div className="seg-ro">{segments.length ? segments.map((x) => <span key={x} className="chk on">{x}</span>) : <span className="kvl">{NexLuckI18n.t("No segments selected: shown to everyone.")}</span>}</div>
       </Field>
-      <Field label="Show buttons" error={errors['buttons.depositForSignedUsers'] || errors['buttons.signUpForAnonymous']}>
+      <Field label={NexLuckI18n.t("Show buttons")} error={errors['buttons.depositForSignedUsers'] || errors['buttons.signUpForAnonymous']}>
         <div className="chk-row">
           <Check label="DEPOSIT_FOR_SIGNED_USERS" path="buttons.depositForSignedUsers" form={b} set={upd} />
           <Check label="SIGN_UP_FOR_ANONYMOUS" path="buttons.signUpForAnonymous" form={b} set={upd} />
         </div>
       </Field>
-      <Field label="Show on pages" error={errors['pages.home'] || errors['pages.welcome']}>
+      <Field label={NexLuckI18n.t("Show on pages")} error={errors['pages.home'] || errors['pages.welcome']}>
         <div className="chk-row">
-          <Check label="Home page" path="pages.home" form={b} set={upd} />
-          <Check label="Welcome page" path="pages.welcome" form={b} set={upd} />
+          <Check label={NexLuckI18n.t("Home page")} path="pages.home" form={b} set={upd} />
+          <Check label={NexLuckI18n.t("Welcome page")} path="pages.welcome" form={b} set={upd} />
         </div>
       </Field>
       {error && <div className="msg bad">{error}</div>}
@@ -590,7 +591,7 @@ function Editor() {
       const c = refs.ce.current.getBoundingClientRect();
       const mid = (x) => ({ x: x.left + x.width / 2 - r.left, y: x.top + x.height / 2 - r.top });
       const cc = mid(c);
-      setLines(['av', 'tr', 'rw', 'gm', 'wg', 'wl', 'ab', 'pc'].filter((k) => refs[k].current).map((k) => {
+      setLines(['av', "tr", 'rw', 'gm', 'wg', 'wl', 'ab', 'pc'].filter((k) => refs[k].current).map((k) => {
         const b = refs[k].current.getBoundingClientRect();
         const p = mid(b);
         return { k, x1: cc.x, y1: cc.y, x2: p.x, y2: p.y };
@@ -603,21 +604,21 @@ function Editor() {
     return () => ro.disconnect();
   }, [!!form, !!orig]);
 
-  if (!form) return <><h1>🎁 {NEW ? 'New bonus' : 'Edit bonus'}</h1><p className="lead">Bonus configuration, grouped around the bonus itself.</p>{status ? <div className="msg bad">{status.text}</div> : <p>Loading…</p>}</>;
+  if (!form) return <><h1>🎁 {NEW ? NexLuckI18n.t("New bonus") : NexLuckI18n.t("Edit bonus")}</h1><p className="lead">{NexLuckI18n.t("Bonus configuration, grouped around the bonus itself.")}</p>{status ? <div className="msg bad">{status.text}</div> : <p>{NexLuckI18n.t("Loading…")}</p>}</>;
 
   const set = (path, v) => { setForm((f) => setIn(f, path, v)); setStatus(null); };
   const creating = NEW && !orig;
   const dirty = creating || JSON.stringify(form) !== JSON.stringify(pick(orig));
   const openRates = (amount) => setModal({ t: 'rates', amount });
   const mapItems = [
-    { id: 'av', title: 'Availability' },
-    { id: 'tr', title: 'Triggers on' },
-    { id: 'rw', title: 'Reward / value' },
-    { id: 'gm', title: 'Games' },
-    { id: 'wg', title: 'Wagering' },
-    { id: 'wl', title: 'Wallet rules' },
-    { id: 'ab', title: 'Anti-bonus-hunter' },
-    { id: 'pc', title: 'Promo codes' },
+    { id: 'av', title: NexLuckI18n.t("Availability") },
+    { id: 'tr', title: NexLuckI18n.t("Triggers on") },
+    { id: 'rw', title: NexLuckI18n.t("Reward / value") },
+    { id: 'gm', title: NexLuckI18n.t("Games") },
+    { id: 'wg', title: NexLuckI18n.t("Wagering") },
+    { id: 'wl', title: NexLuckI18n.t("Wallet rules") },
+    { id: 'ab', title: NexLuckI18n.t("Anti-bonus-hunter") },
+    { id: 'pc', title: NexLuckI18n.t("Promo codes") },
   ].map((item) => ({ ...item, info: SATELLITE_INFO[item.id] }));
   const selectMapNode = (id) => {
     setShowMap(false);
@@ -650,7 +651,7 @@ function Editor() {
         }
         setPromoDates({ startTime: b.availability.startTime, endTime: b.availability.endTime });
       }
-      setStatus(failed ? { bad: true, text: `Bonus created, but ${failed} promo code(s) could not be saved` } : { text: creating ? 'Bonus created' : 'Saved' });
+      setStatus(failed ? { bad: true, text: NexLuckI18n.t("Bonus created, but {value1} promo code(s) could not be saved", { value1: failed }) } : { text: creating ? 'Bonus created' : 'Saved' });
     } catch (e) {
       setErrors(e.fields || {});
       setStatus({ bad: true, text: e.status === 422 ? 'Please fix the highlighted fields' : e.message });
@@ -668,15 +669,15 @@ function Editor() {
 
   return (
     <>
-      <h1>🎁 {creating ? 'New bonus' : 'Edit bonus'}</h1>
-      <p className="lead">Bonus configuration, grouped around the bonus itself.</p>
+      <h1>🎁 {creating ? NexLuckI18n.t("New bonus") : NexLuckI18n.t("Edit bonus")}</h1>
+      <p className="lead">{NexLuckI18n.t("Bonus configuration, grouped around the bonus itself.")}</p>
       <div className="bar">
-        <a className="btn" href="/crm/b/">← Back to list</a>
+        <a className="btn" href="/crm/b/">{NexLuckI18n.t("← Back to list")}</a>
         <span className="sp" />
         {status && <span className={'msg ' + (status.bad ? 'bad' : 'ok')} role="status">{status.text}</span>}
-        <button className="btn" disabled={!dirty || busy} onClick={() => { setForm(creating ? emptyBonus() : pick(orig)); setErrors({}); setStatus(null); }}>Discard</button>
-        <button className="btn" type="button" onClick={() => setShowMap(true)}>Map</button>
-        <button className="btn pri" disabled={!dirty || busy} onClick={save}>{creating ? 'Create bonus' : 'Save changes'}</button>
+        <button className="btn" disabled={!dirty || busy} onClick={() => { setForm(creating ? emptyBonus() : pick(orig)); setErrors({}); setStatus(null); }}>{NexLuckI18n.t("Discard")}</button>
+        <button className="btn" type="button" onClick={() => setShowMap(true)}>{NexLuckI18n.t("Map")}</button>
+        <button className="btn pri" disabled={!dirty || busy} onClick={save}>{creating ? NexLuckI18n.t("Create bonus") : NexLuckI18n.t("Save changes")}</button>
       </div>
 
       <div className="sat" ref={root}>
@@ -684,74 +685,77 @@ function Editor() {
 
         <section className={'card center' + (highlighted === 'ce' ? ' map-highlight' : '')} ref={refs.ce} tabIndex="-1">
           <div className="title-row">
-            <h3>🎁 Bonus</h3>
-            <button className="btn" type="button" onClick={() => setModal({ t: 'promo' })}>Promo</button>
+            <h3>{NexLuckI18n.t("🎁 Bonus")}</h3>
+            <button className="btn" type="button" onClick={() => setModal({ t: 'promo' })}>{NexLuckI18n.t("Promo")}</button>
           </div>
-          <Field label="Name" error={errors.name}><input type="text" value={form.name} maxLength={120} onChange={(e) => set('name', e.target.value)} /></Field>
-          <Field label="ID"><div className="ro">{orig ? orig.id : 'Assigned when saved'}</div></Field>
-          <Field label="Description" error={errors.description}><textarea value={form.description} onChange={(e) => set('description', e.target.value)} /></Field>
+          <Field label={NexLuckI18n.t("Name")} error={errors.name}><input type="text" value={form.name} maxLength={120} onChange={(e) => set('name', e.target.value)} /></Field>
+          <Field label="ID"><div className="ro">{orig ? orig.id : NexLuckI18n.t("Assigned when saved")}</div></Field>
+          <Field label={NexLuckI18n.t("Description")} error={errors.description}><textarea value={form.description} onChange={(e) => set('description', e.target.value)} /></Field>
           <div className="two">
-            <Select label="Status" path="status" options={['active', 'inactive']} labels={{ active: 'ACTIVE', inactive: 'NOT ACTIVE' }} {...p} />
-            <Select label="Bonus type" path="bonusType" options={TYPES} {...p} />
+            <Select label={NexLuckI18n.t("Status")} path="status" options={['active', 'inactive']} labels={{ active: 'ACTIVE', inactive: 'NOT ACTIVE' }} {...p} />
+            <Select label={NexLuckI18n.t("Bonus type")} path="bonusType" options={TYPES} {...p} />
           </div>
-          <Field label="Category" error={errors.category}>
-            <button type="button" className="pick dropdown-control" onClick={() => setModal({ t: 'cat' })}><span>{form.category || 'Select category…'}</span></button>
+          <Field label={NexLuckI18n.t("Category")} error={errors.category}>
+            <button type="button" className="pick dropdown-control" onClick={() => setModal({ t: 'cat' })}><span>{form.category || NexLuckI18n.t("Select category…")}</span></button>
           </Field>
           <div className="two">
-            <Field label="Created at"><div className="ro">{orig ? fmtDate(orig.createdAt) : 'Assigned when saved'}</div></Field>
-            <Field label="Created by"><div className="ro">{orig ? orig.createdBy : 'Assigned when saved'}</div></Field>
+            <Field label={NexLuckI18n.t("Created at")}><div className="ro">{orig ? fmtDate(orig.createdAt) : NexLuckI18n.t("Assigned when saved")}</div></Field>
+            <Field label={NexLuckI18n.t("Created by")}><div className="ro">{orig ? orig.createdBy : NexLuckI18n.t("Assigned when saved")}</div></Field>
           </div>
-          {orig && <button type="button" className="link" onClick={() => setModal({ t: 'log' })}>Changelog →</button>}
+          {orig && <button type="button" className="link" onClick={() => setModal({ t: 'log' })}>{NexLuckI18n.t("Changelog →")}</button>}
         </section>
 
         <section className={'card' + (highlighted === 'av' ? ' map-highlight' : '')} style={{ gridArea: 'av', '--c': '#2e844a' }} ref={refs.av} tabIndex="-1">
-          <h3>Availability</h3>
-          <Field label="Start time" error={errors['availability.startTime']}><DateTime value={form.availability.startTime} onChange={(v) => set('availability.startTime', v)} /></Field>
-          <Field label="End time" error={errors['availability.endTime']}><DateTime value={form.availability.endTime} onChange={(v) => set('availability.endTime', v)} /></Field>
-          <AvailabilitySegments label="Include segments" path="availability.includeSegments" {...p} onOpen={selection => setModal({ t: 'segments', ...selection })} />
-          <AvailabilitySegments label="Exclude segments" path="availability.excludeSegments" {...p} onOpen={selection => setModal({ t: 'segments', ...selection })} />
+          <h3>{NexLuckI18n.t("Availability")}</h3>
+          <Field label={NexLuckI18n.t("Start time")} error={errors['availability.startTime']}><DateTime value={form.availability.startTime} onChange={(v) => set('availability.startTime', v)} /></Field>
+          <Field label={NexLuckI18n.t("End time")} error={errors['availability.endTime']}><DateTime value={form.availability.endTime} onChange={(v) => set('availability.endTime', v)} /></Field>
+          <AvailabilitySegments label={NexLuckI18n.t("Include segments")} path="availability.includeSegments" {...p} onOpen={selection => setModal({ t: 'segments', ...selection })} />
+          <AvailabilitySegments label={NexLuckI18n.t("Exclude segments")} path="availability.excludeSegments" {...p} onOpen={selection => setModal({ t: 'segments', ...selection })} />
         </section>
 
         <section className={'card' + (highlighted === 'tr' ? ' map-highlight' : '')} style={{ gridArea: 'tr', '--c': '#c9780a' }} ref={refs.tr} tabIndex="-1">
-          <h3>Triggers on</h3>
-          <Select label="Event" path="triggers.event" options={['on_registration', 'on_deposit']} {...p} />
-          <Money label="Min deposit" path="triggers.minDeposit" {...p} />
-          <Money label="Max deposit" path="triggers.maxDeposit" {...p} />
-          <Num label="Deposit number" path="triggers.depositNumber" int {...p} />
+          <h3>{NexLuckI18n.t("Triggers on")}</h3>
+          <Select label={NexLuckI18n.t("Event")} path="triggers.event" options={['on_registration', 'on_deposit']} {...p} />
+          <Money label={NexLuckI18n.t("Min deposit")} path="triggers.minDeposit" {...p} />
+          <Money label={NexLuckI18n.t("Max deposit")} path="triggers.maxDeposit" {...p} />
+          <Num label={NexLuckI18n.t("Deposit number")} path="triggers.depositNumber" int {...p} />
           <div className="two">
-            <Num label="Min deposit count" hint="Minimum number of deposits the player has made. Leave empty for no minimum." path="triggers.minDepositCount" int {...p} />
-            <Num label="Max deposit count" hint="Maximum number of deposits the player has made. Leave empty for no maximum." path="triggers.maxDepositCount" int {...p} />
+            <Num label={NexLuckI18n.t("Min deposit count")} hint={NexLuckI18n.t("Minimum number of deposits the player has made. Leave empty for no minimum.")} path="triggers.minDepositCount" int {...p} />
+            <Num label={NexLuckI18n.t("Max deposit count")} hint={NexLuckI18n.t("Maximum number of deposits the player has made. Leave empty for no maximum.")} path="triggers.maxDepositCount" int {...p} />
           </div>
         </section>
 
         <section className={'card' + (highlighted === 'rw' ? ' map-highlight' : '')} style={{ gridArea: 'rw', '--c': '#7b3fc4' }} ref={refs.rw} tabIndex="-1">
-          <h3>Reward / value</h3>
-          <div className="seg" role="group" aria-label="Reward type">
-            <button type="button" aria-pressed={!freeSpinMode} onClick={() => set('reward.mode', 'BONUS_MONEY')}>Bonus money</button>
-            <button type="button" aria-pressed={freeSpinMode} onClick={() => set('reward.mode', 'FREE_SPINS')}>Free spins</button>
+          <h3>{NexLuckI18n.t("Reward / value")}</h3>
+          <div className="seg" role="group" aria-label={NexLuckI18n.t("Reward type")}>
+            <button type="button" aria-pressed={!freeSpinMode} onClick={() => set('reward.mode', 'BONUS_MONEY')}>{NexLuckI18n.t("Bonus money")}</button>
+            <button type="button" aria-pressed={freeSpinMode} onClick={() => set('reward.mode', 'FREE_SPINS')}>{NexLuckI18n.t("Free spins")}</button>
           </div>
           {freeSpinMode ? (
             <>
-              <Num label="Spin quantity" path="reward.freeSpins.quantity" int {...p} />
-              <Num label="Distribution: spins per day" hint="Free spins are credited in daily portions. Example: 100 free spins split as 20 spins/day for 5 days." path="reward.freeSpins.spinsPerDay" int {...p} />
+              <Num label={NexLuckI18n.t("Spin quantity")} path="reward.freeSpins.quantity" int {...p} />
+              <Num label={NexLuckI18n.t("Distribution: spins per day")} hint={NexLuckI18n.t("Free spins are credited in daily portions. Example: 100 free spins split as 20 spins/day for 5 days.")} path="reward.freeSpins.spinsPerDay" int {...p} />
               <div className="calc">
-                <span className="lbl">Distribution</span>
-                <b>{spinDays ? `${spinQty} free spins split as ${spinsPerDay} spins/day for ${spinDays} day${spinDays === 1 ? '' : 's'}` : '—'}</b>
-                {spinDays > 0 && spinQty % spinsPerDay !== 0 && <div className="kvl" style={{ margin: '6px 0 0' }}>The last day gets the remaining {spinQty % spinsPerDay} spins.</div>}
+                <span className="lbl">{NexLuckI18n.t("Distribution")}</span>
+                <b>{spinDays ? NexLuckI18n.t('{quantity} free spins split as {perDay} spins/day for {duration}', {
+                  quantity: spinQty, perDay: spinsPerDay,
+                  duration: new Intl.NumberFormat(NexLuckI18n.formatLocale, { style: 'unit', unit: 'day', unitDisplay: 'long' }).format(spinDays)
+                }) : '—'}</b>
+                {spinDays > 0 && spinQty % spinsPerDay !== 0 && <div className="kvl" style={{ margin: '6px 0 0' }}>{NexLuckI18n.t("The last day gets the remaining ")}{spinQty % spinsPerDay}{NexLuckI18n.t(" spins.")}</div>}
               </div>
             </>
           ) : (
             <>
-              <Field label="Deposit match percentage (DMP)" hint={DMP_HINT} error={errors['reward.dmp']}>
+              <Field label={NexLuckI18n.t("Deposit match percentage (DMP)")} hint={DMP_HINT} error={errors['reward.dmp']}>
                 <div className="money"><input type="number" min="0" step="any" value={form.reward.dmp ?? ''} onChange={(e) => set('reward.dmp', e.target.value === '' ? '' : Number(e.target.value))} /><span className="cur" style={{ textDecoration: 'none', cursor: 'default', display: 'grid', placeItems: 'center' }}>%</span></div>
               </Field>
-              <Money label="Max bonus amount (MBA)" path="reward.maxBonusAmount" {...p} />
+              <Money label={NexLuckI18n.t("Max bonus amount (MBA)")} path="reward.maxBonusAmount" {...p} />
               <div className="calc">
-                <span className="lbl">Bonus amount (calculated)<Hint text={BONUS_AMOUNT_HINT} /></span>
-                <b>{fmt(calculated)} EUR</b>
+                <span className="lbl">{NexLuckI18n.t("Bonus amount (calculated)")}<Hint text={BONUS_AMOUNT_HINT} /></span>
+                <b>{fmt(calculated)}{NexLuckI18n.t(" EUR")}</b>
                 <div className="kvl" style={{ margin: '6px 0 0' }}>
-                  {dmp === 0 ? 'DMP is 0, so the bonus equals MBA.' : <>for a sample deposit of{' '}
-                  <input type="number" min="0" value={sample} onChange={(e) => setSample(e.target.value === '' ? '' : Number(e.target.value))} style={{ width: 80, padding: '2px 6px', border: '1px solid var(--line)', borderRadius: 4 }} /> EUR</>}
+                  {dmp === 0 ? NexLuckI18n.t("DMP is 0, so the bonus equals MBA.") : <>{NexLuckI18n.t("for a sample deposit of")}{' '}
+                  <input type="number" min="0" value={sample} onChange={(e) => setSample(e.target.value === '' ? '' : Number(e.target.value))} style={{ width: 80, padding: '2px 6px', border: '1px solid var(--line)', borderRadius: 4 }} />{NexLuckI18n.t(" EUR")}</>}
                 </div>
               </div>
             </>
@@ -759,15 +763,15 @@ function Editor() {
         </section>
 
         <section className={'card' + (highlighted === 'gm' ? ' map-highlight' : '')} style={{ gridArea: 'gm', '--c': '#4b5ec9' }} ref={refs.gm} tabIndex="-1">
-          <h3>Games</h3>
-          <div className="seg" role="group" aria-label="Link bonus to">
-            <button type="button" aria-pressed={form.games.linkType === 'categories'} onClick={() => set('games.linkType', 'categories')}>Categories</button>
-            <button type="button" aria-pressed={form.games.linkType === 'game'} onClick={() => set('games.linkType', 'game')}>Single game</button>
+          <h3>{NexLuckI18n.t("Games")}</h3>
+          <div className="seg" role="group" aria-label={NexLuckI18n.t("Link bonus to")}>
+            <button type="button" aria-pressed={form.games.linkType === 'categories'} onClick={() => set('games.linkType', 'categories')}>{NexLuckI18n.t("Categories")}</button>
+            <button type="button" aria-pressed={form.games.linkType === 'game'} onClick={() => set('games.linkType', 'game')}>{NexLuckI18n.t("Single game")}</button>
           </div>
-          {form.games.linkType === 'game' ? (
-            <Field label="Game" error={errors['games.game']}>
+          {form.games.linkType === "game" ? (
+            <Field label={NexLuckI18n.t("Game")} error={errors['games.game']}>
               <select value={form.games.game ?? ''} onChange={(e) => set('games.game', e.target.value)}>
-                <option value="">Select a game…</option>
+                <option value="">{NexLuckI18n.t("Select a game…")}</option>
                 {[...new Set(games.map(g => g.category))].map(cat => (
                   <optgroup key={cat} label={cat || 'Uncategorized'}>{games.filter((g) => g.category === cat).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</optgroup>
                 ))}
@@ -775,83 +779,83 @@ function Editor() {
             </Field>
           ) : (
             <>
-              <Multi label="Game categories" path="games.categories" options={CATEGORIES.map(([c]) => c)} {...p} />
-              <div className="kvl" style={{ margin: 0 }}>Leave empty to allow all games.</div>
+              <Multi label={NexLuckI18n.t("Game categories")} path="games.categories" options={CATEGORIES.map(([c]) => c)} {...p} />
+              <div className="kvl" style={{ margin: 0 }}>{NexLuckI18n.t("Leave empty to allow all games.")}</div>
             </>
           )}
         </section>
 
         <section className={'card' + (highlighted === 'wg' ? ' map-highlight' : '')} style={{ gridArea: 'wg', '--c': '#c23934' }} ref={refs.wg} tabIndex="-1">
-          <h3>Wagering</h3>
-          <Num label="Multiplier" path="wagering.multiplier" {...p} />
-          <Num label="Time to complete (days)" path="wagering.timeToCompleteDays" int {...p} />
-          <Select label="Applies to" hint={APPLIES_HINT} path="wagering.appliesTo" options={APPLIES} {...p} />
-          <Field label="Max withdraw cap" error={errors['wagering.maxWithdrawCap.type']}>
+          <h3>{NexLuckI18n.t("Wagering")}</h3>
+          <Num label={NexLuckI18n.t("Multiplier")} path="wagering.multiplier" {...p} />
+          <Num label={NexLuckI18n.t("Time to complete (days)")} path="wagering.timeToCompleteDays" int {...p} />
+          <Select label={NexLuckI18n.t("Applies to")} hint={APPLIES_HINT} path="wagering.appliesTo" options={APPLIES} {...p} />
+          <Field label={NexLuckI18n.t("Max withdraw cap")} error={errors['wagering.maxWithdrawCap.type']}>
             <div className="two">
               <select value={cap.type} onChange={(e) => set('wagering.maxWithdrawCap.type', e.target.value)}>
-                <option value="">Select…</option>
-                <option value="MULTIPLIER">MULTIPLIER</option><option value="FIXED">FIXED</option>
+                <option value="">{NexLuckI18n.t("Select…")}</option>
+                <option value="MULTIPLIER">{NexLuckI18n.t("MULTIPLIER")}</option><option value="FIXED">{NexLuckI18n.t("FIXED")}</option>
               </select>
               {cap.type === 'FIXED' ? (
                 <div className="money">
-                  <input type="number" min="0" step="any" aria-label="Cap value" value={cap.value ?? ''} onChange={(e) => set('wagering.maxWithdrawCap.value', e.target.value === '' ? '' : Number(e.target.value))} />
-                  <button type="button" className="cur" onClick={() => openRates(Number(cap.value) || 0)}>EUR</button>
+                  <input type="number" min="0" step="any" aria-label={NexLuckI18n.t("Cap value")} value={cap.value ?? ''} onChange={(e) => set('wagering.maxWithdrawCap.value', e.target.value === '' ? '' : Number(e.target.value))} />
+                  <button type="button" className="cur" onClick={() => openRates(Number(cap.value) || 0)}>{NexLuckI18n.t("EUR")}</button>
                 </div>
               ) : (
-                <div className="money"><input type="number" min="0" step="any" aria-label="Cap multiplier" value={cap.value ?? ''} onChange={(e) => set('wagering.maxWithdrawCap.value', e.target.value === '' ? '' : Number(e.target.value))} /><span className="cur" style={{ textDecoration: 'none', cursor: 'default', display: 'grid', placeItems: 'center' }}>×</span></div>
+                <div className="money"><input type="number" min="0" step="any" aria-label={NexLuckI18n.t("Cap multiplier")} value={cap.value ?? ''} onChange={(e) => set('wagering.maxWithdrawCap.value', e.target.value === '' ? '' : Number(e.target.value))} /><span className="cur" style={{ textDecoration: 'none', cursor: 'default', display: 'grid', placeItems: 'center' }}>×</span></div>
               )}
             </div>
-            {errors['wagering.maxWithdrawCap.value'] && <span className="emsg">{errors['wagering.maxWithdrawCap.value']}</span>}
+            {errors[NexLuckI18n.t("wagering.maxWithdrawCap.value")] && <span className="emsg">{errors[NexLuckI18n.t("wagering.maxWithdrawCap.value")]}</span>}
           </Field>
         </section>
 
         <section className={'card' + (highlighted === 'wl' ? ' map-highlight' : '')} style={{ gridArea: 'wl', '--c': '#0b7a75' }} ref={refs.wl} tabIndex="-1">
-          <h3>Wallet rules</h3>
+          <h3>{NexLuckI18n.t("Wallet rules")}</h3>
           <div className="two">
-            <Select label="Deduction" path="walletRules.deduction" options={WALLET} {...p} />
-            <Select label="Winnings" path="walletRules.winnings" options={WALLET} {...p} />
+            <Select label={NexLuckI18n.t("Deduction")} path="walletRules.deduction" options={WALLET} {...p} />
+            <Select label={NexLuckI18n.t("Winnings")} path="walletRules.winnings" options={WALLET} {...p} />
           </div>
-          <Check label="Allow to cancel before wagering" path="walletRules.allowCancelBeforeWagering" {...p} />
-          <Check label="Allow withdraw before wagering" path="walletRules.allowWithdrawBeforeWagering" {...p} />
+          <Check label={NexLuckI18n.t("Allow to cancel before wagering")} path="walletRules.allowCancelBeforeWagering" {...p} />
+          <Check label={NexLuckI18n.t("Allow withdraw before wagering")} path="walletRules.allowWithdrawBeforeWagering" {...p} />
         </section>
 
         <section className={'card' + (highlighted === 'ab' ? ' map-highlight' : '')} style={{ gridArea: 'ab', '--c': '#8b3a62' }} ref={refs.ab} tabIndex="-1">
-          <h3>Anti-bonus-hunter</h3>
+          <h3>{NexLuckI18n.t("Anti-bonus-hunter")}</h3>
           <div className="two">
-            <Num label="Max claims per IP" path="antiBonusHunter.maxClaimsPerIp" int {...p} />
-            <Num label="Max claims per device" path="antiBonusHunter.maxClaimsPerDevice" int {...p} />
+            <Num label={NexLuckI18n.t("Max claims per IP")} path="antiBonusHunter.maxClaimsPerIp" int {...p} />
+            <Num label={NexLuckI18n.t("Max claims per device")} path="antiBonusHunter.maxClaimsPerDevice" int {...p} />
           </div>
-          <Check label="Block shared IP subnets" path="antiBonusHunter.blockSharedIpSubnets" {...p} />
-          <Check label="Block known VPNs and proxies" path="antiBonusHunter.blockKnownVpnsAndProxies" {...p} />
-          <Multi label="Payment method blacklist" path="antiBonusHunter.paymentMethodBlacklist" options={PAYMENT_METHODS} {...p} />
-          <Select label="Require KYC level before claim" path="antiBonusHunter.requireKycLevelBeforeClaim" options={KYC_LEVELS} {...p} />
-          <Money label="Max bet per round" path="antiBonusHunter.maxBetPerRound" {...p} />
-          <Num label="Max bet percentage of bonus" hint="Restricts a single wager from exceeding a percentage of the total awarded bonus balance." path="antiBonusHunter.maxBetPercentageOfBonus" {...p} />
-          <Check label="Restrict zero risk betting" path="antiBonusHunter.restrictZeroRiskBetting" {...p} />
-          <Num label="Anti-hedging threshold" hint={ANTI_HEDGING_HINT} path="antiBonusHunter.minEvenMoneyCoveragePercentage" {...p} />
+          <Check label={NexLuckI18n.t("Block shared IP subnets")} path="antiBonusHunter.blockSharedIpSubnets" {...p} />
+          <Check label={NexLuckI18n.t("Block known VPNs and proxies")} path="antiBonusHunter.blockKnownVpnsAndProxies" {...p} />
+          <Multi label={NexLuckI18n.t("Payment method blacklist")} path="antiBonusHunter.paymentMethodBlacklist" options={PAYMENT_METHODS} {...p} />
+          <Select label={NexLuckI18n.t("Require KYC level before claim")} path="antiBonusHunter.requireKycLevelBeforeClaim" options={KYC_LEVELS} {...p} />
+          <Money label={NexLuckI18n.t("Max bet per round")} path="antiBonusHunter.maxBetPerRound" {...p} />
+          <Num label={NexLuckI18n.t("Max bet percentage of bonus")} hint={NexLuckI18n.t("Restricts a single wager from exceeding a percentage of the total awarded bonus balance.")} path="antiBonusHunter.maxBetPercentageOfBonus" {...p} />
+          <Check label={NexLuckI18n.t("Restrict zero risk betting")} path="antiBonusHunter.restrictZeroRiskBetting" {...p} />
+          <Num label={NexLuckI18n.t("Anti-hedging threshold")} hint={ANTI_HEDGING_HINT} path="antiBonusHunter.minEvenMoneyCoveragePercentage" {...p} />
         </section>
 
         <section className={'card' + (highlighted === 'pc' ? ' map-highlight' : '')} style={{ gridArea: 'pc', '--c': '#087f8c' }} ref={refs.pc} tabIndex="-1">
-          <h3>Promo codes</h3>
+          <h3>{NexLuckI18n.t("Promo codes")}</h3>
           <PromoCodes bonus={orig} dates={creating ? { startTime: promoDates.startTime || form.availability.startTime, endTime: promoDates.endTime || form.availability.endTime } : promoDates} setDates={setPromoDates} codes={promoCodes} setCodes={setPromoCodes} />
         </section>
       </div>
 
-      {modal && modal.t === 'rates' && <RatesModal amount={modal.amount} onClose={() => setModal(null)} />}
-      {modal && modal.t === 'segments' && <SegmentWidget state={segmentState}
+      {modal && modal.t === "rates" && <RatesModal amount={modal.amount} onClose={() => setModal(null)} />}
+      {modal && modal.t === "segments" && <SegmentWidget state={segmentState}
         selected={get(form, modal.path) || []} extraNames={[...(modal.path === 'availability.includeSegments' ? INCLUDE : EXCLUDE), ...(get(form, modal.path) || [])]}
         onClose={() => setModal(null)} onSelect={({ name }) => {
           const values = get(form, modal.path) || [];
           set(modal.path, values.includes(name) ? values.filter(value => value !== name) : [...values, name]);
         }} />}
-      {modal && modal.t === 'cat' && <CategoryModal value={form.category} onPick={(c) => set('category', c)} onClose={() => setModal(null)} />}
-      {modal && modal.t === 'promo' && <PromoModal initial={banner} segments={form.availability.includeSegments || []} onClose={() => setModal(null)} onSave={async (b) => {
+      {modal && modal.t === "cat" && <CategoryModal value={form.category} onPick={(c) => set('category', c)} onClose={() => setModal(null)} />}
+      {modal && modal.t === "promo" && <PromoModal initial={banner} segments={form.availability.includeSegments || []} onClose={() => setModal(null)} onSave={async (b) => {
         if (creating) { setBanner(b); setBannerDirty(true); }
         else setBanner(await api(`/bonuses/${orig.id}/promo-banner`, { method: 'PUT', body: JSON.stringify(b) }));
         setModal(null);
         setStatus({ text: creating ? 'Promo will be saved with the bonus' : 'Promo saved' });
       }} />}
-      {modal && modal.t === 'log' && <ChangelogModal id={orig.id} onClose={() => setModal(null)} />}
+      {modal && modal.t === "log" && <ChangelogModal id={orig.id} onClose={() => setModal(null)} />}
       {showAIAgent && creating && <AIAgentModal onClose={() => { setShowAIAgent(false); history.replaceState(null, '', '/crm/b/e/?new=1'); }} />}
       {showMap && <SatelliteMap title={form.name} items={mapItems} centerInfo={SATELLITE_INFO.ce} onSelect={selectMapNode} onClose={() => setShowMap(false)} />}
     </>

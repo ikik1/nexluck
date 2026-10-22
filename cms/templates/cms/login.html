@@ -1,4 +1,4 @@
-{% extends "cms/base.html" %}{% block content %}
-<main class="login-panel"><h1>Sign in to CMS</h1><p>Use your CMS staff account. CRM demo identity does not grant CMS access.</p>
-<form method="post">{% csrf_token %}{{ form.as_p }}<input type="hidden" name="next" value="{{ next }}"><button class="primary">Sign in</button></form></main>
+{% extends "cms/base.html" %}{% load cms_i18n %}{% block content %}
+<main class="login-panel"><h1>{% cms_t "Sign in to CMS" %}</h1><p>{% cms_t "Use your CMS staff account. CRM demo identity does not grant CMS access." %}</p>
+<form method="post">{% csrf_token %}{{ form.as_p }}<input type="hidden" name="next" value="{{ next }}"><button class="primary">{% cms_t "Sign in" %}</button></form></main>
 {% endblock %}

@@ -1,4 +1,6 @@
-{% extends "cms/base.html" %}{% load static %}
-{% block title %}CMS modules API{% endblock %}
-{% block head %}<link rel="stylesheet" href="{% static 'docs.css' %}">{% endblock %}
-{% block content %}<main class="cms-main"><h1>Frontend modules REST API</h1><p>Staff session required. Public pages consume only their published widget configuration.</p><div id="swagger-ui"></div></main><script type="module" src="{% static 'docs.js' %}"></script>{% endblock %}
+{% extends "cms/base.html" %}{% load cms_i18n %}{% load static %}
+{% block title %}{% cms_t "CMS modules API" %}{% endblock %}
+{% block head %}<style>.api-endpoint{margin:24px 0;padding:20px;border:1px solid var(--line);border-radius:10px}.api-endpoint label{display:flex;flex-direction:column;gap:6px;margin:12px 0;max-width:600px}.api-endpoint pre{white-space:pre-wrap;overflow-wrap:anywhere}.api-endpoint summary{cursor:pointer;font-family:monospace}</style>{% endblock %}
+{% block content %}<main class="cms-main"><h1>{% cms_t "Frontend modules REST API" %}</h1><p>{% cms_t "Staff session required. Public pages consume only their published widget configuration." %}</p>
+<nav aria-label="{% cms_t 'CMS modules API' %}"><a href="/cms/api/">{% cms_t "Localized API reference" %}</a> · <a href="/cms/api/?view=swagger">{% cms_t "Swagger UI" %}</a> · <a href="/cms/api/openapi.json">{% cms_t "OpenAPI JSON" %}</a></nav>
+<div id="swagger-ui"></div></main><script type="module" src="{% static 'docs.js' %}"></script>{% endblock %}

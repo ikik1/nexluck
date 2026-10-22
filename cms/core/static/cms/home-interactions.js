@@ -1,4 +1,5 @@
 (() => {
+  const t = (source, params) => window.CMSWebsiteI18n.t(source, params);
   let toastTimer;
   let menuTrigger;
   const notify = text => {
@@ -24,12 +25,12 @@
       const input = document.querySelector('.home-search input');
       input?.scrollIntoView({ block: 'center' }); input?.focus();
     }
-    if (action === 'deposit') notify('Demo only: deposits are not connected.');
+    if (action === 'deposit') notify(t('Demo only: deposits are not connected.'));
     if (action === 'mode') {
       const sports = document.body.dataset.mode !== 'sports';
       document.body.dataset.mode = sports ? 'sports' : 'casino';
       document.querySelectorAll('.module-games,.module-categories,.module-providers').forEach(node => { node.hidden = sports; });
-      button.querySelector('small').textContent = sports ? 'Casino' : 'Sport';
+      button.querySelector('small').textContent = sports ? t('Casino') : t('Sport');
     }
     if (button.dataset.slide) {
       button.closest('[data-block-key]').querySelector('.home-promo-track')?.scrollBy({ left: Number(button.dataset.slide) * 300, behavior: 'smooth' });
