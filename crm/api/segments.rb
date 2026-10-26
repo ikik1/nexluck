@@ -82,12 +82,21 @@ module CustomerSegments
 
   def self.validate(body, parameters = PARAMETERS)
     errors = {}
-    (body.keys - %w[name rules]).each { |k| errors[k] = 'Unknown or read-only field' }
+    (body.keys - %w[name tag_name rules]).each { |k| errors[k] = 'Unknown or read-only field' }
     name = body['name']
     errors['name'] = 'Supply a name of 1 to 200 characters' unless name.is_a?(String) && name.strip.length.between?(1, 200)
+    tag_name = body['tag_name']
+    unless tag_name.nil? || (tag_name.is_a?(String) && tag_name.strip.length <= 200 && !tag_name.include?("\u0000"))
+      errors['tag_name'] = 'Supply a tag name of up to 200 characters, or leave it blank'
+    end
     count = [0]
     validate_node(body['rules'], 'rules', 0, count, errors, parameters.map { |parameter| [parameter['key'], parameter] }.to_h)
-    [errors.empty? ? { 'name' => name.strip, 'rules' => normalize(body['rules']) } : nil, errors]
+    return [nil, errors] unless errors.empty?
+
+    clean = { 'name' => name.strip, 'rules' => normalize(body['rules']) }
+    # A blank or null tag_name clears the friendly label; an omitted key lets the store keep the previous one.
+    clean['tag_name'] = tag_name.strip if tag_name.is_a?(String) && !tag_name.strip.empty?
+    [clean, errors]
   end
 
   def self.normalize(node)

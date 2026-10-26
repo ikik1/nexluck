@@ -174,6 +174,36 @@ class CustomerStoreTest < Minitest::Test
     end
   end
 
+  def test_segment_tag_name_is_optional_preserved_and_clearable
+    body = JSON.parse(JSON.generate(CustomerSegments::SEEDS.first)).slice('name', 'rules')
+    legacy = @store.segment('SG-1001')
+    refute legacy.key?('tag_name')
+    edited, errors = @store.save_segment('SG-1001', body)
+    assert_empty errors
+    refute edited.key?('tag_name')
+    tagged, errors = @store.save_segment('SG-1001', body.merge('tag_name' => '  Registered players  '))
+    assert_empty errors
+    assert_equal 'Registered players', tagged['tag_name']
+    assert_equal 'REGISTERED', tagged['name']
+    kept, errors = @store.save_segment('SG-1001', body)
+    assert_empty errors
+    assert_equal 'Registered players', kept['tag_name']
+    assert_equal kept, CustomerStore.new.segment('SG-1001')
+    [nil, '', '   '].each do |blank|
+      cleared, errors = @store.save_segment('SG-1001', body.merge('tag_name' => blank))
+      assert_empty errors
+      refute cleared.key?('tag_name')
+    end
+    [42, 'x' * 201, "bad\u0000"].each do |invalid|
+      saved, errors = @store.save_segment('SG-1001', body.merge('tag_name' => invalid))
+      assert_nil saved
+      assert errors.key?('tag_name')
+    end
+    saved, errors = @store.save_segment('SG-1001', body.merge('risk_score' => 40))
+    assert_nil saved
+    assert errors.key?('risk_score')
+  end
+
   def test_segment_depth_and_size_limits
     rule = CustomerSegments::SEEDS.first['rules']['children'].first
     group = ->(children) { { 'kind' => 'group', 'operator' => 'AND', 'not' => false, 'children' => children } }

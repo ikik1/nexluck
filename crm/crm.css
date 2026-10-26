@@ -69,3 +69,10 @@ footer a{color:var(--brand)}footer a:hover{text-decoration:underline}
 @media(max-width:800px){#hdr .right{margin-left:0}.crm-context{width:100%;margin:0}.crm-context select{max-width:calc(100vw - 120px);flex:1}}
 .language-choice{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:12px}.language-choice select{font:inherit;padding:6px 30px 6px 10px;min-width:100px;border:1px solid #c9d2dc;border-radius:5px;background-color:#fff;color:#243746}
 @media(max-width:800px){#hdr .right{flex-wrap:wrap}.language-choice{margin-left:auto}}
+/* Risk segment tags (technical name risk_*): colour follows the casino risk matrix score. */
+.segment-risk.segment-risk.segment-risk-low,.segment-risk-score.segment-risk-low{background:#fff3d6;color:#8a5a00;border-color:#f5b942}
+.segment-risk.segment-risk.segment-risk-medium,.segment-risk-score.segment-risk-medium{background:#fff0df;color:#984400;border-color:#ef8b24}
+.segment-risk.segment-risk.segment-risk-high,.segment-risk-score.segment-risk-high{background:#fde8e8;color:#a61b1b;border-color:#f0a3a3}
+.segment-risk-score{display:inline-block;border:1px solid;border-radius:99px;padding:0 8px;font-weight:700;white-space:nowrap}
+/* Segment tags show stored casing (friendly tag_name or legacy technical name) instead of forced uppercase. */
+html :is(.segment-tag,.tag,.tag-chk,.promo,.chk,.availability-tag)[data-segment]{text-transform:none}

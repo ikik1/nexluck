@@ -113,11 +113,12 @@ function analyticsSegmentIds(data, player, asOf) {
   return data.segmentDefinitions.filter(s => (!s.casino_id || s.casino_id === player.catalogCasinoId) && evaluateSegment(s.rules, facts, data.parameters) === true).map(s => s.id);
 }
 
+const analyticsSegmentLabel = segment => globalThis.NexLuckSegmentTags ? NexLuckSegmentTags.friendlyName(segment) : segment.name;
 function analyticsScope(data, filters) {
   const asOf = Date.parse(filters.to);
   const players = data.players.filter(p => p.lead <= asOf).map(p => {
     const segmentIds = analyticsSegmentIds(data, p, asOf);
-    return { ...p, segmentIds, segment: data.segmentDefinitions.filter(s => segmentIds.includes(s.id)).map(s => s.name).sort().join(' + ') || 'No matching segments' };
+    return { ...p, segmentIds, segment: data.segmentDefinitions.filter(s => segmentIds.includes(s.id)).map(analyticsSegmentLabel).sort().join(' + ') || 'No matching segments' };
   }).filter(p => ANALYTICS_DIMENSIONS.every(([key]) => key === 'segment'
     ? !filters.segment?.length || filters.segment.some(id => p.segmentIds.includes(id))
     : !filters[key] || (key === 'status' ? p.statusAt(asOf) : p[key]) === filters[key]));
@@ -217,8 +218,10 @@ function analyticsAsk(data, currentFilters, request) {
     return new RegExp('(^|[^\\p{L}\\p{N}_])' + escaped + '($|[^\\p{L}\\p{N}_])', 'u').test(originalText);
   };
   const qualifiedSegments = data.segmentDefinitions.filter(segment => matchesName(segment.name));
-  const matchedSegments = qualifiedSegments.length ? qualifiedSegments :
+  const technicalSegments = qualifiedSegments.length ? qualifiedSegments :
     data.segmentDefinitions.filter(segment => matchesName(segment.original_name || segment.name));
+  const matchedSegments = technicalSegments.length ? technicalSegments :
+    data.segmentDefinitions.filter(segment => segment.tag_name?.trim() && matchesName(segment.tag_name.trim()));
   if (/\bsegments?\b/.test(text) && !matchedSegments.length) return { error: NexLuckI18n.t("Name a saved Customer segment, e.g. VIP, or choose segments in the dashboard filters.") };
   if (matchedSegments.length && (/\bsegments?\b/.test(text) || !campaign)) filters.segment = matchedSegments.map(s => s.id);
   let campaignName = '';
@@ -240,7 +243,7 @@ function analyticsAsk(data, currentFilters, request) {
   const rows = top ? analyticsGroups(scope, 'id').filter(g => g.active).sort((a, b) => b.ggr - a.ggr || a.name.localeCompare(b.name)).slice(0, 10) : [];
   return { filters, totals, rows, title: top ? NexLuckI18n.t('Customers with highest GGR') : campaign ? NexLuckI18n.t("Affiliate results: ") + campaignName : NexLuckI18n.t('GGR result'),
     context: filters.from + ' — ' + filters.to + ' · ' + (filters.site || NexLuckI18n.t('All casino websites')) + ' · ' +
-      (filters.segment.length ? NexLuckI18n.t("Segments (OR): ") + data.segmentDefinitions.filter(s => filters.segment.includes(s.id)).map(s => s.name).join(', ') : NexLuckI18n.t('All segments')) +
+      (filters.segment.length ? NexLuckI18n.t("Segments (OR): ") + data.segmentDefinitions.filter(s => filters.segment.includes(s.id)).map(analyticsSegmentLabel).join(', ') : NexLuckI18n.t('All segments')) +
       (filters.to === data.partialDate ? NexLuckI18n.t(' · TODAY IS PARTIAL; no period comparison') : '') };
 }
 

@@ -19,7 +19,9 @@ function DateField({ label, value, onChange }) {
   );
 }
 
+const TransactionSegmentTag = NexLuckSegmentTags.createSegmentTag(React);
 function Details({ t, onClose }) {
+  const segmentCatalog = NexLuckSegmentTags.useCatalog(React);
   const logs = useMemo(() => txLogs(t), [t]);
   const [open, setOpen] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -37,7 +39,7 @@ function Details({ t, onClose }) {
           <dt>{NexLuckI18n.t("Amount")}</dt><dd><b>{money(t.amount, t.currency)}</b></dd><dt>{NexLuckI18n.t("Player")}</dt><dd>{t.player}</dd>
           <dt>{NexLuckI18n.t("Gateway")}</dt><dd>{t.gateway}</dd><dt>{NexLuckI18n.t("Method")}</dt><dd>{t.method}</dd>
           <dt>{NexLuckI18n.t("Country")}</dt><dd>{COUNTRIES[t.country][0]}</dd><dt>{NexLuckI18n.t("Geo zone")}</dt><dd>{t.zone}</dd>
-          <dt>{NexLuckI18n.t("Gateway reference")}</dt><dd>{t.ref}</dd><dt>{NexLuckI18n.t("Segments")}</dt><dd>{t.segments.map(s => <span key={s} className="tag">{s}</span>)}</dd>
+          <dt>{NexLuckI18n.t("Gateway reference")}</dt><dd>{t.ref}</dd><dt>{NexLuckI18n.t("Segments")}</dt><dd>{t.segments.map(s => <TransactionSegmentTag key={s} className="tag" segment={s} segments={segmentCatalog} />)}</dd>
           {t.reason && <><dt>{NexLuckI18n.t("Decline reason")}</dt><dd style={{ color: '#ba0517', fontWeight: 600 }}>{NexLuckI18n.t(t.reason)}</dd></>}
         </dl>
         <div className="sec2"><span>{NexLuckI18n.t("Communication log (")}{logs.length})</span><button className="link" onClick={copy}>{copied ? NexLuckI18n.t("Copied") : NexLuckI18n.t("Copy log")}</button></div>

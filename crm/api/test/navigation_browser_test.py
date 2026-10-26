@@ -91,14 +91,14 @@ async def check(base):
         await page.wait_for_url("**/crm/api-docs/**")
         await nav.wait_for()
         # Every static CRM HTML entry point is represented by a route or a
-        # parameterized detail template; no customer-facing routes are indexed.
+        # parameterized detail template. Compliance is the explicit /coml/ exception.
         indexed = await page.evaluate("CRM_PAGE_INDEX.flatMap(p => p.template ? [p.href,p.template] : [p.href])")
         for html in (ROOT / "crm").rglob("*.html"):
             route = "/" + html.relative_to(ROOT).as_posix()
             if route.endswith("/index.html"):
                 route = route[:-len("index.html")]
             assert any(url.split("?")[0] == route for url in indexed), route
-        assert all(url.startswith("/crm/") for url in indexed)
+        assert all(url.startswith("/crm/") or url == "/coml/" for url in indexed)
         section_keys = await page.evaluate("SECTIONS.map(s=>s.k)")
         assert len(section_keys) == 9
         for key, phrase, destination in [
@@ -106,7 +106,7 @@ async def check(base):
             ("analytics", "show me analytics", "/crm/a/"),
             ("casinos", "my casinos", "/crm/c/l/"),
             ("loyalty", "loyalty", "/crm/section.html?s=loyalty"),
-            ("compliance", "compliance", "/crm/section.html?s=compliance"),
+            ("compliance", "compliance", "/coml/"),
             ("audit", "audit", "/crm/section.html?s=audit"),
             ("wallets", "list of wallets", "/crm/f/wallets/"),
             ("transactions", "transactions", "/crm/f/transactions/"),

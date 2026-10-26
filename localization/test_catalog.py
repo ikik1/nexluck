@@ -58,7 +58,7 @@ class CatalogTests(unittest.TestCase):
         catalog = json.loads((DIRECTORY / "crm.json").read_text())["en"]
         missing = set()
         for pattern in ("**/*.js", "**/*.jsx", "**/*.html"):
-            for path in (ROOT / "crm").glob(pattern):
+            for path in list((ROOT / "crm").glob(pattern)) + list((ROOT / "coml").glob(pattern)):
                 if "test" in path.parts:
                     continue
                 source = path.read_text()

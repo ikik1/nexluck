@@ -46,7 +46,230 @@ tags:
   - name: Finance
   - name: Reporting
   - name: Dashboard
+  - name: Compliance
 paths:
+  /compliance:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+    get:
+      tags: [Compliance]
+      operationId: getCompliance
+      summary: Get casino-owned compliance review queues
+      description: |
+        Also available under /crm/ui-api/v1 with the existing operator authentication policy.
+        Only in CRM_UI_MODE=demo, the first authorized GET lazily creates 15 synthetic payout
+        reviews, 20 KYC requests and 30 alerts in New status, plus three payout and KYC
+        examples per Pending/Approved/Declined state (24/29 total). Existing demo stores
+        receive extra examples once without overwriting review decisions.
+        If necessary, it creates demo profiles
+        without credentials or a financial ledger. Registry, dashboard and segment reads do
+        not seed these fixtures. Seeds persist across restarts and are never duplicated.
+        Synthetic document previews use only /coml/demo-document.svg. No uploads, real
+        payouts or customer messages are performed. Request bodies are limited to 64 KiB.
+      security: [{ oauth2: ["compliance:read"] }]
+      responses:
+        '200':
+          description: Review queues and segment risk scores
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [payouts, kyc_requests, alerts, risk_matrix, demo]
+                properties:
+                  demo: { type: boolean }
+                  payouts: { type: array, items: { $ref: '#/components/schemas/CompliancePayout' } }
+                  kyc_requests: { type: array, items: { $ref: '#/components/schemas/ComplianceKyc' } }
+                  alerts: { type: array, items: { $ref: '#/components/schemas/ComplianceAlert' } }
+                  risk_matrix: { type: array, items: { $ref: '#/components/schemas/ComplianceRiskEntry' } }
+        '400': { description: Missing or malformed casino context }
+        '401': { description: Authentication required }
+        '403': { description: Casino or scope not permitted }
+  /compliance/risk-matrix:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+    get:
+      tags: [Compliance]
+      operationId: getComplianceRiskMatrix
+      summary: Read configured casino-local segment risk scores
+      security: [{ oauth2: ["compliance:read"] }]
+      responses:
+        '200':
+          description: Matrix entries; segment list and detail DTOs expose risk_score (default 0)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ComplianceRiskMatrix' }
+    patch:
+      tags: [Compliance]
+      operationId: replaceComplianceRiskMatrix
+      summary: Atomically replace all configured matrix entries
+      security: [{ oauth2: ["compliance:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ComplianceRiskMatrix' }
+      responses:
+        '200':
+          description: Persisted entries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ComplianceRiskMatrix' }
+        '422': { description: Duplicate or foreign segment IDs, invalid scores, or unknown fields }
+  /compliance/kyc-requests:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+    post:
+      tags: [Compliance]
+      operationId: createComplianceKycRequest
+      summary: Create a KYC review request, without uploading a document
+      description: |
+        Sets the customer profile KYC status to PENDING. The new request is New with
+        preview_url null; a document name is not proof that any document was uploaded.
+      security: [{ oauth2: ["compliance:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [customer_id, document_name]
+              properties:
+                customer_id: { type: string, pattern: '^CU-[0-9]+$' }
+                document_name: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        '201':
+          description: Persisted request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ComplianceKyc' }
+        '404': { description: Customer does not belong to the selected casino }
+        '422': { description: Invalid document name or read-only fields }
+  /compliance/{collection}/{id}:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+      - in: path
+        name: collection
+        required: true
+        schema: { type: string, enum: [payouts, kyc-requests, alerts] }
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Compliance]
+      operationId: updateComplianceStatus
+      summary: Review a record; never execute a payout
+      description: |
+        New can become Pending, Approved or Declined; Pending can become Approved or
+        Declined. Terminal decisions cannot be reversed. Repeating the current status is
+        idempotent. Audit metadata records the actor, time and old/new statuses.
+        For the latest KYC request of a customer only, Pending/Approved/Declined update
+        the profile to PENDING/VERIFIED/REJECTED respectively. Older requests do not
+        overwrite the latest request's result. Initial demo rows preserve profile statuses.
+      security: [{ oauth2: ["compliance:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/ComplianceStatus' }
+      responses:
+        '200':
+          description: Updated review record
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/CompliancePayout'
+                  - $ref: '#/components/schemas/ComplianceKyc'
+                  - $ref: '#/components/schemas/ComplianceAlert'
+        '404': { description: Record or customer does not belong to the selected casino }
+        '409': { description: Status transition is not allowed }
+        '422': { description: Invalid status or read-only fields }
+  /compliance/customers/{customer_id}/block:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+      - in: path
+        name: customer_id
+        required: true
+        schema: { type: string, pattern: '^CU-\d+$' }
+    post:
+      tags: [Compliance]
+      summary: Persist an internal customer block flag (no external enforcement)
+      description: |
+        Sets compliance_blocked, compliance_blocked_at and compliance_blocked_by on
+        the casino-owned customer. Idempotent. Does not change AML status or execute
+        restrictions in external login, gaming or payment services.
+      security: [{ oauth2: ["compliance:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, maxProperties: 0 }
+      responses:
+        '200':
+          description: Updated customer with internal blocking metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  compliance_blocked: { type: boolean, enum: [true] }
+                  compliance_blocked_at: { type: string, format: date-time }
+                  compliance_blocked_by: { type: string }
+        '404':
+          description: Customer not found in this casino
+        '422':
+          description: Unknown request fields
+  /compliance/customers/{customer_id}/chat:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+      - in: path
+        name: customer_id
+        required: true
+        schema: { type: string, pattern: '^CU-[0-9]+$' }
+    get:
+      tags: [Compliance]
+      operationId: getComplianceInternalNotes
+      summary: Read staff-only internal notes (no external delivery)
+      security: [{ oauth2: ["compliance:read"] }]
+      responses:
+        '200':
+          description: Internal notes in creation order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ComplianceNotes' }
+        '404': { description: Customer does not belong to the selected casino }
+    post:
+      tags: [Compliance]
+      operationId: createComplianceInternalNote
+      summary: Save a staff-only internal note; never send a customer message
+      security: [{ oauth2: ["compliance:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [message]
+              properties:
+                message: { type: string, minLength: 1, maxLength: 4000 }
+      responses:
+        '201':
+          description: All persisted internal notes, including the new note
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ComplianceNotes' }
+        '404': { description: Customer does not belong to the selected casino }
+        '409': { description: Maximum 1000 notes per customer reached }
+        '422': { description: Invalid message or read-only fields }
   /dashboard:
     parameters:
       - $ref: '#/components/parameters/CasinoContext'
@@ -1364,11 +1587,105 @@ components:
             finance:read: Read casino-owned payment configuration and financial records
             finance:write: Manage casino-owned payment connections and cascades
             dashboard:read: Read casino-specific CRM Home sample summaries
+            compliance:read: Read casino-owned compliance reviews and internal notes
+            compliance:write: Review compliance records, configure risk scores and write internal notes
     basicAuth:
       type: http
       scheme: basic
       description: client_id and client_secret, used only at the token endpoint.
   schemas:
+    ComplianceStatus:
+      type: string
+      enum: [New, Pending, Approved, Declined]
+    ComplianceRecord:
+      type: object
+      required: [id, external_id, customer_id, casino_id, created_at, updated_at, status]
+      properties:
+        id: { type: string, readOnly: true }
+        external_id: { type: string, readOnly: true }
+        customer_id: { type: string }
+        casino_id: { type: string, readOnly: true }
+        created_at: { type: string, format: date-time, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
+        status: { $ref: '#/components/schemas/ComplianceStatus' }
+        demo: { type: boolean, readOnly: true }
+        source: { type: string, enum: [synthetic_demo], readOnly: true }
+        created_by: { type: string, readOnly: true }
+        updated_by: { type: string, readOnly: true }
+        audit:
+          type: array
+          readOnly: true
+          items:
+            type: object
+            properties:
+              at: { type: string, format: date-time }
+              by: { type: string }
+              from: { $ref: '#/components/schemas/ComplianceStatus' }
+              to: { $ref: '#/components/schemas/ComplianceStatus' }
+    CompliancePayout:
+      allOf:
+        - $ref: '#/components/schemas/ComplianceRecord'
+        - type: object
+          required: [amount, currency, payment_method]
+          properties:
+            amount: { type: number, description: Synthetic review amount only; never executed }
+            currency: { type: string }
+            payment_method: { type: string }
+    ComplianceKyc:
+      allOf:
+        - $ref: '#/components/schemas/ComplianceRecord'
+        - type: object
+          required: [document_name, preview_url]
+          properties:
+            document_name: { type: string, maxLength: 200 }
+            preview_url: { type: string, nullable: true, description: Static demo fixture for seeded rows; null for new requests }
+    ComplianceAlert:
+      allOf:
+        - $ref: '#/components/schemas/ComplianceRecord'
+        - type: object
+          required: [last_session]
+          properties:
+            last_session:
+              type: object
+              required: [ip, country, at, device]
+              properties:
+                ip: { type: string, description: RFC 5737 documentation-only IP in demo data }
+                country: { type: string }
+                at: { type: string, format: date-time }
+                device: { type: string }
+    ComplianceRiskEntry:
+      type: object
+      additionalProperties: false
+      required: [segment_id, score]
+      properties:
+        segment_id: { type: string, description: Unique ID of a segment in this casino }
+        score: { type: integer, minimum: 0, maximum: 100 }
+    ComplianceRiskMatrix:
+      type: object
+      additionalProperties: false
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          maxItems: 1000
+          items: { $ref: '#/components/schemas/ComplianceRiskEntry' }
+    ComplianceNotes:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, message, created_at]
+            properties:
+              id: { type: string }
+              message: { type: string }
+              created_at: { type: string, format: date-time }
+              casino_id: { type: string }
+              customer_id: { type: string }
+              created_by: { type: string }
+              internal: { type: boolean, enum: [true] }
     CopyGroups:
       type: array
       uniqueItems: true
@@ -1483,6 +1800,7 @@ components:
       required: [name, rules]
       properties:
         name: { type: string, minLength: 1, maxLength: 200 }
+        tag_name: { type: string, nullable: true, maxLength: 200, description: Optional friendly label; blank or null clears it }
         rules: { $ref: '#/components/schemas/SegmentNode' }
     CustomerSegment:
       allOf:
@@ -1493,6 +1811,7 @@ components:
             id: { type: string, readOnly: true, example: SG-1001 }
             created_at: { type: string, format: date-time, readOnly: true }
             updated_at: { type: string, format: date-time, readOnly: true }
+            risk_score: { type: integer, minimum: 0, maximum: 100, default: 0, readOnly: true, description: Configured casino compliance matrix score, or zero if unconfigured }
     SegmentNode:
       description: |
         At most 100 total nodes and 5 nested levels. List comparisons match any

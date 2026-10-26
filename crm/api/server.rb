@@ -206,7 +206,7 @@ end
 ISSUER = 'nexluck-crm'
 AUDIENCE = 'nexluck-crm-api'
 TOKEN_TTL = 900
-SCOPES = %w[bonuses:read bonuses:write customers:read customers:write customers:credentials segments:read segments:write games:read games:write casinos:read casinos:write finance:read finance:write dashboard:read]
+SCOPES = %w[bonuses:read bonuses:write customers:read customers:write customers:credentials segments:read segments:write games:read games:write casinos:read casinos:write finance:read finance:write dashboard:read compliance:read compliance:write]
 JWT_KEY = ENV['CRM_JWT_SECRET'] || SecureRandom.hex(32)
 CLIENT_SECRET = ENV['CRM_CLIENT_SECRET'] || SecureRandom.hex(24)
 CLIENTS = {

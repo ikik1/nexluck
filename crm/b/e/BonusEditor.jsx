@@ -97,14 +97,19 @@ function Field({ label, hint, error, children }) {
 function AvailabilitySegments({ label, path, form, set, errors, onOpen }) {
   const values = get(form, path) || [];
   const remove = value => set(path, values.filter(v => v !== value));
+  const segmentCatalog = NexLuckSegmentTags.useCatalog(React);
+  const tagFor = value => {
+    const info = NexLuckSegmentTags.describe(value, segmentCatalog);
+    return { ...info, label: info.segment.tag_name?.trim() ? info.label : NexLuckI18n.t(value) };
+  };
   return <Field label={NexLuckI18n.t(label)} error={errors[path]}>
     <div className="availability-segments">
-      {values.map(value => <button type="button" className="availability-tag" key={value}
-        title={NexLuckI18n.t("Double-click to remove; press Delete or Backspace to remove")}
-        aria-label={NexLuckI18n.t("Remove ") + value + NexLuckI18n.t(" from ") + label.toLowerCase()}
-        onDoubleClick={() => remove(value)} onKeyDown={e => {
-          if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); remove(value); }
-        }}>{NexLuckI18n.t(value)}</button>)}
+      {values.map(value => tagFor(value)).map(info => <button type="button" className={'availability-tag' + info.className} key={info.name}
+        title={NexLuckI18n.t("Double-click to remove; press Delete or Backspace to remove") + ' — ' + info.title} data-segment={info.name}
+        aria-label={NexLuckI18n.t("Remove ") + info.label + NexLuckI18n.t(" from ") + label.toLowerCase()}
+        onDoubleClick={() => remove(info.name)} onKeyDown={e => {
+          if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); remove(info.name); }
+        }}>{info.label}</button>)}
       <button type="button" className="btn segment-more" aria-label={NexLuckI18n.t("Edit ") + label.toLowerCase()}
         onClick={() => onOpen({ path, label })}>...</button>
     </div>
@@ -469,6 +474,7 @@ const BANNER_IMAGES = [['web', NexLuckI18n.t("Web")], ['tablet', NexLuckI18n.t("
 const MAX_IMAGE_BYTES = 2_000_000;
 
 function PromoModal({ initial, segments, onSave, onClose }) {
+  const segmentCatalog = NexLuckSegmentTags.useCatalog(React);
   const [b, setB] = useState(() => Object.fromEntries(Object.keys(emptyBanner()).map(key => [key, initial[key]])));
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
@@ -522,7 +528,7 @@ function PromoModal({ initial, segments, onSave, onClose }) {
         <textarea className="code" rows="6" value={b.description} onChange={(e) => upd('description', e.target.value)} placeholder="<p>Deposit and get 100% up to 100 EUR…</p>" />
       </Field>
       <Field label={NexLuckI18n.t("Show for segments")} hint={NexLuckI18n.t("Taken from the bonus Availability → Include segments.")}>
-        <div className="seg-ro">{segments.length ? segments.map((x) => <span key={x} className="chk on">{x}</span>) : <span className="kvl">{NexLuckI18n.t("No segments selected: shown to everyone.")}</span>}</div>
+        <div className="seg-ro">{segments.length ? segments.map((x) => <SegmentTag key={x} className="chk on" segment={x} segments={segmentCatalog} />) : <span className="kvl">{NexLuckI18n.t("No segments selected: shown to everyone.")}</span>}</div>
       </Field>
       <Field label={NexLuckI18n.t("Show buttons")} error={errors['buttons.depositForSignedUsers'] || errors['buttons.signUpForAnonymous']}>
         <div className="chk-row">

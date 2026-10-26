@@ -168,7 +168,7 @@ function AnalyticsPage() {
   const selectedSummary = [
     (filters.from || NexLuckI18n.t('Missing start')) + ' — ' + (filters.to || NexLuckI18n.t('Missing end')),
     ...ANALYTICS_DIMENSIONS.filter(([key]) => key === 'segment' ? filters.segment?.length : filters[key]).map(([key, label]) => NexLuckI18n.t(label) + ': ' +
-      (key === 'segment' ? data.segmentDefinitions.filter(s => filters.segment.includes(s.id)).map(s => s.name).join(', ') : filters[key])),
+      (key === 'segment' ? data.segmentDefinitions.filter(s => filters.segment.includes(s.id)).map(analyticsSegmentLabel).join(', ') : filters[key])),
     NexLuckI18n.t('Group: ') + NexLuckI18n.t(ANALYTICS_DIMENSIONS.find(([key]) => key === groupBy)[1])
   ].join(' · ');
   const options = key => key === 'status' ? data.statuses : [...new Set(data.players.map(p => p[key]))].sort();

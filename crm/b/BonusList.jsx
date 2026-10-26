@@ -9,7 +9,9 @@ const GROUPS = [
 const fmt = value => new Intl.DateTimeFormat(NexLuckI18n.formatLocale, { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z'));
 const eur = n => '\u20ac' + n.toLocaleString(NexLuckI18n.formatLocale);
 
+const BonusSegmentTag = NexLuckSegmentTags.createSegmentTag(React);
 function BonusRow({ b, onEdit }) {
+  const segmentCatalog = NexLuckSegmentTags.useCatalog(React);
   const p = b.bonusValue > 0 ? Math.min(100, Math.round(b.wagered / b.bonusValue * 100)) : 0;
   const on = b.status !== 'inactive';
   return (
@@ -26,7 +28,7 @@ function BonusRow({ b, onEdit }) {
       <td className="pb"><div className="bar"><i style={{ width: p + '%' }}></i></div><small>{eur(b.bonusValue)} / {eur(b.wagered)} ({p}%)</small></td>
       <td className="num">{eur(b.wins)}</td>
       <td className="num">{eur(b.wagered)}</td>
-      <td className="grp">{b.groups.map(g => <span key={g} className="promo">{g}</span>)}</td>
+      <td className="grp">{b.groups.map(g => <BonusSegmentTag key={g} className="promo" segment={g} segments={segmentCatalog} />)}</td>
       <td className="num">{b.received.toLocaleString(NexLuckI18n.formatLocale)}</td>
       <td className="ed"><button className="edit" title={NexLuckI18n.t("Modify")} aria-label={NexLuckI18n.t("Modify ") + b.name} onClick={() => onEdit(b)}>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 14.75V17h2.25L15.9 6.35l-2.25-2.25L3 14.75Z" /><path d="m12.8 5.2 2.25 2.25M3 17h14" /></svg>

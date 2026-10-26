@@ -15,6 +15,38 @@ async function apiRequest(url, options = {}) {
 }
 const SEGMENT_OPS = { list: ['IS', '=', '!='], boolean: ['IS', '=', '!='], number: ['IS', '<', '>', '!=', '=', '>=', '=<'], date: ['IS', '<', '>', '!=', '=', '>=', '=<'] };
 
+// Shared with CustomerPages and Compliance: demo wallet activity used by segment facts and profile tiles.
+function customerActivity(id, now = Date.now()) {
+  const index = Number(id.slice(3)) - 1001;
+  const wallets = WALLETS.filter(w => w.customer_id === id || (!w.customer_id && [String(7000 + index * 2), String(7001 + index * 2)].includes(w.id.slice(2))));
+  const transactions = WALLET_TX.filter(t => wallets.some(w => w.id === t.wallet) && t.ts <= now);
+  const stats = [...new Set(wallets.map(w => w.currency))].map(currency => {
+    const tx = transactions.filter(t => t.currency === currency);
+    const sum = type => tx.filter(t => t.type === type).reduce((total, t) => total + Math.abs(t.amount), 0);
+    const bets = sum('Bet'), wins = sum('Win'), wagered = sum('Bonus wagering'), granted = sum('Bonus granted');
+    return {
+      currency, bets, wins, ggr: bets - wins, net: wins - bets, rounds: tx.filter(t => t.type === 'Bet').length,
+      rtp: bets ? wins / bets * 100 : null, wagered, granted, cancelled: sum('Bonus cancelled'),
+      bonusEvents: tx.filter(t => t.type.startsWith('Bonus ')).length,
+      deposits: [1, 7, 30, 365].map(days => tx.filter(t => t.type === 'Deposit' && t.ts >= now - days * 86400000).reduce((total, t) => total + t.amount, 0))
+    };
+  });
+  const bets = transactions.filter(t => t.type === 'Bet' && wallets.some(w => w.id === t.wallet && w.type === 'Real'));
+  const rank = names => {
+    const counts = new Map();
+    names.forEach(name => counts.set(name, (counts.get(name) || 0) + 1));
+    return [...counts].sort(([a, ac], [b, bc]) => bc - ac || a.localeCompare(b)).slice(0, 3);
+  };
+  const games = bets.map(t => DEMO_GAME_CATALOG.find(game => game.name === t.note));
+  const favourites = {
+    games: rank(bets.map(t => t.note)),
+    categories: rank(games.map(game => game ? game.category : 'Unmapped category')),
+    providers: rank(games.map(game => game ? game.provider : 'Unmapped provider'))
+  };
+  const points = bets.length * 100;
+  return { wallets, transactions, stats, favourites, points, tier: points >= 500 ? 'Gold' : points >= 200 ? 'Silver' : 'Bronze' };
+}
+
 function segmentFacts(customer, now = Date.now()) {
   const activity = customerActivity(customer.id, now);
   const transactions = activity.transactions;
@@ -99,6 +131,17 @@ function customerSegmentIds(customer, segments, parameters, now = Date.now()) {
   return segments.filter(segment => evaluateSegment(segment.rules, facts, parameters) === true).map(segment => segment.id);
 }
 
+function customerSegmentRisk(customer, segments, parameters, now = Date.now()) {
+  const ids = customerSegmentIds(customer, segments, parameters, now);
+  return segments.filter(segment => ids.includes(segment.id)).reduce((max, segment) => Math.max(max, NexLuckSegmentTags.riskScore(segment)), 0);
+}
+
+function CustomerRiskScore({ score, stored }) {
+  const level = NexLuckSegmentTags.riskLevel(score);
+  return <span className={'segment-risk-score segment-risk-' + level}
+    title={NexLuckI18n.t("Highest risk matrix score among matching segments ({value1}). Stored profile value: {value2}/100", { value1: NexLuckI18n.t(level), value2: stored ?? 0 })}>{score} / 100</span>;
+}
+
 function segmentAutoName(node) {
   if (node.kind === 'group') {
     const parts = node.children.map(segmentAutoName);
@@ -135,15 +178,18 @@ function useCustomerSegments() {
     finally { setLoading(false); }
   };
   React.useEffect(() => { load(); }, []);
+  React.useEffect(() => { if (!loading && !error) NexLuckSegmentTags.setCatalog(segments); }, [segments, loading, error]);
   const saved = segment => setSegments(old => old.some(s => s.id === segment.id) ? old.map(s => s.id === segment.id ? segment : s) : [...old, segment]);
   return { segments, parameters, error, loading, load, saved };
 }
 
-function SegmentTags({ segments, onRemove }) {
-  return <div className="segment-tags">{segments.map(segment => <span className="segment-tag" key={segment.id} title={segment.name}>
-    {segment.name}{onRemove && <button type="button" aria-label={NexLuckI18n.t("Remove segment filter ") + segment.name} onClick={() => onRemove(segment.id)}>×</button>}
-  </span>)}</div>;
+const SegmentTag = NexLuckSegmentTags.createSegmentTag(React);
+function SegmentTags({ segments, onRemove, removeLabel = NexLuckI18n.t("Remove segment filter ") }) {
+  return <div className="segment-tags">{segments.map(segment => <SegmentTag key={segment.id || segment.name} segment={segment}
+    removeLabel={removeLabel} onRemove={onRemove && (() => onRemove(segment.id))} />)}</div>;
 }
+globalThis.SegmentTag = SegmentTag;
+globalThis.SegmentTags = SegmentTags;
 
 function SegmentParameters({ customer, parameters, onClose }) {
   const [days, setDays] = React.useState(30);
@@ -295,6 +341,7 @@ function SegmentEditor({ segment, parameters, customers, ownerId, onSave, onClos
   });
   const [name, setName] = React.useState(segment?.name || '');
   const [manualName, setManualName] = React.useState(Boolean(segment));
+  const [tagName, setTagName] = React.useState(segment?.tag_name || '');
   const [picker, setPicker] = React.useState(null);
   const [error, setError] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -307,9 +354,10 @@ function SegmentEditor({ segment, parameters, customers, ownerId, onSave, onClos
     if (validation) { setError(validation); return; }
     setBusy(true); setError('');
     try {
-      const saved = await apiRequest(SEGMENT_API + (segment ? '/' + (segment.object_id || segment.id) : ''), {
-        casinoId: ownerId, method: segment ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: currentName, rules })
+      const response = await apiRequest(SEGMENT_API + (segment ? '/' + (segment.object_id || segment.id) : ''), {
+        casinoId: ownerId, method: segment ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: currentName, tag_name: tagName.trim(), rules })
       });
+      const saved = { risk_score: segment?.risk_score ?? 0, ...response };
       onSave(CRMContext.reporting ? { ...saved, original_name: saved.name, object_id: saved.id, id: ownerId + ':' + saved.id, casino_id: ownerId,
         name: saved.name + ' (' + CRMContext.casinos.find(site => site.id === ownerId)?.name + ', ' + ownerId + ')' } : saved);
     } catch (e) { setError(e.fields && Object.keys(e.fields).length ? Object.entries(e.fields).map(([key, value]) => key + ': ' + value).join('; ') : e.message); }
@@ -320,6 +368,8 @@ function SegmentEditor({ segment, parameters, customers, ownerId, onSave, onClos
       {ownerId && <p className="notice">{NexLuckI18n.t("Owner casino: ")}{CRMContext.casinos.find(site => site.id === ownerId)?.name} ({ownerId}{NexLuckI18n.t("). This saves operational configuration, not report filters.")}</p>}
       <label className="field">{NexLuckI18n.t("Segment name")}<input aria-label={NexLuckI18n.t("Segment name")} value={currentName} maxLength={200} required disabled={busy} onChange={e => { setName(e.target.value); setManualName(true); }} /></label>
       <button type="button" className="btn" disabled={busy} onClick={() => setManualName(false)}>{NexLuckI18n.t("Use automatic name")}</button>
+      <label className="field">{NexLuckI18n.t("Tag name")}<input aria-label={NexLuckI18n.t("Tag name")} value={tagName} maxLength={200} disabled={busy} placeholder={currentName} onChange={e => setTagName(e.target.value)} /></label>
+      <p className="hint">{NexLuckI18n.t("Optional friendly label shown on segment tags. Leave blank to show the technical segment name.")}</p>
       <p className="notice">{NexLuckI18n.t("Membership is calculated from current demo customer and wallet data. Money rules use their selected currency. Missing data does not match, including under NOT.")}</p>
       <SegmentRuleNode node={rules} parameters={parameters} onChange={setRules} busy={busy} onPick={(parameter, initial, apply) => setPicker({ parameter, initial, apply })} />
       <p className="segment-preview">{segmentRuleText(rules, parameters)}</p>
@@ -355,7 +405,7 @@ function SegmentWidget({ state, customers = null, customer = null, selected = []
   const entries = [...memberships, ...[...new Set(extraNames)].filter(name => !memberships.some(s => s.name === name))
     .map(name => ({ id: 'legacy:' + name, name, rules: null, members: null }))];
   const shown = entries.filter(s => (!customer || customerSegmentIds(customer, [s], state.parameters).length) &&
-    (s.name + ' ' + (s.rules ? segmentRuleText(s.rules, state.parameters) : '')).toLowerCase().includes(query.toLowerCase().trim()));
+    (s.name + ' ' + (s.tag_name || '') + ' ' + (s.rules ? segmentRuleText(s.rules, state.parameters) : '')).toLowerCase().includes(query.toLowerCase().trim()));
   const isSelected = segment => selected.includes(onSelect ? segment.name : segment.id);
   const select = segment => onSelect ? onSelect(segment) : onToggle?.(segment.id);
   return <SegmentDialog title={customer ? customer.name + NexLuckI18n.t(" segments") : NexLuckI18n.t("Segments")} wide onClose={onClose}>
@@ -372,7 +422,7 @@ function SegmentWidget({ state, customers = null, customer = null, selected = []
       selected={shown.filter(isSelected).map(s => s.id)} onSelect={select} checkbox={Boolean(onToggle)}
       renderDetails={segment => <>{segment.rules ? <p className="segment-preview">{segmentRuleText(segment.rules, state.parameters)}</p> : <p className="segment-preview">{NexLuckI18n.t("Existing ")}{selectionOwner}{NexLuckI18n.t(" segment")}</p>}
         {segment.members && <p className="hint">{segment.members.length}{NexLuckI18n.t(" matching ")}{segment.members.length === 1 ? 'customer' : 'customers'}</p>}</>}
-      renderActions={segment => segment.rules && <button type="button" className="btn" disabled={CRMContext.reporting && (ownerId !== segment.casino_id || ownerLoading || !ownerParameters.length)} onClick={() => setEditor({ segment })} aria-label={NexLuckI18n.t("Edit segment ") + segment.name}>{NexLuckI18n.t("Edit")}</button>} />}
+      renderActions={segment => segment.rules && <button type="button" className="btn" disabled={CRMContext.reporting && (ownerId !== segment.casino_id || ownerLoading || !ownerParameters.length)} onClick={() => setEditor({ segment })} aria-label={NexLuckI18n.t("Edit segment ") + NexLuckSegmentTags.friendlyName(segment)}>{NexLuckI18n.t("Edit")}</button>} />}
     {!state.loading && !state.error && !shown.length && <p className="hint">{NexLuckI18n.t("No matching segments.")}</p>}
     <div className="customer-actions"><button type="button" className="btn" onClick={onClose}>{NexLuckI18n.t("Done")}</button></div>
     {editor && <SegmentEditor segment={editor.segment && CRMContext.reporting ? { ...editor.segment, name: editor.segment.original_name } : editor.segment} ownerId={CRMContext.reporting ? ownerId : undefined} parameters={CRMContext.reporting ? ownerParameters : state.parameters} customers={customers}

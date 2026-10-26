@@ -7,7 +7,9 @@ const money = (n, c) => n.toLocaleString(NexLuckI18n.formatLocale, { minimumFrac
 const signed = (n, c) => (n >= 0 ? '+' : '−') + money(Math.abs(n), c);
 const PAGE = 25;
 
+const WalletSegmentTag = NexLuckSegmentTags.createSegmentTag(React);
 function Wallets() {
+  const segmentCatalog = NexLuckSegmentTags.useCatalog(React);
   const countryList = [...new Set(WALLETS.map(wallet => wallet.country))].sort((a, b) => (COUNTRIES[a] || [a])[0].localeCompare((COUNTRIES[b] || [b])[0]));
   const empty = { player: '', segment: '', country: '', type: '' };
   const [f, setF] = useState(empty);
@@ -32,7 +34,7 @@ function Wallets() {
       <div className="tools" style={{ margin: '8px 0 0' }}><FinanceMenu current="/crm/f/wallets/" /></div>
       <div className="ff">
         <label className="fld q">{NexLuckI18n.t("Player")}<input type="text" placeholder={NexLuckI18n.t("Search by player name…")} value={f.player} onChange={e => set('player', e.target.value)} /></label>
-        <label className="fld">{NexLuckI18n.t("Segment")}<select value={f.segment} onChange={e => set('segment', e.target.value)}><option value="">{NexLuckI18n.t("All segments")}</option>{ALL_SEGMENTS.map(s => <option key={s} value={s}>{NexLuckI18n.t(s)}</option>)}</select></label>
+        <label className="fld">{NexLuckI18n.t("Segment")}<select value={f.segment} onChange={e => set('segment', e.target.value)}><option value="">{NexLuckI18n.t("All segments")}</option>{ALL_SEGMENTS.map(s => <option key={s} value={s}>{NexLuckSegmentTags.find(segmentCatalog, s)?.tag_name?.trim() || NexLuckI18n.t(s)}</option>)}</select></label>
         <label className="fld">{NexLuckI18n.t("Country")}<select value={f.country} onChange={e => set('country', e.target.value)}><option value="">{NexLuckI18n.t("All countries")}</option>{countryList.map(c => <option key={c} value={c}>{NexLuckI18n.t((COUNTRIES[c] || [c])[0])}</option>)}</select></label>
         <label className="fld">{NexLuckI18n.t("Wallet type")}<select value={f.type} onChange={e => set('type', e.target.value)}><option value="">{NexLuckI18n.t("All wallet types")}</option>{WALLET_TYPES.map(t => <option key={t} value={t}>{NexLuckI18n.t(t)}</option>)}</select></label>
         {dirty && <button className="link" style={{ paddingBottom: 10 }} onClick={() => { setF(empty); setShown(PAGE); }}>{NexLuckI18n.t("Clear filters")}</button>}
@@ -52,7 +54,7 @@ function Wallets() {
                   <tr key={w.id} className="clk" onClick={() => open(w)} tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') open(w); }} aria-label={`${w.player} ${w.type} wallet, ${money(w.balance, w.currency)}`}>
                     <td className="brand-n">{w.player}</td>
                     <td><span className="tag c" title={COUNTRIES[w.country][0]}>{w.country}</span></td>
-                    <td>{w.segments.map(s => <span key={s} className="tag">{s}</span>)}</td>
+                    <td>{w.segments.map(s => <WalletSegmentTag key={s} className="tag" segment={s} segments={segmentCatalog} />)}</td>
                     <td>{w.id}</td>
                     <td><span className={'wt ' + w.type}>{NexLuckI18n.t(w.type)}</span></td>
                     <td className="num"><b>{money(w.balance, w.currency)}</b></td>

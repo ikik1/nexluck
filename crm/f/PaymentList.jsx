@@ -256,11 +256,11 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
         <div className="fld" style={{ marginTop: 8 }}>
           <label>{NexLuckI18n.t("Segments ")}<small style={{ color: 'var(--muted)', fontWeight: 'normal' }}>{NexLuckI18n.t("(Player groups eligible for this connection)")}</small></label>
           <div className="segs">
-            {data.segments.map(s => <button type="button" key={s} className="tag-chk on"
-              aria-label={NexLuckI18n.t("Remove segment ") + s} title={NexLuckI18n.t("Double-click to remove; press Delete or Backspace to remove")}
+            {data.segments.map(s => <SegmentTag as="button" type="button" key={s} className="tag-chk on" segment={s} segments={segmentState.segments}
+              labelPrefix={NexLuckI18n.t("Remove segment ")} title={NexLuckI18n.t("Double-click to remove; press Delete or Backspace to remove")}
               onDoubleClick={() => removeSegment(s)} onKeyDown={e => {
                 if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSegment(s); }
-              }}>{s}</button>)}
+              }} />)}
             <button type="button" className="new-btn" aria-label={NexLuckI18n.t("Edit connection segments")} onClick={() => setShowSegments(true)}>...</button>
           </div>
         </div>
@@ -311,6 +311,7 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
 
 function PaymentList() {
   const [connections, setConnections] = useState(() => PAYMENT_CONNECTIONS);
+  const segmentCatalog = NexLuckSegmentTags.useCatalog(React);
   const [q, setQ] = useState('');
   const [applied, setApplied] = useState('');
   const [zones, setZones] = useState([]);
@@ -324,7 +325,7 @@ function PaymentList() {
     return connections.filter(c => {
       if (zones.length && !c.countries.some(code => zones.includes(zoneOf(code)))) return false;
       const countryNames = c.countries.map(code => COUNTRIES[code] ? COUNTRIES[code][0] : code);
-      const hay = [c.name, c.brand, c.currency, ...c.methods, ...c.countries, ...countryNames, ...zonesOf(c.countries), ...c.segments].join(' ').toLowerCase();
+      const hay = [c.name, c.brand, c.currency, ...c.methods, ...c.countries, ...countryNames, ...zonesOf(c.countries), ...c.segments, ...c.segments.map(s => NexLuckSegmentTags.describe(s, segmentCatalog).label)].join(' ').toLowerCase();
       return terms.every(t => hay.includes(t));
     });
   }, [connections, applied, zones]);
@@ -400,7 +401,7 @@ function PaymentList() {
                 <td><span className="tag g">{c.currency}</span></td>
                 <td><Countries codes={c.countries} /></td>
                 <td>{zonesOf(c.countries).map(z => <span key={z} className="tag z">{NexLuckI18n.t(z)}</span>)}</td>
-                <td>{c.segments.map(s => <span key={s} className="tag">{s}</span>)}</td>
+                <td>{c.segments.map(s => <SegmentTag key={s} className="tag" segment={s} segments={segmentCatalog} />)}</td>
                 <td>
                   <button
                     className={'cn ' + c.conn}

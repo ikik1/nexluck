@@ -448,6 +448,65 @@ async def check_browser(base):
         print("Segment editor, search pickers, tags, filtering, nested rules, profile membership, gender and mobile passed")
 
 
+async def check_friendly_tags(base, risk_id):
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(channel="chrome", headless=True)
+        page = await browser.new_page(viewport={"width": 1440, "height": 1000})
+        page.set_default_timeout(10000)
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        payloads = []
+        page.on("request", lambda req: payloads.append(req.post_data) if req.method in ("POST", "PATCH") and "/segments" in req.url else None)
+        await page.goto(base + "/crm/c/list/")
+        tag = page.locator("tbody .segment-tag.segment-risk-high").filter(has_text="Adult risk").first
+        await tag.wait_for()
+        assert "risk_adult_test" in await tag.get_attribute("title")
+        assert "75/100" in await tag.get_attribute("title")
+        assert await page.locator("tbody .segment-tag").filter(has_text="risk_adult_test").count() == 0
+        assert await page.locator("tbody .segment-risk-score.segment-risk-high").filter(has_text="75 / 100").count() > 0
+        assert await page.locator("tbody .segment-tag").filter(has_text="VIP").first.get_attribute("class") == "segment-tag"
+        assert await tag.inner_text() == "Adult risk"
+        boundaries = await page.evaluate("""() => [0, 40, 41, 60, 61, 100].map(score => {
+          const info = NexLuckSegmentTags.describe({ name: 'risk_edge', tag_name: 'Edge Case', risk_score: score });
+          return [score, info.risk, info.className.trim(), info.label, info.name, info.title.includes(score + '/100')];
+        })""")
+        expected = {0: "low", 40: "low", 41: "medium", 60: "medium", 61: "high", 100: "high"}
+        for score, level, css, label, name, titled in boundaries:
+            assert level == expected[score] and css == "segment-risk segment-risk-" + level, (score, level, css)
+            assert label == "Edge Case" and name == "risk_edge" and titled, (score, label, name)
+        plain = await page.evaluate("""() => [NexLuckSegmentTags.describe({ name: 'VIP', risk_score: 90 }),
+          NexLuckSegmentTags.describe({ name: 'LEGACY_ONLY', tag_name: '  ' }),
+          NexLuckSegmentTags.describe('risk_adult_test', [{ name: 'risk_adult_test', tag_name: 'Adult risk', risk_score: 75 }])]""")
+        assert plain[0]["className"] == "" and plain[0]["risk"] is None and plain[0]["label"] == "VIP"
+        assert plain[1]["label"] == "LEGACY_ONLY" and plain[1]["title"] == "LEGACY_ONLY"
+        assert plain[2]["label"] == "Adult risk" and plain[2]["name"] == "risk_adult_test" and plain[2]["risk"] == "high"
+        await page.get_by_role("button", name="Segments", exact=True).click()
+        library = page.get_by_role("dialog", name="Segments", exact=True)
+        await library.get_by_label("Search segments").fill("Adult risk")
+        await library.get_by_role("checkbox").check()
+        remove = page.get_by_role("button", name="Remove segment filter Adult risk", exact=True)
+        await library.get_by_role("button", name="Edit segment Adult risk", exact=True).click()
+        edit = page.get_by_role("dialog", name="Edit segment", exact=True)
+        assert await edit.get_by_label("Segment name", exact=True).input_value() == "risk_adult_test"
+        assert await edit.get_by_label("Tag name", exact=True).input_value() == "Adult risk"
+        await edit.get_by_role("button", name="Save segment", exact=True).click()
+        await edit.wait_for(state="hidden")
+        assert await library.locator(".segment-tag.segment-risk-high").filter(has_text="Adult risk").count() == 1
+        await library.get_by_role("button", name="Done", exact=True).click()
+        await remove.wait_for()
+        body = json.loads(payloads[-1])
+        assert body["name"] == "risk_adult_test" and body["tag_name"] == "Adult risk", body
+        await page.goto(base + "/crm/b/e/?id=BN-1002")
+        include = page.get_by_role("button", name="Remove Adult risk from include segments", exact=True)
+        await include.wait_for()
+        assert "segment-risk-high" in await include.get_attribute("class")
+        await page.goto(base + "/crm/g/")
+        await page.locator("tbody .segment-tag").filter(has_text="Adult risk").first.wait_for()
+        assert not errors, errors
+        await browser.close()
+        print("Friendly segment tag names, risk colours, accessible labels and canonical payloads passed")
+
+
 def main():
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -490,6 +549,24 @@ def main():
             assert created["availability"]["includeSegments"] == ["API_EDITED"]
             assert created["availability"]["excludeSegments"] == ["VIP"]
             asyncio.run(check_browser(base))
+            risk_body = {"name": "risk_adult_test", "tag_name": "  Adult risk  ",
+                         "rules": {"kind": "rule", "field": "age", "operator": ">=", "value": 18, "not": False}}
+            status, risk = request(base, "/crm/ui-api/v1/segments", "POST", risk_body)
+            assert status == 201 and risk["name"] == "risk_adult_test" and risk["tag_name"] == "Adult risk", risk
+            assert request(base, "/crm/ui-api/v1/segments", "POST", dict(risk_body, name="risk_bad_tag", tag_name=7))[0] == 422
+            assert request(base, "/crm/ui-api/v1/compliance/risk-matrix", "PATCH",
+                           {"entries": [{"segment_id": risk["id"], "score": 75}]})[0] == 200
+            listed = {s["name"]: s for s in request(base, "/crm/ui-api/v1/segments")[1]["items"]}
+            assert listed["risk_adult_test"]["risk_score"] == 75
+            assert "tag_name" not in listed["VIP"] and listed["VIP"]["risk_score"] == 0
+            assert request(base, bonus_path, "PATCH", {"availability": {"includeSegments": ["risk_adult_test"], "excludeSegments": ["VIP"]}})[0] == 200
+            assert request(base, bonus_path)[1]["availability"]["includeSegments"] == ["risk_adult_test"]
+            games = request(base, "/crm/ui-api/v1/games")[1]["items"]
+            game = games[0]
+            assert request(base, "/crm/ui-api/v1/games/" + game["id"], "PATCH", {"segments": ["risk_adult_test"]})[0] == 200
+            asyncio.run(check_friendly_tags(base, risk["id"]))
+            assert request(base, "/crm/ui-api/v1/games/" + game["id"])[1]["segments"] == ["risk_adult_test"]
+            assert request(base, "/crm/ui-api/v1/segments/" + risk["id"])[1]["tag_name"] == "Adult risk"
         finally:
             server.terminate()
             server.wait(timeout=10)

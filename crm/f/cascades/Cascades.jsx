@@ -67,6 +67,7 @@ function Step({ s, i, n, type, onChange, onRemove, onMove, onInsert, picking, se
 
 function CascadeEditor({ cascade, onSave, onClose }) {
   const [c, setC] = useState(() => JSON.parse(JSON.stringify(cascade)));
+  const segmentCatalog = NexLuckSegmentTags.useCatalog(React);
   const [picking, setPicking] = useState(null);
   const [errs, setErrs] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -114,7 +115,7 @@ function CascadeEditor({ cascade, onSave, onClose }) {
         <div className="segs">{ALL_SEGMENTS.map(s => (
           <label key={s} className={'tag-chk' + (c.segments.includes(s) ? ' on' : '')}>
             <input type="checkbox" checked={c.segments.includes(s)} onChange={() => toggleSeg(s)} />
-            <span>{s}</span>
+            <SegmentTag className="" segment={s} segments={segmentCatalog} />
           </label>
         ))}</div>
         <div className="sec">{NexLuckI18n.t("Waterfall: ")}{c.type === "success" ? NexLuckI18n.t("a transaction falls to the next connection when the success rate drops below the threshold") : NexLuckI18n.t("a transaction falls to the next connection on the selected decline reason")}</div>
@@ -135,6 +136,7 @@ function CascadeEditor({ cascade, onSave, onClose }) {
 
 function Cascades() {
   const [list, setList] = useState(CASCADES);
+  const segmentCatalog = NexLuckSegmentTags.useCatalog(React);
   const [country, setCountry] = useState('');
   const [zone, setZone] = useState('');
   const [edit, setEdit] = useState(null);
@@ -173,7 +175,7 @@ function Cascades() {
               <tr key={c.id}>
                 <td><div className="brand-n">{c.name}</div><div className="desc">{TYPE_LABEL[c.type]} · {c.steps.map(s => s.psp).join(' → ') || 'no steps'}</div></td>
                 <td>{c.country ? COUNTRIES[c.country][0] : <span className="desc">{NexLuckI18n.t("All")}</span>}</td>
-                <td>{c.segments.length ? c.segments.map(s => <span key={s} className="tag">{s}</span>) : <span className="desc">{NexLuckI18n.t("All")}</span>}</td>
+                <td>{c.segments.length ? c.segments.map(s => <SegmentTag key={s} className="tag" segment={s} segments={segmentCatalog} />) : <span className="desc">{NexLuckI18n.t("All")}</span>}</td>
                 <td>{c.zone ? <span className="tag z">{c.zone}</span> : <span className="desc">{NexLuckI18n.t("All")}</span>}</td>
                 <td className="ed"><button className="edit" title={NexLuckI18n.t("Edit")} aria-label={NexLuckI18n.t("Edit ") + c.name} onClick={() => setEdit(c)}>
                   <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 14.75V17h2.25L15.9 6.35l-2.25-2.25L3 14.75Z" /><path d="m12.8 5.2 2.25 2.25M3 17h14" /></svg>

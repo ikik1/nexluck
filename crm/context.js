@@ -13,7 +13,7 @@
 
   function url(value, id = active) {
     const target = new URL(value, location.href);
-    if (target.origin === location.origin && target.pathname.startsWith('/crm/') && !target.pathname.includes('/api/')) {
+    if (target.origin === location.origin && (target.pathname.startsWith('/crm/') || target.pathname.startsWith('/coml/')) && !target.pathname.includes('/api/')) {
       if (id) target.searchParams.set('casino_context', id);
     }
     return target;
@@ -45,7 +45,7 @@
       const href = link.getAttribute('href');
       if (!href || href.startsWith('#')) return;
       const target = new URL(href, location.href);
-      if (target.origin !== location.origin || !target.pathname.startsWith('/crm/') ||
+      if (target.origin !== location.origin || !(target.pathname.startsWith('/crm/') || target.pathname.startsWith('/coml/')) ||
           /\.(md|ya?ml|json|svg)$/.test(target.pathname) || target.pathname.includes('-api/')) return;
       target.searchParams.set('casino_context', active);
       const value = target.pathname + target.search + target.hash;

@@ -44,10 +44,10 @@ function GameEditor({ game, categories, games, publishers, onCategorySaved, onSa
         <label className="field">{NexLuckI18n.t("Bonus contribution override %")}<div className="game-contribution"><input aria-label={NexLuckI18n.t("Bonus contribution override %")} type="number" min="0" max="100" step="any" placeholder={NexLuckI18n.t("Use provider default")} value={draft.bonus_contribution ?? ''} onChange={e => set('bonus_contribution', e.target.value === '' ? null : Number(e.target.value))} /><span>{game.provider_bonus_contribution}{NexLuckI18n.t("% from the provider")}</span></div><small>{NexLuckI18n.t("Leave empty to inherit the provider contribution.")}</small></label>
         <label className="field">{NexLuckI18n.t("Multiplier")}<input required type="number" min="0" max="1000000000" step="any" value={draft.multiplier} onChange={e => set('multiplier', e.target.value === '' ? '' : Number(e.target.value))} /></label>
         <label className="field">{NexLuckI18n.t("Variance")}<select aria-label={NexLuckI18n.t("Variance")} value={draft.variance} onChange={e => set('variance', e.target.value)}>{['low', "medium", 'high'].map(v => <option key={v} value={v}>{NexLuckI18n.t(v)}</option>)}</select></label>
-      <div className="field">{NexLuckI18n.t("Segments")}<div className="segment-tags">{draft.segments.map(name => <button key={name} type="button" className="segment-tag" aria-label={NexLuckI18n.t("Remove segment ") + name}
+      <div className="field">{NexLuckI18n.t("Segments")}<div className="segment-tags">{draft.segments.map(name => <SegmentTag as="button" key={name} type="button" segment={name} segments={segmentState.segments} labelPrefix={NexLuckI18n.t("Remove segment ")}
         onDoubleClick={() => set('segments', draft.segments.filter(v => v !== name))} onKeyDown={e => {
           if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); set('segments', draft.segments.filter(v => v !== name)); }
-        }}>{name}</button>)}<button type="button" className="btn" aria-label={NexLuckI18n.t("Edit game segments")} onClick={() => setSegmentsOpen(true)}>...</button></div></div>
+        }} />)}<button type="button" className="btn" aria-label={NexLuckI18n.t("Edit game segments")} onClick={() => setSegmentsOpen(true)}>...</button></div></div>
       </div>
       <div className="game-categories-preview">
         <GameChecks label={NexLuckI18n.t("Categories")} options={categories.filter(c => c.kind === 'static').map(c => [c.id, c.name])} values={categoryIds} disabled />
@@ -106,9 +106,9 @@ function GameCategoryEditor({ category, categories, games, onSaved, onClose }) {
           <label className="field">{NexLuckI18n.t("CMS identifier")}<input required maxLength={80} pattern={'[a-z][a-z0-9_\\-]*'} value={draft.cms_identifier} onChange={e => set('cms_identifier', e.target.value)} /></label>
         </div>
         {dynamic && <p className="hint">{NexLuckI18n.t("Dynamic category: games are resolved per customer.")}</p>}
-        <div className="field">{NexLuckI18n.t("Segments")}<div className="segment-tags">{draft.segments.map(name => <button type="button" key={name} className="segment-tag" aria-label={NexLuckI18n.t("Remove category segment ") + name}
+        <div className="field">{NexLuckI18n.t("Segments")}<div className="segment-tags">{draft.segments.map(name => <SegmentTag as="button" type="button" key={name} segment={name} segments={segmentState.segments} labelPrefix={NexLuckI18n.t("Remove category segment ")}
           onDoubleClick={() => set('segments', draft.segments.filter(s => s !== name))}
-          onKeyDown={e => { if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); set('segments', draft.segments.filter(s => s !== name)); } }}>{name}</button>)}
+          onKeyDown={e => { if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); set('segments', draft.segments.filter(s => s !== name)); } }} />)}
           <button type="button" className="btn" aria-label={NexLuckI18n.t("Edit category segments")} onClick={() => setSegmentsOpen(true)}>...</button></div></div>
         <GameChecks label={NexLuckI18n.t("Tags")} options={tagOptions.map(t => [t, t])} values={draft.tags} onChange={v => set('tags', v)} />
         <div className="game-category-toolbar"><label className="field">{NexLuckI18n.t("New tag")}<input maxLength={200} value={tag} onChange={e => setTag(e.target.value)} /></label>
@@ -170,6 +170,7 @@ function GameCategories({ categories, games, publishers, selected, onToggle, onS
   const [activeId, setActiveId] = React.useState(initialCategoryId || categories[0]?.id);
   const [sort, setSort] = React.useState('popularity');
   const [dragged, setDragged] = React.useState(null);
+  const segmentCatalog = NexLuckSegmentTags.useCatalog(React);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
   const [addingGames, setAddingGames] = React.useState(false);
@@ -205,7 +206,7 @@ function GameCategories({ categories, games, publishers, selected, onToggle, onS
             finally { setBusy(false); }
           }} />
           <div className="category-row-badges" aria-label={NexLuckI18n.t("Segments and tags for ") + c.name}>
-            {c.segments.map(s => <span key={'segment-' + s} className="segment-tag" title={NexLuckI18n.t("Segment: ") + s}>{s}</span>)}
+            {c.segments.map(s => <SegmentTag key={'segment-' + s} segment={s} segments={segmentCatalog} title={NexLuckI18n.t("Segment: ") + NexLuckSegmentTags.describe(s, segmentCatalog).label} />)}
             {c.tags.map(t => <span key={'tag-' + t} className="game-tag" title={NexLuckI18n.t("Tag: ") + t}>{t}</span>)}
           </div>
           <button type="button" className="game-category-name" disabled={busy} aria-label={NexLuckI18n.t("View games in ") + c.name} onClick={() => { setActiveId(c.id); setError(''); }}>{c.name}
@@ -217,7 +218,7 @@ function GameCategories({ categories, games, publishers, selected, onToggle, onS
       </div>
       {active && <section className="game-category-detail" aria-label={NexLuckI18n.t("Games in ") + active.name}>
         <h3>{active.name}</h3>
-        <div className="segment-tags">{active.segments.map(s => <span key={s} className="segment-tag">{s}</span>)}{active.tags.map(t => <span key={t} className="game-tag">{t}</span>)}</div>
+        <div className="segment-tags">{active.segments.map(s => <SegmentTag key={s} segment={s} segments={segmentCatalog} />)}{active.tags.map(t => <span key={t} className="game-tag">{t}</span>)}</div>
         {active.kind === "dynamic" ? <p className="hint">{NexLuckI18n.t("Dynamic category definition only. ")}{active.dynamic_kind === "recent" ? NexLuckI18n.t("Recently played") : NexLuckI18n.t("Favourite")}{NexLuckI18n.t(" games are customer-specific and are not resolved in this catalog.")}</p> : <>
           <p className="hint">{NexLuckI18n.t("Games may belong to many categories. Drag to reorder, or use the move buttons. Statistics below are demo data.")}</p>
           <div className="game-category-toolbar">
@@ -293,6 +294,7 @@ function GamesPage() {
   const [error, setError] = React.useState('');
   const [filters, setFilters] = React.useState({ q: '', status: '', publisher: '', currency: '', variance: '', attribute: '', segment: '', tag: '' });
   const [selectedCategories, setSelectedCategories] = React.useState([]);
+  const segmentCatalog = NexLuckSegmentTags.useCatalog(React);
   const [categoryOpen, setCategoryOpen] = React.useState(false);
   const [editing, setEditing] = React.useState(null);
   const [menu, setMenu] = React.useState(null);
@@ -324,7 +326,7 @@ function GamesPage() {
   const categoryName = id => categories.find(c => c.id === id)?.name || id;
   const filtered = games.filter(g => {
     const pub = publishers.find(p => p.id === g.publisher_id);
-    const text = [g.id, g.external_id, g.name, pub?.name, ...g.category_ids.map(categoryName), ...g.tags, ...g.segments].join(' ').toLowerCase();
+    const text = [g.id, g.external_id, g.name, pub?.name, ...g.category_ids.map(categoryName), ...g.tags, ...g.segments, ...g.segments.map(s => NexLuckSegmentTags.describe(s, segmentCatalog).label)].join(' ').toLowerCase();
     return filters.q.toLowerCase().trim().split(/\s+/).every(t => text.includes(t)) &&
       (!filters.status || g.enabled === (filters.status === 'enabled')) &&
       (!filters.publisher || g.publisher_id === filters.publisher) &&
@@ -341,7 +343,7 @@ function GamesPage() {
     ['currency', NexLuckI18n.t("Deposit currency"), CURRENCIES.map(c => [c, c])],
     ['variance', NexLuckI18n.t("Variance"), ['low', "medium", 'high'].map(v => [v, v])],
     ['attribute', NexLuckI18n.t("Attribute"), GAME_ATTRIBUTES],
-    ['segment', NexLuckI18n.t("Segment"), [...new Set(games.flatMap(g => g.segments))].sort().map(v => [v, v])],
+    ['segment', NexLuckI18n.t("Segment"), [...new Set(games.flatMap(g => g.segments))].sort().map(v => [v, NexLuckSegmentTags.describe(v, segmentCatalog).label])],
     ['tag', NexLuckI18n.t("Tag"), [...new Set(games.flatMap(g => g.tags))].sort().map(v => [v, v])]
   ];
   return <>
@@ -372,7 +374,7 @@ function GamesPage() {
             }}
             onContextMenu={e => { e.preventDefault(); if (!updating) setMenu({ game: g, x: e.clientX, y: e.clientY }); }}>
             <td>{g.id}</td><td>{g.external_id}</td><td className="game-name">{g.name}</td><td className="game-status">{g.enabled ? 'Enabled' : 'Disabled'}</td><td className="num">{gameDate(g.created_at)}</td>
-            <td><div className="game-tag-group"><small>{NexLuckI18n.t("Segments")}</small>{g.segments.map(s => <span className="segment-tag" key={s}>{s}</span>)}</div>
+            <td><div className="game-tag-group"><small>{NexLuckI18n.t("Segments")}</small>{g.segments.map(s => <SegmentTag key={s} segment={s} segments={segmentCatalog} />)}</div>
               <div className="game-tag-group"><small>{NexLuckI18n.t("Tags")}</small>{g.tags.map(t => <span className="game-tag" key={t}>{t}</span>)}</div>
               <div className="game-tag-group"><small>{NexLuckI18n.t("Categories")}</small>{g.category_ids.map(id => <span key={id} className="game-tag">{categoryName(id)}</span>)}</div></td>
             <td className="num">{g.popularity}</td><td className="num">{g.play_count.toLocaleString(NexLuckI18n.formatLocale)}</td>

@@ -22,6 +22,10 @@ My Casinos opens `/crm/c/l/` from Home, the legacy casinos section, and
 requests such as "my casinos", "casino websites" or "CMS".
 See [website configuration](c/l/README.md) for settings and status behavior.
 
+Compliance opens `/coml/` from Home or a "compliance" navigation request.
+It retains casino context like the other operational pages. See the
+[Compliance guide](../coml/README.md) for payout/KYC queues, alerts and risk scores.
+
 Type to see destinations, use Up/Down to highlight, Tab to fill the highlighted
 suggestion, Enter/Go to navigate, and Escape to dismiss suggestions. Clicking a
 suggestion navigates directly. Unmatched phrases show an explicit message.

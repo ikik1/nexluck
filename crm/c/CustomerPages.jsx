@@ -98,7 +98,7 @@ function CustomerList() {
           <td>{segmentState.loading ? 'Loading…' : segmentState.error ? 'Unavailable' : <SegmentTags segments={segmentState.segments.filter(s => membership[c.id]?.includes(s.id))} />}</td>
           <td><FunnelStatus value={c.funnel_status} /></td>
           <td>{c.external_id}</td><td>{c.DocumentINo}</td><td>{COUNTRIES[c.country][0]}</td><td>{c.currency}</td><td>{c.lang}</td><td>{c.mfa_type}</td>
-          <td><CustomerStatus value={c.kyc_status} /></td><td><CustomerStatus value={c.aml_status} /></td><td>{c.risk_score} / 100</td><td>{dateText(c.created_at)}</td>
+          <td><CustomerStatus value={c.kyc_status} /></td><td><CustomerStatus value={c.aml_status} /></td><td>{segmentState.loading || segmentState.error ? '—' : <CustomerRiskScore score={customerSegmentRisk(c, segmentState.segments, segmentState.parameters)} stored={c.risk_score} />}</td><td>{dateText(c.created_at)}</td>
           <td><a className="btn" href={'/crm/c/i/?id=' + encodeURIComponent(c.id)} aria-label={NexLuckI18n.t("View ") + c.name}>{NexLuckI18n.t("View")}</a></td>
         </tr>)}</tbody>
       </table>{!filtered.length && <div className="empty">{NexLuckI18n.t("No customers match these filters.")}</div>}</div>
@@ -165,37 +165,6 @@ function CustomerEdit({ customer, onClose, onSave }) {
   </div>;
 }
 
-function customerActivity(id, now = Date.now()) {
-  const index = Number(id.slice(3)) - 1001;
-  const wallets = WALLETS.filter(w => w.customer_id === id || (!w.customer_id && [String(7000 + index * 2), String(7001 + index * 2)].includes(w.id.slice(2))));
-  const transactions = WALLET_TX.filter(t => wallets.some(w => w.id === t.wallet) && t.ts <= now);
-  const stats = [...new Set(wallets.map(w => w.currency))].map(currency => {
-    const tx = transactions.filter(t => t.currency === currency);
-    const sum = type => tx.filter(t => t.type === type).reduce((total, t) => total + Math.abs(t.amount), 0);
-    const bets = sum('Bet'), wins = sum('Win'), wagered = sum('Bonus wagering'), granted = sum('Bonus granted');
-    return {
-      currency, bets, wins, ggr: bets - wins, net: wins - bets, rounds: tx.filter(t => t.type === 'Bet').length,
-      rtp: bets ? wins / bets * 100 : null, wagered, granted, cancelled: sum('Bonus cancelled'),
-      bonusEvents: tx.filter(t => t.type.startsWith('Bonus ')).length,
-      deposits: [1, 7, 30, 365].map(days => tx.filter(t => t.type === 'Deposit' && t.ts >= now - days * 86400000).reduce((total, t) => total + t.amount, 0))
-    };
-  });
-  const bets = transactions.filter(t => t.type === 'Bet' && wallets.some(w => w.id === t.wallet && w.type === 'Real'));
-  const rank = names => {
-    const counts = new Map();
-    names.forEach(name => counts.set(name, (counts.get(name) || 0) + 1));
-    return [...counts].sort(([a, ac], [b, bc]) => bc - ac || a.localeCompare(b)).slice(0, 3);
-  };
-  const games = bets.map(t => DEMO_GAME_CATALOG.find(game => game.name === t.note));
-  const favourites = {
-    games: rank(bets.map(t => t.note)),
-    categories: rank(games.map(game => game ? game.category : 'Unmapped category')),
-    providers: rank(games.map(game => game ? game.provider : 'Unmapped provider'))
-  };
-  const points = bets.length * 100;
-  return { wallets, transactions, stats, favourites, points, tier: points >= 500 ? 'Gold' : points >= 200 ? 'Silver' : 'Bronze' };
-}
-
 function Stats({ items }) {
   return <div className="stat-list">{items.map(([label, value]) => <div key={label}><span>{NexLuckI18n.t(label)}</span><b>{NexLuckI18n.t(value)}</b></div>)}</div>;
 }
@@ -251,7 +220,7 @@ function CustomerInfo() {
           {segmentState.error && <p role="alert" className="error">{segmentState.error} <button className="btn" onClick={segmentState.load}>{NexLuckI18n.t("Retry segments")}</button></p>}
           {segmentCustomerError && <p role="alert" className="error">{segmentCustomerError}</p>}
         </div>
-        <dl className="detail-list">{profileFields.map(([key, label]) => <React.Fragment key={key}><dt>{NexLuckI18n.t(label)}</dt><dd>{key === 'country' ? COUNTRIES[customer.country][0] : key === 'risk_score' ? `${customer[key]} / 100` : ['kyc_status', 'aml_status'].includes(key) ? <CustomerStatus value={customer[key]} /> : customer[key] === '' ? '—' : customer[key]}</dd></React.Fragment>)}</dl>
+        <dl className="detail-list">{profileFields.map(([key, label]) => <React.Fragment key={key}><dt>{NexLuckI18n.t(label)}</dt><dd>{key === 'country' ? COUNTRIES[customer.country][0] : key === 'risk_score' ? segmentState.loading || segmentState.error ? '—' : <CustomerRiskScore score={customerSegmentRisk(customer, segmentState.segments, segmentState.parameters)} stored={customer[key]} /> : ['kyc_status', 'aml_status'].includes(key) ? <CustomerStatus value={customer[key]} /> : customer[key] === '' ? '—' : customer[key]}</dd></React.Fragment>)}</dl>
         <h3 className="activity-title">{NexLuckI18n.t("Activity info")}</h3>
         <Stats items={[
           ['Last login', lastLoginDays === null ? 'No recorded login' : lastLoginDays === 0 ? 'Today' : `${lastLoginDays} day${lastLoginDays === 1 ? '' : 's'} ago`],

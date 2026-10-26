@@ -79,6 +79,8 @@ class CustomerStore
     return [nil, errors] unless errors.empty?
     id ||= "SG-#{(@segments.keys.map { |key| key.delete_prefix('SG-').to_i }.max || 1000) + 1}"
     now = Time.now.utc.iso8601
+    previous_tag = @segments.dig(id, 'tag_name')
+    clean['tag_name'] = previous_tag if previous_tag && !body.key?('tag_name')
     saved = clean.merge('id' => id, 'created_at' => @segments.dig(id, 'created_at') || now, 'updated_at' => now)
     updated = @segments.merge(id => saved)
     write_file('segments.json', updated)

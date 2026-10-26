@@ -1,5 +1,6 @@
 require 'digest'
 require_relative 'home_dashboard'
+require_relative 'compliance'
 
 # One atomic snapshot contains the registry, tenants, migration and operation keys.
 # The file lock also serializes independent Ruby processes sharing the store.
@@ -13,6 +14,7 @@ class CasinoContext
   }.freeze
 
   class Tenant < CustomerStore
+    include ComplianceStore
     attr_reader :state, :casino_id
 
     def initialize(state, casino_id, casinos)
@@ -50,6 +52,7 @@ class CasinoContext
       return [nil, { 'id' => 'Segment not found' }] if id && !segment(id)
       clean, errors = CustomerSegments.validate(body, parameters)
       return [nil, errors] unless errors.empty?
+      clean['tag_name'] = @segments.dig(id, 'tag_name') if id && !body.key?('tag_name') && @segments.dig(id, 'tag_name')
       check = lambda do |node|
         if node['kind'] == 'group'
           node['children'].each { |child| check.call(child) }
@@ -131,9 +134,11 @@ class CasinoContext
     transaction do |document|
       changed = false
       document.fetch('tenants').each do |id, state|
-        next if state.key?('home_dashboard')
-        state['home_dashboard'] = HomeDashboard.seed(id)
-        changed = true
+        changed = ComplianceStore.prepare(state, id, demo: false) || changed
+        unless state.key?('home_dashboard')
+          state['home_dashboard'] = HomeDashboard.seed(id)
+          changed = true
+        end
       end
       persist(document) if changed
     end
@@ -483,6 +488,7 @@ class CasinoContext
         unless id
           target, report = source ? clone_state(source, saved['id'], groups) : [empty_state, { 'counts' => counts(empty_state), 'requested_groups' => [], 'dependency_groups' => [] }]
           target['home_dashboard'] = HomeDashboard.seed(saved['id'])
+          ComplianceStore.prepare(target, saved['id'], demo: false)
           stamp(target, saved['id'])
           document['tenants'][saved['id']] = target
         end
@@ -513,7 +519,15 @@ class CasinoContext
         return if secured && !authorize(req, res, %w[games:read bonuses:read customers:read segments:read])
         return json(res, 200, state['catalogs'].merge('categories' => customer_store.game_categories))
       end
-      if rest == 'finance' || rest.start_with?('finance/')
+      if rest == 'compliance' || rest.start_with?('compliance/')
+        return if secured && !authorize(req, res, req.request_method == 'GET' ? 'compliance:read' : 'compliance:write')
+        if rest == 'compliance' && req.request_method == 'GET' && ComplianceStore.prepare(state, casino_id)
+          state['revision'] += 1
+          document['audit'] << audit(req, 'compliance_demo_seeded', casino_id, { 'source' => 'synthetic_demo' })
+          persist(document)
+        end
+        customer_store.handle_compliance(req, res, rest)
+      elsif rest == 'finance' || rest.start_with?('finance/')
         return if secured && !authorize(req, res, req.request_method == 'GET' ? 'finance:read' : 'finance:write')
         match = rest.match(%r{\Afinance(?:/(connections|cascades)(?:/([\w-]+))?)?\z})
         return json(res, 404, { error: 'Not found' }) unless match
