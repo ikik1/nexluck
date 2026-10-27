@@ -17,3 +17,10 @@ label{display:flex;flex-direction:column;font-size:12px;font-weight:600;color:va
 .preview-toolbar{justify-content:center}.preview-options{justify-content:center}
 .preview-options>select{width:auto}.preview-options label{margin:0;min-width:0;flex-wrap:wrap}
 .preview-options label select{width:auto;max-width:180px}
+.editor-page-actions{display:flex;align-items:center;gap:12px;margin-left:auto}
+.page-management{position:relative}.page-management>button{font-size:20px;line-height:1}
+.page-navigation{position:absolute;right:0;top:calc(100% + 8px);width:min(330px,calc(100vw - 40px));max-height:75vh;overflow:auto;background:white;border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 35px #0003;padding:16px;z-index:50}
+.page-navigation nav{display:grid;gap:5px}.page-navigation nav button{display:flex;justify-content:space-between;text-align:left;overflow-wrap:anywhere}
+.page-navigation nav button[aria-current=page]{background:#eaf2fb;border-color:var(--brand)}
+.page-navigation small{color:var(--muted);max-width:45%;overflow-wrap:anywhere}
+.page-navigation form{border-top:1px solid var(--line);margin-top:16px}

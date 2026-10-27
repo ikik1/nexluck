@@ -49,6 +49,8 @@ class Page(models.Model):
     slug = models.SlugField(default="home")
     title = models.CharField(max_length=160)
     layout = models.ForeignKey(Layout, on_delete=models.PROTECT)
+    theme_override = models.ForeignKey(Theme, null=True, blank=True, on_delete=models.PROTECT)
+    navigation = models.JSONField(null=True, blank=True)
     revision = models.PositiveIntegerField(default=1)
     published = models.ForeignKey("Publication", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     updated_at = models.DateTimeField(auto_now=True)

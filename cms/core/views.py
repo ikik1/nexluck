@@ -4,6 +4,7 @@ import json
 from copy import deepcopy
 from django.conf import settings
 from django.db import connection
+from django.db import IntegrityError, transaction
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.http import Http404, HttpResponseNotModified
@@ -18,7 +19,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from .crm import CRMUnavailable, crm_get
 from .documents import StrictSerializer, layout_tree, theme_tokens
-from .models import Layout, Page, Plugin, Publication, Site, Theme
+from .models import ContentBlock, Layout, Page, Plugin, Publication, Site, Theme
 from .registry import registry
 from .services import document_for, publish_page, require_site, save_document, sites_for, validate_document
 from .starter import import_site
@@ -27,7 +28,60 @@ from .popular import context_query, demo_context
 
 
 def page_query():
-    return Page.objects.select_related("site__theme", "layout", "published").prefetch_related("blocks", "site__menus")
+    return Page.objects.select_related("site__theme", "theme_override", "layout", "published").prefetch_related("blocks", "site__menus")
+
+
+def selected_page(request, site_id):
+    page_id = request.GET.get("page")
+    if page_id is not None:
+        if not page_id.isascii() or not page_id.isdecimal():
+            raise serializers.ValidationError({"page": "Choose a valid page."})
+        return get_object_or_404(page_query(), site_id=site_id, pk=page_id)
+    return get_object_or_404(page_query(), site_id=site_id, slug="home")
+
+
+def page_url(page):
+    return f"/cms/sites/{page.site.slug}/" + ("" if page.slug == "home" else f"{page.slug}/")
+
+
+def page_record(page):
+    return {"id": page.pk, "title": page.title, "slug": page.slug, "revision": page.revision,
+            "published_revision": page.published.revision if page.published_id else None, "url": page_url(page)}
+
+
+class CreatePageInput(StrictSerializer):
+    title = serializers.CharField(max_length=160)
+    slug = serializers.SlugField(max_length=50)
+    source_id = serializers.IntegerField(min_value=1, required=False)
+
+
+@never_cache
+@api_view(["GET", "POST"])
+def pages(request, site_id):
+    site = require_site(request.user, site_id)
+    if request.method == "POST":
+        serializer = CreatePageInput(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        if values["slug"] == "home":
+            raise serializers.ValidationError({"slug": "Home page URL is reserved."})
+        source = get_object_or_404(page_query(), site=site, pk=values["source_id"]) if "source_id" in values else None
+        home = get_object_or_404(page_query(), site=site, slug="home")
+        base = document_for(source or home)
+        try:
+            with transaction.atomic():
+                page = Page.objects.create(site=site, slug=values["slug"], title=values["title"],
+                    layout=(source or home).layout, theme_override=Theme.objects.get(key=base["theme"]),
+                    navigation=base["menu"] if source else [])
+                if source:
+                    ContentBlock.objects.bulk_create([ContentBlock(page=page, position=i, **block)
+                        for i, block in enumerate(base["blocks"])])
+        except IntegrityError as exc:
+            if Page.objects.filter(site=site, slug=values["slug"]).exists():
+                raise serializers.ValidationError({"slug": "A page with this URL already exists."}) from exc
+            raise
+        return Response(page_record(page), status=201)
+    return Response({"items": [page_record(page) for page in page_query().filter(site=site).order_by("id")]})
 
 
 @never_cache
@@ -90,11 +144,12 @@ def crm_sites(request):
 @api_view(["GET", "PATCH"])
 def draft(request, site_id):
     require_site(request.user, site_id)
-    page = get_object_or_404(page_query(), site_id=site_id, slug="home")
+    page = selected_page(request, site_id)
     if request.method == "PATCH":
         page = save_document(page.id, request.data)
         page = page_query().get(pk=page.pk)
-    return Response({"document": document_for(page), "published_revision": page.published.revision if page.published_id else None})
+    return Response({"document": document_for(page), "published_revision": page.published.revision if page.published_id else None,
+                     "page": page_record(page)})
 
 
 class RevisionSerializer(StrictSerializer):
@@ -107,9 +162,9 @@ def publish(request, site_id):
     site = require_site(request.user, site_id, publish=True)
     serializer = RevisionSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    page = get_object_or_404(Page, site=site, slug="home")
+    page = selected_page(request, site.pk)
     publication = publish_page(page.id, serializer.validated_data["revision"], request.user)
-    return Response({"revision": publication.revision, "url": f"/cms/sites/{site.slug}/"})
+    return Response({"revision": publication.revision, "url": page_url(page)})
 
 
 def render_document(request, doc, site, preview=False, publication=None, token=""):
@@ -126,6 +181,7 @@ def render_document(request, doc, site, preview=False, publication=None, token="
     popular_key = request.GET.get("popular")
     if popular_key and not any(b["key"] == popular_key and b["kind"] == "games" and b["enabled"] for b in blocks):
         raise Http404("Popular module not found.")
+    preview_page = selected_page(request, site.pk).pk if preview and request.GET.get("page") else None
     for b in blocks:
         if b["kind"] == "seo":
             from .modules import SEOProps
@@ -134,6 +190,8 @@ def render_document(request, doc, site, preview=False, publication=None, token="
         b["data_url"] = (f"/cms/api/sites/{site.id}/widgets/{b['key']}/?preview={token}" if preview else
                          f"/cms/api/public/{site.slug}/{publication.id}/widgets/{b['key']}/?")
         b["data_url"] += ("&" if preview else "") + f"lang={locale}"
+        if preview_page:
+            b["data_url"] += "&page=" + str(preview_page)
         b["full_list"] = request.GET.get("popular") == b["key"] and b["kind"] == "games"
         if b["kind"] == "games":
             demo_context(request)
@@ -177,7 +235,7 @@ def preview(request, site_id):
     if token:
         doc = preview_document(request, site, token)
         return render_document(request, doc, site, preview=True, token=token)
-    page = get_object_or_404(page_query(), site=site, slug="home")
+    page = selected_page(request, site.pk)
     doc, layout, theme = validate_document(document_for(page))
     doc.update(site_name=site.name, renderer=layout.renderer, tokens=theme.tokens, sections=layout_tree(layout, doc["blocks"]))
     return render_document(request, doc, site, preview=True)
@@ -187,6 +245,8 @@ def preview_document(request, site, token):
     data = cache.get("cms:preview:" + token[:100])
     if not data or data["user_id"] != request.user.id or data["site_id"] != site.id:
         raise Http404("Preview expired or unavailable. Make a change or reload the editor.")
+    if request.GET.get("page") and data.get("page_id") != selected_page(request, site.pk).pk:
+        raise Http404("Preview does not belong to this page.")
     return deepcopy(data["document"])
 
 
@@ -195,18 +255,19 @@ def preview_document(request, site, token):
 def create_preview(request, site_id):
     locale = website_locale(request)
     site = require_site(request.user, site_id)
+    page = selected_page(request, site_id)
     doc, layout, theme = validate_document(request.data)
     doc.update(site_name=site.name, renderer=layout.renderer, tokens=theme.tokens, sections=layout_tree(layout, doc["blocks"]))
     token = secrets.token_urlsafe(32)
-    cache.set("cms:preview:" + token, {"user_id": request.user.id, "site_id": site.id, "document": doc}, 300)
-    return Response({"url": f"/cms/preview/{site.id}/?token={token}&lang={locale}"})
+    cache.set("cms:preview:" + token, {"user_id": request.user.id, "site_id": site.id, "page_id": page.pk, "document": doc}, 300)
+    return Response({"url": f"/cms/preview/{site.id}/?token={token}&lang={locale}&page={page.pk}"})
 
 
 @ensure_csrf_cookie
-def public_page(request, slug):
+def public_page(request, slug, page_slug="home"):
     locale = website_locale(request)
     page = get_object_or_404(Page.objects.select_related("site", "published").defer("published__document"),
-        site__slug=slug, site__enabled=True, slug="home", published__isnull=False)
+        site__slug=slug, site__enabled=True, slug=page_slug, published__isnull=False)
     etag = '"' + hashlib.sha256(f"popular-v1:{request.GET.urlencode()}:{locale}:{page.published_id}:{page.published.revision}".encode()).hexdigest() + '"'
     if request.headers.get("If-None-Match") == etag:
         response = HttpResponseNotModified()
@@ -273,7 +334,7 @@ def draft_widget(request, site_id, key):
     token = request.GET.get("preview")
     if token:
         return widget_result(site, preview_document(request, site, token), key, include_hidden=True, locale=locale, request=request)
-    page = get_object_or_404(page_query(), site=site, slug="home")
+    page = selected_page(request, site.pk)
     return widget_result(site, document_for(page), key, include_hidden=True, locale=locale, request=request)
 
 
@@ -313,7 +374,7 @@ def popular_favourite(request, key, site_id=None, slug=None, publication_id=None
         site = require_site(request.user, site_id)
         token = request.GET.get("preview")
         doc = preview_document(request, site, token) if token else document_for(
-            get_object_or_404(page_query(), site=site, slug="home"))
+            selected_page(request, site.pk))
     else:
         publication = get_object_or_404(Publication.objects.select_related("page__site"),
             pk=publication_id, page__site__slug=slug, page__site__enabled=True, page__published_id=publication_id)

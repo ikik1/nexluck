@@ -18,6 +18,7 @@ cms_urls = [
     path("api/crm-sites/", views.crm_sites),
     path("api/import/", views.import_crm),
     path("api/sites/<int:site_id>/draft/", views.draft),
+    path("api/sites/<int:site_id>/pages/", views.pages),
     path("api/sites/<int:site_id>/previews/", views.create_preview),
     path("api/sites/<int:site_id>/publish/", views.publish),
     path("api/sites/<int:site_id>/widgets/<slug:key>/", views.draft_widget),
@@ -26,6 +27,7 @@ cms_urls = [
     path("api/public/<slug:slug>/<int:publication_id>/widgets/<slug:key>/favourites/", views.popular_favourite),
     path("preview/<int:site_id>/", views.preview),
     path("sites/<slug:slug>/", views.public_page),
+    path("sites/<slug:slug>/<slug:page_slug>/", views.public_page),
     *registry.plugin_urls,
 ]
 urlpatterns = [path("cms/", include(cms_urls))]

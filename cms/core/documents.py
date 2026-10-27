@@ -53,6 +53,7 @@ class MenuItemSerializer(StrictSerializer):
 class DocumentSerializer(StrictSerializer):
     revision = serializers.IntegerField(min_value=1)
     title = serializers.CharField(max_length=160)
+    slug = serializers.SlugField(max_length=50, required=False)
     layout = serializers.SlugField()
     theme = serializers.SlugField()
     menu = MenuItemSerializer(many=True, max_length=20)

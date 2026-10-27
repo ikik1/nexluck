@@ -1,8 +1,8 @@
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 from .documents import DocumentSerializer, layout_tree, theme_tokens
-from .models import ContentBlock, Layout, NavigationMenu, Page, Plugin, Publication, Site, SiteMember, Theme
+from .models import ContentBlock, Layout, Page, Plugin, Publication, Site, SiteMember, Theme
 from .registry import registry
 
 
@@ -25,9 +25,10 @@ def require_site(user, pk, publish=False):
 
 
 def document_for(page):
-    menu = next((m.items for m in page.site.menus.all() if m.key == "main"), [])
+    menu = page.navigation if page.navigation is not None else next((m.items for m in page.site.menus.all() if m.key == "main"), [])
     return {
-        "revision": page.revision, "title": page.title, "layout": page.layout.key, "theme": page.site.theme.key,
+        "revision": page.revision, "title": page.title, "slug": page.slug,
+        "layout": page.layout.key, "theme": (page.theme_override or page.site.theme).key,
         "menu": menu,
         "blocks": [{"key": b.key, "kind": b.kind, "slot": b.slot, "enabled": b.enabled, "props": b.props,
                     "translations": b.translations}
@@ -55,12 +56,23 @@ def save_document(page_id, raw):
     page = Page.objects.select_for_update().select_related("site").get(pk=page_id)
     if doc["revision"] != page.revision:
         raise Conflict()
+    slug = doc.get("slug", page.slug)
+    if page.slug == "home" and slug != "home" or page.slug != "home" and slug == "home":
+        raise ValidationError({"slug": "Home page URL is reserved."})
+    if Page.objects.filter(site=page.site, slug=slug).exclude(pk=page.pk).exists():
+        raise ValidationError({"slug": "A page with this URL already exists."})
+    page.slug = slug
     page.title, page.layout = doc["title"], layout
     page.revision += 1
-    page.save(update_fields=["title", "layout", "revision", "updated_at"])
-    page.site.theme = theme
-    page.site.save(update_fields=["theme", "updated_at"])
-    NavigationMenu.objects.update_or_create(site=page.site, key="main", defaults={"items": doc["menu"]})
+    page.theme_override = theme
+    page.navigation = doc["menu"]
+    try:
+        with transaction.atomic():
+            page.save(update_fields=["title", "slug", "layout", "revision", "updated_at", "theme_override", "navigation"])
+    except IntegrityError as exc:
+        if Page.objects.filter(site=page.site, slug=slug).exclude(pk=page.pk).exists():
+            raise ValidationError({"slug": "A page with this URL already exists."}) from exc
+        raise
     page.blocks.all().delete()
     ContentBlock.objects.bulk_create([ContentBlock(page=page, position=i, **block) for i, block in enumerate(doc["blocks"])])
     return page

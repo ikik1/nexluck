@@ -154,6 +154,28 @@ Apply migrations before starting the updated backend. Verification:
 
 ## Editing workflow
 
+### Page management
+
+The right-hand burger button in the editor title opens **Page management**:
+select a website page, or create a blank page / copy the selected saved page.
+Copies include modules and Localization overrides, layout, theme and navigation;
+they start as unpublished revision 1. Unsaved changes require confirmation before
+switching or creating a page. Copying uses the saved source, not unsaved edits.
+
+Edit the selected page's title, URL slug, layout, theme, navigation and modules.
+Each page has its own draft revision, ephemeral preview and publication.
+Home keeps its reserved `home` slug and public `/cms/sites/<site>/` URL.
+Additional pages publish to `/cms/sites/<site>/<page-slug>/`; duplicate slugs
+within a website are rejected. Saving a page URL changes its public routing;
+content still comes from its last publication until publishing again.
+There is no delete/unpublish action.
+
+Staff APIs: `GET/POST /cms/api/sites/<id>/pages/` lists/creates pages
+(`title`, `slug`, optional casino-local `source_id`). Existing draft, preview,
+publish and draft-widget endpoints accept `?page=<page-id>`; omitted page
+continues selecting Home. Page permissions inherit website membership and
+publication permission. Apply `0005_page_configuration` before starting.
+
 1. Sign in with a staff account. The single **Website** selector fetches websites
    from the CRM casino API. Superusers see all CRM websites; other staff see
    only CRM websites already assigned through a `SiteMember` record.

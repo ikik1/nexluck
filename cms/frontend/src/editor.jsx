@@ -3,10 +3,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api } from './api';
 import { ContextMenu, Properties } from './Properties';
+import { PageManagement } from './PageManagement';
 
 function Editor() {
   const [catalog, setCatalog] = useState(null);
   const [siteId, setSiteId] = useState('');
+  const [pages, setPages] = useState([]);
+  const [pageId, setPageId] = useState(null);
+  const [pageUrl, setPageUrl] = useState('');
   const [draft, setDraft] = useState(null);
   const [published, setPublished] = useState(null);
   const [dirty, setDirty] = useState(false);
@@ -55,24 +59,35 @@ function Editor() {
       }
     }).catch(e => setError(e.message));
   }, []);
-  const reloadDraft = async id => {
-    const result = await api(`/cms/api/sites/${id}/draft/`);
+  const pageQuery = id => id ? `?page=${id}` : '';
+  const reloadDraft = async (id, selectedPage = pageId, signal) => {
+    const result = await api(`/cms/api/sites/${id}/draft/${pageQuery(selectedPage)}`, signal ? { signal } : undefined);
+    if (signal?.aborted) return;
     setDraft(result.document); setPublished(result.published_revision); setDirty(false);
+    setPageId(result.page.id); setPageUrl(result.page.url);
     setSelected(result.document.blocks[0]?.key || ''); setPreviewVersion(n => n + 1);
   };
   useEffect(() => {
     if (!siteId) { setDraft(null); return; }
-    setDraft(null); setPreviewUrl(''); setError(''); setBusy(true); setProperties(false); setContext(null);
-    reloadDraft(siteId).catch(e => setError(e.message)).finally(() => setBusy(false));
+    setDraft(null); setPages([]); setPageId(null); setPreviewUrl(''); setError(''); setBusy(true); setProperties(false); setContext(null);
+    const controller = new AbortController();
+    const load = async () => {
+      const listing = await api(`/cms/api/sites/${siteId}/pages/`, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      setPages(listing.items);
+      await reloadDraft(siteId, null, controller.signal);
+    };
+    load().catch(e => { if (e.name !== 'AbortError') setError(e.message); }).finally(() => { if (!controller.signal.aborted) setBusy(false); });
+    return () => controller.abort();
   }, [siteId]);
   useEffect(() => {
-    if (!draft || !siteId) return;
+    if (!draft || !siteId || !pageId) return;
     let active = true;
     const controller = new AbortController();
     setPreviewUpdating(true);
     const timer = setTimeout(async () => {
       try {
-        const result = await api(`/cms/api/sites/${siteId}/previews/?lang=${contentLocale}`, {
+        const result = await api(`/cms/api/sites/${siteId}/previews/?lang=${contentLocale}&page=${pageId}`, {
           method: 'POST', body: JSON.stringify(draft), signal: controller.signal
         });
         if (active) {
@@ -84,7 +99,7 @@ function Editor() {
       } finally { if (active) setPreviewUpdating(false); }
     }, 450);
     return () => { active = false; clearTimeout(timer); controller.abort(); };
-  }, [draft, siteId, previewVersion, contentLocale, demoCountry]);
+  }, [draft, siteId, pageId, previewVersion, contentLocale, demoCountry]);
   useEffect(() => {
     const unload = e => {
       if (dirty && !localeLeaving.current) { e.preventDefault(); e.returnValue = ''; }
@@ -153,15 +168,39 @@ function Editor() {
     setDirty(false); setSiteId(String(id));
   });
   const save = () => task(async () => {
-    const result = await api(`/cms/api/sites/${siteId}/draft/`, { method: 'PATCH', body: JSON.stringify(draft) });
+    const result = await api(`/cms/api/sites/${siteId}/draft/${pageQuery(pageId)}`, { method: 'PATCH', body: JSON.stringify(draft) });
     setDraft(result.document); setDirty(false); setPublished(result.published_revision);
+    setPageUrl(result.page.url);
+    setPages(items => items.map(item => item.id === pageId ? result.page : item));
     setPreviewVersion(n => n + 1); setStatus(t("Draft saved. Preview updated; public page unchanged."));
   });
   const site = catalog?.sites.find(s => String(s.id) === siteId);
   const slots = catalog?.layouts.find(l => l.key === draft?.layout)?.definition.sections.map(s => s.slot) || ['main'];
+  const selectPage = async id => {
+    if (dirty && !confirm(t("Discard unsaved draft changes?"))) return false;
+    let success = false;
+    await task(async () => {
+      await reloadDraft(siteId, id);
+      setProperties(false); setContext(null); setPreviewUrl(''); success = true;
+    });
+    return success;
+  };
+  const createPage = async values => {
+    if (dirty && !confirm(t("Discard unsaved draft changes?"))) return false;
+    let success = false;
+    await task(async () => {
+      const created = await api(`/cms/api/sites/${siteId}/pages/`, { method: 'POST', body: JSON.stringify(values) });
+      setPages(items => [...items, created]);
+      await reloadDraft(siteId, created.id);
+      setProperties(false); setContext(null); setPreviewUrl(''); success = true;
+    });
+    return success;
+  };
   return <>
     <div className="editor-title"><div><h1>{t("Visual page editor")}</h1><p>{t("NexLuck Demo Layout \u00b7 CRM-powered modules \u00b7 Draft / Preview / Publish \u00b7")}<a href="/cms/api/" target="_blank" rel="noopener noreferrer">{t("Module API docs \u2197")}</a></p></div>
-      <span className={'state-badge ' + (dirty ? 'unsaved' : '')}>{dirty ? t("Unsaved changes") : draft ? t("Draft revision {revision}", { revision: draft.revision }) : t("Choose a site")}</span></div>
+      <div className="editor-page-actions"><span className={'state-badge ' + (dirty ? 'unsaved' : '')}>{dirty ? t("Unsaved changes") : draft ? t("Draft revision {revision}", { revision: draft.revision }) : t("Choose a site")}</span>
+        {siteId && <PageManagement key={siteId} pages={pages} selected={pageId} busy={busy}
+          onSelect={selectPage} onCreate={createPage} />}</div></div>
     {error && <div className="error-panel" role="alert">{error}<button onClick={() => location.reload()}>{t("Reload editor")}</button></div>}
     {status && <p className="success-panel" role="status">{status}</p>}
     {!catalog ? <p role="status">{t("Loading CMS...")}</p> : <>
@@ -171,16 +210,20 @@ function Editor() {
         {draft && <><button disabled={busy || !dirty} onClick={save}>{t("Save draft & preview")}</button>
           <button disabled={busy} onClick={() => { if (!dirty || confirm(t("Discard unsaved changes?"))) task(() => reloadDraft(siteId)); }}>{t("Reload draft")}</button>
           <button className="primary" disabled={busy || dirty || !site?.can_publish} onClick={() => task(async () => {
-            const result = await api(`/cms/api/sites/${siteId}/publish/`, { method: 'POST', body: JSON.stringify({ revision: draft.revision }) });
-            setPublished(result.revision); setStatus(t("Published revision {revision}.", { revision: result.revision }));
+            const result = await api(`/cms/api/sites/${siteId}/publish/${pageQuery(pageId)}`, { method: 'POST', body: JSON.stringify({ revision: draft.revision }) });
+            setPublished(result.revision); setPageUrl(result.url);
+            setPages(items => items.map(item => item.id === pageId ? { ...item, published_revision: result.revision } : item));
+            setStatus(t("Published revision {revision}.", { revision: result.revision }));
           })}>{t("Publish")}</button>{previewUrl && !previewUpdating && !previewError && <a className="button" target="_blank" rel="noopener noreferrer" href={previewUrl + '&standalone=1'}>{t("Preview \u2197")}</a>}
-          {published && <a className="button" target="_blank" rel="noopener noreferrer" href={`/cms/sites/${site.slug}/`}>{t("Open published site \u2197")}</a>}
+          {published && <a className="button" target="_blank" rel="noopener noreferrer" href={pageUrl}>{t("Open published site \u2197")}</a>}
         </>}
       </div>
       {draft ? <div className="editor-workspace">
         <aside className="editor-properties"><fieldset disabled={busy}>
           <h2>{t("Page settings")}</h2>
           <label>{t("Page title")}<input maxLength={160} value={draft.title} onChange={e => change({ title: e.target.value })} /></label>
+          <label>{t("Page URL")}<input maxLength={50} value={draft.slug ?? 'home'} disabled={pages.find(page => page.id === pageId)?.slug === 'home'}
+            onChange={event => change({ slug: event.target.value })} /></label>
           <label>{t("Theme")}<select aria-label={t("Theme")} value={draft.theme} onChange={e => change({ theme: e.target.value })}>{catalog.themes.map(theme => <option key={theme.key} value={theme.key}>{t(theme.name)}</option>)}</select></label>
           <label>{t("Layout")}<select aria-label={t("Layout")} value={draft.layout} onChange={e => {
             const firstSlot = catalog.layouts.find(l => l.key === e.target.value).definition.sections[0].slot;
