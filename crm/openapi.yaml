@@ -48,6 +48,72 @@ tags:
   - name: Dashboard
   - name: Compliance
 paths:
+  /games/ranking:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+    get:
+      tags: [Games]
+      operationId: getDemoGameRanking
+      summary: Casino-scoped synthetic geo or personal ranking (demo mode only)
+      description: |
+        Requires games:read. Returns 503 outside CRM_UI_MODE=demo.
+        No real bet-volume or player-history feed is connected. Order is deterministic
+        per casino/country/demo identity, and all returned IDs belong to enabled games.
+      parameters:
+        - {name: country, in: query, schema: {type: string, default: WORLD}}
+        - {name: mode, in: query, schema: {type: string, enum: [geo, personal], default: geo}}
+        - {name: minutes, in: query, schema: {type: integer, minimum: 1, maximum: 525600, default: 60}}
+        - {name: player, in: query, schema: {type: string, pattern: '^demo-[a-zA-Z0-9-]{1,80}$'}}
+      responses:
+        '200':
+          description: Ordered game IDs and explicit ranking metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: {type: array, items: {type: object, properties: {gameId: {type: string}}}}
+                  total: {type: integer}
+                  metric: {type: string, enum: [bet_volume]}
+                  country: {type: string}
+                  countryName: {type: string, nullable: true}
+                  period: {type: object, properties: {minutes: {type: integer}, live: {type: boolean}}}
+                  updatedAt: {type: string, format: date-time}
+                  personalized: {type: boolean}
+                  demo: {type: boolean, enum: [true]}
+        '422': {description: Invalid country, demo identity or ranking parameters}
+        '503': {description: Demo rankings disabled}
+  /games/demo-favourites:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+      - {name: player, in: query, required: true, schema: {type: string, pattern: '^demo-[a-zA-Z0-9-]{1,80}$'}}
+    get:
+      tags: [Games]
+      summary: Read casino-local favourites for an explicit demo identity
+      description: Demo mode only. Requires games:read. Not a real player-authentication endpoint.
+      responses:
+        '200': {description: 'items of gameId, total and demo=true'}
+        '422': {description: Invalid or missing demo identity}
+        '503': {description: Demo endpoints disabled}
+    post:
+      tags: [Games]
+      summary: Set or remove a casino-local demo favourite
+      description: Demo mode only. Requires games:write. Persists in the atomic casino tenant snapshot.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [gameId, favourite]
+              properties:
+                gameId: {type: string}
+                favourite: {type: boolean}
+      responses:
+        '200': {description: Updated gameId list}
+        '422': {description: Invalid body or game does not belong to this casino or is disabled}
+        '503': {description: Demo endpoints disabled}
   /compliance:
     parameters:
       - $ref: '#/components/parameters/CasinoContext'
@@ -1788,6 +1854,8 @@ components:
           properties:
             id: { type: string, readOnly: true }
             publisher_id: { type: string, readOnly: true }
+            image: { type: string, readOnly: true, description: Catalogue image URL; synthetic SVG data URI for demo games without artwork }
+            badges: { type: array, readOnly: true, items: { type: string, enum: [NEW, HOT, JACKPOT] } }
             created_at: { type: string, format: date-time, readOnly: true }
             updated_at: { type: string, format: date-time, readOnly: true }
             provider_bonus_contribution: { type: number, readOnly: true, minimum: 0, maximum: 100 }

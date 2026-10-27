@@ -10,13 +10,6 @@
 <div class="landing-shell home-shell">
 <header class="landing-header home-header">
 <a class="landing-brand" href="/" aria-label="{% cms_t '{name} home' name=doc.site_name %}"><span class="bird-logo"><i></i><b></b></span><span class="logo-copy">nex<span>luck</span></span><span class="brand-name">{{ doc.site_name }}</span></a>
-<label class="website-language">{% cms_t "Language" %}<select id="website-language" aria-label="{% cms_t 'Website language' %}">
-<option value="en"{% if website_language == "en" %} selected{% endif %}>{% cms_t "English" %}</option>
-<option value="ru"{% if website_language == "ru" %} selected{% endif %}>{% cms_t "Russian" %}</option>
-<option value="pt-PT"{% if website_language == "pt-PT" %} selected{% endif %}>{% cms_t "Portuguese (Portugal)" %}</option>
-<option value="pt-BR"{% if website_language == "pt-BR" %} selected{% endif %}>{% cms_t "Portuguese (Brazil)" %}</option>
-<option value="es"{% if website_language == "es" %} selected{% endif %}>{% cms_t "Spanish (Spain)" %}</option>
-</select></label>
 {% for block in profile_blocks %}<div class="home-header-actions{% if not block.enabled %} cms-module-hidden{% endif %}" data-block-key="{{ block.key }}" aria-label="{{ block.props.title }}" {% if not block.enabled %}data-cms-hidden="true" title="{% cms_t "Hidden on published website" %}"{% endif %} {% if editing %}tabindex="0" draggable="true"{% endif %}>
 <label class="balance-select"><span>{% cms_t "Demo balance" %}</span><select aria-label="{% cms_t "Select currency" %}"><option>{% cms_t "100 EUR" %}</option><option>{% cms_t "100 USD" %}</option><option>{% cms_t "85 GBP" %}</option></select></label>
 <button class="header-notice bonus-notice" data-notice="{% cms_t "Demo bonus wallet is up to date." %}" aria-label="{% cms_t "Bonus notifications" %}"><span aria-hidden="true">%</span><i></i></button>
@@ -24,14 +17,15 @@
 <a class="profile-avatar" href="/w/" aria-label="{% cms_t "Demo profile: luna.play, Gold loyalty level" %}"><span>L</span><b class="loyalty-badge">✦</b></a>
 </div>{% endfor %}</header>
 <main class="home-main">{% for section in content_sections %}<div class="layout-section columns-{{ section.columns }}" data-slot="{{ section.slot }}">
-{% for block in section.blocks %}<section class="home-section module-{{ block.kind }}{% if not block.enabled %} cms-module-hidden{% endif %}" id="{{ block.key }}" data-block-key="{{ block.key }}" {% if not block.enabled %}data-cms-hidden="true" title="{% cms_t "Hidden on published website" %}"{% endif %} {% if editing %}tabindex="0" draggable="true"{% endif %}>
+{% for block in section.blocks %}{% if not popular_page or block.full_list %}<section class="home-section module-{{ block.kind }}{% if not block.enabled %} cms-module-hidden{% endif %}" id="{{ block.key }}" data-block-key="{{ block.key }}" {% if not block.enabled %}data-cms-hidden="true" title="{% cms_t "Hidden on published website" %}"{% endif %} {% if editing %}tabindex="0" draggable="true"{% endif %}>
 <div class="section-heading"><div><span class="eyebrow">{{ block.props.subtitle }}</span><h2>{{ block.props.title }}</h2></div>
+{% if block.kind == "games" %}{% if block.full_list %}<a class="text-link" href="{{ block.back_url }}">{% cms_t "Back to home" %}</a>{% else %}<a class="text-link popular-view-all" href="{{ block.view_all_url }}">{% cms_t "View all →" %}</a>{% endif %}{% endif %}
 {% if block.kind == "promotions" %}<div class="carousel-arrows"><button data-slide="-1" aria-label="{% cms_t "Previous promotions" %}">←</button><button data-slide="1" aria-label="{% cms_t "Next promotions" %}">→</button></div>{% endif %}</div>
 {% if block.kind == "seo" %}<div class="home-seo seo-content">{{ block.props.html|safe }}</div>
 {% else %}{% if block.props.body %}<p class="block-body">{{ block.props.body|linebreaksbr }}</p>{% endif %}{% endif %}
-{% if block.kind == "games" %}<label class="home-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="{% cms_t "Search games" %}" aria-label="{% cms_t "Search games" %}"></label>{% endif %}
-{% if block.async %}<div data-island="{{ block.key }}"><p class="widget-status" role="status">{% cms_t "Loading catalog..." %}</p></div>{% endif %}
-</section>{% endfor %}</div>{% endfor %}</main>
+{% if block.full_list %}<label class="home-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="{% cms_t "Search games" %}" aria-label="{% cms_t "Search games" %}"></label>{% endif %}
+{% if block.async %}<div data-island="{{ block.key }}">{% if block.kind == "games" %}<div class="popular-track popular-loading popular-{{ block.props.layout|default:'row' }}" aria-label="{% cms_t "Loading games" %}" role="status">{% for i in block.skeletons %}<span class="popular-skeleton"></span>{% endfor %}</div>{% else %}<p class="widget-status" role="status">{% cms_t "Loading catalog..." %}</p>{% endif %}</div>{% endif %}
+</section>{% endif %}{% endfor %}</div>{% endfor %}</main>
 <footer class="home-footer" id="responsible-play"><p class="home-responsible">{% cms_t "18+ only. Play responsibly and within your limits." %}</p><p>{% cms_t "Catalog preview only. No deposits, wagering, prizes, or real-money transactions are processed here." %}</p><small>{% cms_t "Terms and applicable license information must be supplied before a real launch." %}</small></footer></div>
 {% for block in tab_blocks %}<nav class="landing-bottom-nav{% if not block.enabled %} cms-module-hidden{% endif %}" aria-label="{{ block.props.title }}" data-block-key="{{ block.key }}" {% if not block.enabled %}data-cms-hidden="true" title="{% cms_t "Hidden on published website" %}"{% endif %} {% if editing %}tabindex="0" draggable="true"{% endif %}>
 <button data-action="deposit"><span class="nav-symbol" aria-hidden="true">◈</span><small>{% cms_t "Deposit" %}</small></button>

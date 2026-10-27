@@ -1,3 +1,7 @@
+require 'cgi'
+require 'digest'
+require 'base64'
+
 # Uses CustomerStore's private directory and atomic JSON persistence.
 module GameCatalog
   CURRENCIES = CustomerStore::CURRENCIES
@@ -115,7 +119,13 @@ module GameCatalog
     @game_catalog['games'].map do |game|
       ids = game_categories.select { |c| c['kind'] == 'static' && c['game_ids'].include?(game['id']) }.map { |c| c['id'] }
       primary = ids.include?(game['category']) ? game['category'] : ids.first.to_s
-      game.merge('category_ids' => ids, 'category' => primary)
+      color = Digest::SHA256.hexdigest(game['id'])[0, 6]
+      name = CGI.escapeHTML(game['name'])
+      art = %(<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="##{color}"/><stop offset="1" stop-color="#0e122f"/></linearGradient></defs><rect width="480" height="360" fill="url(#g)"/><circle cx="360" cy="90" r="120" fill="#ffffff" opacity=".08"/><path d="M240 40 310 150 240 260 170 150Z" fill="#6df5ff" opacity=".3"/><text x="24" y="310" fill="white" font-family="sans-serif" font-weight="bold" font-size="24">#{name}</text></svg>)
+      badges = game.fetch('tags', []).map(&:upcase) & %w[NEW HOT JACKPOT]
+      badges << 'JACKPOT' if game.fetch('attributes', []).include?('jackpot') && !badges.include?('JACKPOT')
+      game.merge('category_ids' => ids, 'category' => primary, 'badges' => badges,
+        'image' => game['image'] || "data:image/svg+xml;base64,#{Base64.strict_encode64(art)}")
     end
   end
 

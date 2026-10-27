@@ -32,7 +32,8 @@ lazy_t = lazy(t, str)
 
 
 def website_locale(request):
-    locale = request.GET.get("lang", "en")
+    saved = request.COOKIES.get("nexluck_website_language", "en")
+    locale = request.GET.get("lang", saved if saved in LOCALES else "en")
     if locale not in LOCALES:
         raise BadRequest(t("Choose a supported language."))
     return locale

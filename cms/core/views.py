@@ -2,6 +2,7 @@ import hashlib
 import secrets
 import json
 from copy import deepcopy
+from django.conf import settings
 from django.db import connection
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
@@ -22,6 +23,7 @@ from .registry import registry
 from .services import document_for, publish_page, require_site, save_document, sites_for, validate_document
 from .starter import import_site
 from .i18n import DJANGO_LOCALES, catalog, localized_document, t, website_locale
+from .popular import context_query, demo_context
 
 
 def page_query():
@@ -49,6 +51,7 @@ def bootstrap(request):
         "layouts": list(Layout.objects.values("key", "name", "definition")),
         "modules": [{"key": m.key, "label": m.label, "async": m.data is not None} for m in registry.modules.values()],
         "can_import": request.user.is_superuser,
+        "popular_demo_inputs": settings.POPULAR_DEMO_INPUTS,
     })
 
 
@@ -120,6 +123,9 @@ def render_document(request, doc, site, preview=False, publication=None, token="
         doc["sections"] = [{**section, "blocks": [b for b in doc["blocks"] if b["slot"] == section["slot"]]}
                            for section in doc["sections"]]
     blocks = [b for section in doc["sections"] for b in section["blocks"]]
+    popular_key = request.GET.get("popular")
+    if popular_key and not any(b["key"] == popular_key and b["kind"] == "games" and b["enabled"] for b in blocks):
+        raise Http404("Popular module not found.")
     for b in blocks:
         if b["kind"] == "seo":
             from .modules import SEOProps
@@ -128,12 +134,26 @@ def render_document(request, doc, site, preview=False, publication=None, token="
         b["data_url"] = (f"/cms/api/sites/{site.id}/widgets/{b['key']}/?preview={token}" if preview else
                          f"/cms/api/public/{site.slug}/{publication.id}/widgets/{b['key']}/?")
         b["data_url"] += ("&" if preview else "") + f"lang={locale}"
+        b["full_list"] = request.GET.get("popular") == b["key"] and b["kind"] == "games"
+        if b["kind"] == "games":
+            demo_context(request)
+            b["skeletons"] = range(3 if b["full_list"] else b["props"].get("homeLimit", 10))
+            extra = context_query(request)
+            if extra:
+                b["data_url"] += "&" + extra
+            if request.GET.get("browse") == "1":
+                b["data_url"] += "&browse=1"
+            from urllib.parse import urlencode
+            b["view_all_url"] = "?" + urlencode({**request.GET.dict(), "popular": b["key"]})
+            b["back_url"] = "?" + urlencode({key: value for key, value in request.GET.items() if key != "popular"})
     response = render(request, template, {
         "doc": doc, "site": site, "preview": preview,
         "website_language": locale, "website_messages": catalog().get(locale, {}),
         "editing": editing,
         "tokens": [(key, value) for key, value in theme_tokens(doc["tokens"]).items()],
-        "islands": [{"key": b["key"], "kind": b["kind"], "url": b["data_url"], "props": b["props"]} for b in blocks if b["async"]],
+        "islands": [{"key": b["key"], "kind": b["kind"], "url": b["data_url"], "props": b["props"],
+                     "fullList": b["full_list"], "viewAllUrl": b.get("view_all_url", "")} for b in blocks if b["async"]],
+        "popular_page": request.GET.get("popular", ""),
         "content_sections": [{**s, "blocks": [b for b in s["blocks"] if b["kind"] not in ("header_profile", "tab_menu", "main_menu")]}
                              for s in doc["sections"]],
         "profile_blocks": [b for b in blocks if b["kind"] == "header_profile"],
@@ -147,6 +167,7 @@ def render_document(request, doc, site, preview=False, publication=None, token="
 @never_cache
 @login_required
 @xframe_options_sameorigin
+@ensure_csrf_cookie
 def preview(request, site_id):
     if not request.user.is_staff:
         from django.core.exceptions import PermissionDenied
@@ -181,15 +202,16 @@ def create_preview(request, site_id):
     return Response({"url": f"/cms/preview/{site.id}/?token={token}&lang={locale}"})
 
 
+@ensure_csrf_cookie
 def public_page(request, slug):
     locale = website_locale(request)
     page = get_object_or_404(Page.objects.select_related("site", "published").defer("published__document"),
         site__slug=slug, site__enabled=True, slug="home", published__isnull=False)
-    etag = '"' + hashlib.sha256(f"i18n-v1:{locale}:{page.published_id}:{page.published.revision}".encode()).hexdigest() + '"'
+    etag = '"' + hashlib.sha256(f"popular-v1:{request.GET.urlencode()}:{locale}:{page.published_id}:{page.published.revision}".encode()).hexdigest() + '"'
     if request.headers.get("If-None-Match") == etag:
         response = HttpResponseNotModified()
         response["ETag"] = etag
-        response["Cache-Control"] = "public, max-age=0, must-revalidate"
+        response["Cache-Control"] = "private, max-age=0, must-revalidate"
         response["Content-Language"] = locale
         return response
     cache_key = f"cms:publication:v2:{locale}:{page.published_id}"
@@ -200,7 +222,7 @@ def public_page(request, slug):
     doc = deepcopy(doc)
     response = render_document(request, doc, page.site, publication=page.published)
     response["ETag"] = etag
-    response["Cache-Control"] = "public, max-age=0, must-revalidate"
+    response["Cache-Control"] = "private, max-age=0, must-revalidate"
     response["Content-Language"] = locale
     return response
 
@@ -217,7 +239,7 @@ def health(request):
     return JsonResponse({"status": "ok"})
 
 
-def widget_result(site, doc, key, *, include_hidden=False, locale="en"):
+def widget_result(site, doc, key, *, include_hidden=False, locale="en", request=None):
     doc = localized_document(doc, locale)
     block = next((b for b in doc["blocks"] if b["key"] == key and (b["enabled"] or include_hidden)), None)
     if not block:
@@ -229,6 +251,15 @@ def widget_result(site, doc, key, *, include_hidden=False, locale="en"):
         return Response({"detail": t("This plugin is disabled.", locale)}, status=503)
     try:
         with translation.override(DJANGO_LOCALES.get(locale, locale)):
+            if block["kind"] == "games" and request is not None:
+                from .popular import request_context
+                token = request_context.set({"context": demo_context(request), "browse": request.GET.get("browse") == "1"})
+                try:
+                    result = module.data(site, block["props"])
+                finally:
+                    request_context.reset(token)
+                result["favouriteUrl"] = request.path + "favourites/?" + request.GET.urlencode()
+                return Response(result)
             return Response(module.data(site, block["props"]))
     except CRMUnavailable as exc:
         return Response({"detail": t(str(exc), locale)}, status=503)
@@ -241,9 +272,9 @@ def draft_widget(request, site_id, key):
     site = require_site(request.user, site_id)
     token = request.GET.get("preview")
     if token:
-        return widget_result(site, preview_document(request, site, token), key, include_hidden=True, locale=locale)
+        return widget_result(site, preview_document(request, site, token), key, include_hidden=True, locale=locale, request=request)
     page = get_object_or_404(page_query(), site=site, slug="home")
-    return widget_result(site, document_for(page), key, include_hidden=True, locale=locale)
+    return widget_result(site, document_for(page), key, include_hidden=True, locale=locale, request=request)
 
 
 @api_view(["GET"])
@@ -252,14 +283,50 @@ def public_widget(request, slug, publication_id, key):
     locale = website_locale(request)
     publication = get_object_or_404(Publication.objects.select_related("page__site"),
         pk=publication_id, page__site__slug=slug, page__site__enabled=True, page__published_id=publication_id)
-    response = widget_result(publication.page.site, publication.document, key, locale=locale)
+    response = widget_result(publication.page.site, publication.document, key, locale=locale, request=request)
     if response.status_code == 200:
+        cache_policy = "private" if "signedIn" in response.data else "public"
         etag = '"' + hashlib.sha256((locale + json.dumps(response.data, sort_keys=True)).encode()).hexdigest() + '"'
         if request.headers.get("If-None-Match") == etag:
             response = HttpResponseNotModified()
         response["ETag"] = etag
-        response["Cache-Control"] = "public, max-age=0, must-revalidate"
+        response["Cache-Control"] = f"{cache_policy}, max-age=0, must-revalidate"
     else:
         response["Cache-Control"] = "no-store"
     response["Content-Language"] = locale
     return response
+
+
+class FavouriteInput(StrictSerializer):
+    gameId = serializers.CharField(max_length=120)
+    favourite = serializers.BooleanField()
+
+
+@never_cache
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def popular_favourite(request, key, site_id=None, slug=None, publication_id=None):
+    from rest_framework.authentication import SessionAuthentication
+    from rest_framework.exceptions import PermissionDenied
+    SessionAuthentication().enforce_csrf(request)
+    if site_id is not None:
+        site = require_site(request.user, site_id)
+        token = request.GET.get("preview")
+        doc = preview_document(request, site, token) if token else document_for(
+            get_object_or_404(page_query(), site=site, slug="home"))
+    else:
+        publication = get_object_or_404(Publication.objects.select_related("page__site"),
+            pk=publication_id, page__site__slug=slug, page__site__enabled=True, page__published_id=publication_id)
+        site, doc = publication.page.site, publication.document
+    if not any(block["key"] == key and block["kind"] == "games" and block["enabled"] for block in doc["blocks"]):
+        raise Http404("Popular module not found.")
+    context = demo_context(request)
+    if not context["player"]:
+        raise PermissionDenied("Choose a demo signed-in player to use favourites.")
+    serializer = FavouriteInput(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        return Response(crm_get("games/demo-favourites", casino_id=site.crm_id, params={"player": context["player"]},
+            full_response=True, method="POST", body=dict(serializer.validated_data)))
+    except CRMUnavailable as exc:
+        return Response({"detail": t(str(exc))}, status=503)

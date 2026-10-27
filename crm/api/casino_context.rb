@@ -1,6 +1,7 @@
 require 'digest'
 require_relative 'home_dashboard'
 require_relative 'compliance'
+require_relative 'popular_games'
 
 # One atomic snapshot contains the registry, tenants, migration and operation keys.
 # The file lock also serializes independent Ruby processes sharing the store.
@@ -15,6 +16,7 @@ class CasinoContext
 
   class Tenant < CustomerStore
     include ComplianceStore
+    include PopularGames
     attr_reader :state, :casino_id
 
     def initialize(state, casino_id, casinos)
@@ -519,7 +521,10 @@ class CasinoContext
         return if secured && !authorize(req, res, %w[games:read bonuses:read customers:read segments:read])
         return json(res, 200, state['catalogs'].merge('categories' => customer_store.game_categories))
       end
-      if rest == 'compliance' || rest.start_with?('compliance/')
+      if %w[games/ranking games/demo-favourites].include?(rest)
+        return if secured && !authorize(req, res, req.request_method == 'GET' ? 'games:read' : 'games:write')
+        customer_store.handle_popular_games(req, res, rest)
+      elsif rest == 'compliance' || rest.start_with?('compliance/')
         return if secured && !authorize(req, res, req.request_method == 'GET' ? 'compliance:read' : 'compliance:write')
         if rest == 'compliance' && req.request_method == 'GET' && ComplianceStore.prepare(state, casino_id)
           state['revision'] += 1

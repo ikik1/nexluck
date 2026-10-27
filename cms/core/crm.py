@@ -23,7 +23,7 @@ def casino_cache_key(prefix, casino_id):
     return f"cms:{prefix}:v2:{owner}"
 
 
-def crm_get(path, *, casino_id=None, paginate=False):
+def crm_get(path, *, casino_id=None, paginate=False, params=None, full_response=False, method="GET", body=None):
     base = settings.CRM_API_BASE.rstrip("/")
     headers = {"Accept": "application/json"}
     if path != "casinos":
@@ -35,7 +35,7 @@ def crm_get(path, *, casino_id=None, paginate=False):
             else:
                 if not settings.CRM_CLIENT_ID or not settings.CRM_CLIENT_SECRET:
                     raise CRMUnavailable("CRM service credentials are not configured.")
-                scope = "games:read bonuses:read casinos:read segments:read"
+                scope = "games:write" if method != "GET" else "games:read bonuses:read casinos:read segments:read"
                 fingerprint = hashlib.sha256((base + settings.CRM_CLIENT_ID + settings.CRM_CLIENT_SECRET + scope).encode()).hexdigest()
                 token_key = "cms:crm:token:" + fingerprint
                 token = cache.get(token_key)
@@ -50,12 +50,18 @@ def crm_get(path, *, casino_id=None, paginate=False):
                 headers["Authorization"] = "Bearer " + token
             items = []
             while True:
-                suffix = ("?" + urlencode({"limit": 100, "offset": len(items)})) if paginate else ""
-                response = client.get(base + "/" + path + suffix, headers=headers)
+                query = {**(params or {}), **({"limit": 100, "offset": len(items)} if paginate else {})}
+                suffix = "?" + urlencode(query) if query else ""
+                if method == "GET":
+                    response = client.get(base + "/" + path + suffix, headers=headers)
+                else:
+                    response = client.request(method, base + "/" + path + suffix, headers=headers, json=body)
                 response.raise_for_status()
                 result = response.json()
                 if not isinstance(result, dict) or not isinstance(result.get("items"), list):
                     raise ValueError("Invalid catalog shape")
+                if full_response:
+                    return result
                 batch = result["items"]
                 items.extend(batch)
                 if not paginate or len(items) >= result["total"]:

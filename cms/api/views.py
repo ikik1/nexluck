@@ -25,7 +25,9 @@ class PromotionQuery(SiteQuery):
 
 def field_schema(name, field):
     value = {"title": t(field.label or name.replace("_", " ").title())}
-    if isinstance(field, serializers.ListField):
+    if isinstance(field, serializers.Serializer):
+        value.update(type="object", properties={key: field_schema(key, child) for key, child in field.fields.items()})
+    elif isinstance(field, serializers.ListField):
         value.update(type="array", items=field_schema("value", field.child), maxItems=field.max_length)
     elif isinstance(field, serializers.IntegerField):
         value.update(type="integer", minimum=field.min_value, maximum=field.max_value)
@@ -41,6 +43,8 @@ def field_schema(name, field):
         value["default"] = field.get_default()
     if name == "custom_segment":
         value.update(widget="crm-segments", source="/cms/api/segments/")
+    if name in ("games", "pinned"):
+        value["widget"] = "popular-games"
     if name in ("html", "body"):
         value["widget"] = "html" if name == "html" else "textarea"
     return value
@@ -54,7 +58,7 @@ def module_schema(module):
     if module.data:
         visible.add("limit")
     if module.key == "games":
-        visible.update(["provider", "category"])
+        visible = {"title", "mode", "games", "pinned", "layout", "homeLimit", "pageLimit", "rankingMinutes"}
     if module.key == "promotions":
         visible = {"title", "subtitle", "body", "total", "sort_by", "custom_segment", "bonus_external_ids"}
     if module.key == "seo":
@@ -83,6 +87,19 @@ def segments(request):
     site = require_site(request.user, serializer.validated_data["site_id"])
     try:
         return Response({"items": segment_catalog(casino_id=site.crm_id)})
+    except CRMUnavailable as exc:
+        return Response({"detail": t(str(exc))}, status=503)
+
+
+@never_cache
+@api_view(["GET"])
+def popular_catalog(request):
+    from core.popular import game_catalog
+    serializer = SiteQuery(data=request.query_params)
+    serializer.is_valid(raise_exception=True)
+    site = require_site(request.user, serializer.validated_data["site_id"])
+    try:
+        return Response({"items": list(game_catalog(site).values())})
     except CRMUnavailable as exc:
         return Response({"detail": t(str(exc))}, status=503)
 
@@ -121,6 +138,9 @@ def openapi(request):
         "servers": [{"url": "/cms/api"}],
         "paths": {
             "/modules/": {"get": {"summary": "Module property schemas and defaults", "responses": {"200": {"description": "Schema catalog"}}}},
+            "/popular-catalog/": {"get": {"summary": "Enabled casino game catalogue for ordered Popular lists and pins",
+                "parameters": [parameters[0]], "responses": {"200": {"description": "Game IDs, names, provider names, images and badges"},
+                    "404": {"description": "Site not found or not permitted"}, "503": {"description": "Catalogue unavailable with no saved copy"}}}},
             "/segments/": {"get": {"summary": "Saved CRM segment IDs and names for a permitted site",
                 "parameters": [parameters[0]], "responses": {"200": {"description": "Segment list"},
                     "400": {"description": "Site ID required"}, "404": {"description": "Site not found or not permitted"},

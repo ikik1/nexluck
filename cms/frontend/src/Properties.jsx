@@ -1,6 +1,7 @@
 import { t } from './i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from './api';
+import { PopularGamePicker } from './PopularGamePicker';
 import '../../../crm/c/SegmentSelection.js';
 
 const SegmentSelection = globalThis.createSegmentSelection(React);
@@ -76,9 +77,10 @@ function ArrayField({ value, onChange, label }) {
 
 export function Properties({ siteId, block, schema, slots, onChange, onClose, contentLocale, onLocaleChange }) {
   const props = contentLocale === 'en' ? block.props : { ...block.props, ...block.translations?.[contentLocale] };
-  const update = (name, value) => contentLocale === 'en'
-    ? onChange({ props: { ...block.props, [name]: value } })
-    : onChange({ translations: { ...block.translations, [contentLocale]: { ...block.translations?.[contentLocale], [name]: value } } });
+  const updateFields = values => contentLocale === 'en'
+    ? onChange({ props: { ...block.props, ...values } })
+    : onChange({ translations: { ...block.translations, [contentLocale]: { ...block.translations?.[contentLocale], ...values } } });
+  const update = (name, value) => updateFields({ [name]: value });
   return <Dialog title={t("{module} properties", { module: t(schema.label) })} onClose={onClose}>
     <p>{block.kind} · {t("Changes appear in the private preview. Save draft to persist.")}</p>
     <label>{t("Localization")}<select aria-label={t("Localization")} value={contentLocale} onChange={e => onLocaleChange(e.target.value)}>
@@ -95,13 +97,23 @@ export function Properties({ siteId, block, schema, slots, onChange, onClose, co
     {Object.entries(schema.properties).map(([name, field]) => {
       const value = props[name] ?? field.default ?? '';
       const label = name === 'title' ? t("Module heading") : name === 'limit' ? t("Maximum items") : t(field.title);
+      if (field.widget === 'popular-games') {
+        const mode = props.mode || 'auto';
+        if (name === 'games' && mode !== 'manual' || name === 'pinned' && !['hybrid', 'ai'].includes(mode)) return null;
+        return <PopularGamePicker key={`${siteId}:${name}:${contentLocale}`} siteId={siteId} value={value}
+          pinned={name === 'pinned'} onChange={v => update(name, v)} />;
+      }
       if (field.widget === 'crm-segments') return <SegmentPicker key={`${siteId}:${name}:${contentLocale}`} siteId={siteId} value={value} onChange={v => update(name, v)} />;
       if (field.widget === 'html') return <HTMLField key={`${name}:${contentLocale}`} value={value} maxLength={field.maxLength} onChange={v => update(name, v)} />;
       if (field.type === 'boolean') return <label className="check" key={name}>
         <input type="checkbox" checked={value === true} onChange={e => update(name, e.target.checked)} />{label}
       </label>;
       return <label key={`${name}:${contentLocale}`}>{label}
-        {field.enum ? <select value={value} onChange={e => update(name, e.target.value)}>{field.enum.map(v => <option key={v}>{v}</option>)}</select> :
+        {field.enum ? <select aria-label={label} value={value} onChange={e => {
+          if (block.kind === 'games' && name === 'layout' && [10, 20].includes(props.homeLimit ?? 10)) {
+            updateFields({ layout: e.target.value, homeLimit: Math.min(props.pageLimit ?? 100, e.target.value === 'double' ? 20 : 10) });
+          } else update(name, e.target.value);
+        }}>{field.enum.map(v => <option key={v}>{v}</option>)}</select> :
           field.type === 'array' ? <ArrayField label={label} value={value} onChange={v => update(name, v)} /> :
           field.widget === 'textarea' ? <textarea value={value} maxLength={field.maxLength} onChange={e => update(name, e.target.value)} /> :
           <input aria-label={label} type={field.type === 'integer' ? 'number' : 'text'} value={value}

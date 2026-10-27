@@ -61,6 +61,12 @@ async def check():
         page.set_default_timeout(15000)
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
+        for casino_id in (Server.a, Server.b):
+            await page.goto(base + "/crm/section.html?s=compliance&casino_context=" + casino_id)
+            await page.wait_for_url(base + "/coml/?casino_context=" + casino_id)
+            await page.get_by_role("tab", name="Payout requests New 15", exact=True).wait_for()
+            assert await page.evaluate("CRMContext.id") == casino_id
+            assert await page.locator('tbody tr[data-status="New"]').count() == 15
         await page.goto(base + "/crm/?casino_context=" + Server.a)
         card = page.locator('[data-section="compliance"]')
         await card.wait_for()

@@ -24,6 +24,7 @@ function Editor() {
   const [context, setContext] = useState(null);
   const [properties, setProperties] = useState(false);
   const [contentLocale, setContentLocale] = useState('en');
+  const [demoCountry, setDemoCountry] = useState('WORLD');
   const [dragging, setDragging] = useState('');
   const [dropTarget, setDropTarget] = useState('');
   const [announcement, setAnnouncement] = useState('');
@@ -74,13 +75,16 @@ function Editor() {
         const result = await api(`/cms/api/sites/${siteId}/previews/?lang=${contentLocale}`, {
           method: 'POST', body: JSON.stringify(draft), signal: controller.signal
         });
-        if (active) { setPreviewUrl(result.url); setPreviewError(''); }
+        if (active) {
+          setPreviewUrl(result.url + (catalog?.popular_demo_inputs ? `&demo_country=${encodeURIComponent(demoCountry)}` : ''));
+          setPreviewError('');
+        }
       } catch (e) {
         if (active && e.name !== 'AbortError') setPreviewError(t("Preview not updated: {error}", { error: e.message }));
       } finally { if (active) setPreviewUpdating(false); }
     }, 450);
     return () => { active = false; clearTimeout(timer); controller.abort(); };
-  }, [draft, siteId, previewVersion, contentLocale]);
+  }, [draft, siteId, previewVersion, contentLocale, demoCountry]);
   useEffect(() => {
     const unload = e => {
       if (dirty && !localeLeaving.current) { e.preventDefault(); e.returnValue = ''; }
@@ -227,7 +231,17 @@ function Editor() {
             setPluginTitle(''); setPluginBody(''); setPreviewVersion(n => n + 1); setStatus(t("Public announcement added."));
           })}>{t("Publish announcement")}</button></details>}
         </aside>
-        <section className="preview-panel"><div className="preview-toolbar"><strong>{t("Visual preview")}</strong><label>{t("Viewport")}<select value={device} onChange={e => setDevice(e.target.value)}><option value="desktop">{t("Desktop")}</option><option value="tablet">{t("Tablet")}</option><option value="mobile">{t("Mobile")}</option></select></label><span>{previewUpdating ? t("Updating preview...") : dirty ? t("Unsaved preview \u00b7 save to persist") : t("Saved draft \u00b7 right-click a module to edit")}</span></div>
+        <section className="preview-panel"><div className="preview-toolbar"><strong>{t("Visual preview")}</strong>
+          <div className="preview-options">
+            <select aria-label={t("Viewport")} value={device} onChange={e => setDevice(e.target.value)}><option value="desktop">{t("Desktop")}</option><option value="tablet">{t("Tablet")}</option><option value="mobile">{t("Mobile")}</option></select>
+            {catalog.popular_demo_inputs && <label>{t("Demo country")}<select aria-label={t("Demo country")} value={demoCountry}
+              onChange={event => setDemoCountry(event.target.value)}>
+              <option value="WORLD">{t("All countries")}</option>
+              {['CA', 'US', 'BR', 'MX', 'AR', 'CL', 'PE', 'DE', 'FR', 'ES', 'IT', 'NL', 'PL', 'SE', 'GB', 'IE', 'AT', 'FI', 'RU', 'KZ', 'UA', 'UZ', 'AZ', 'AE', 'SA', 'TR', 'EG', 'MA', 'NG', 'ZA', 'KE', 'GH', 'TH', 'VN', 'ID', 'PH', 'MY', 'IN', 'JP', 'KR', 'AU', 'NZ', 'BD'].map(code =>
+                <option key={code} value={code}>{new Intl.DisplayNames([document.documentElement.lang], { type: 'region' }).of(code)}</option>)}
+            </select></label>}
+          </div>
+          {previewUpdating && <span className="sr-only" role="status">{t("Updating preview...")}</span>}</div>
           {previewError && <p className="error-panel" role="alert">{previewError} <button onClick={() => setPreviewVersion(n => n + 1)}>{t("Retry preview")}</button></p>}
           <div className={'preview-stage device-' + device}>{previewUrl ? <iframe ref={frame} title={t("Page preview")} src={previewUrl}
             onLoad={() => frame.current?.contentWindow?.postMessage({ type: 'cms:highlight', key: selected }, location.origin)} /> : <p role="status">{t("Preparing private preview...")}</p>}</div>

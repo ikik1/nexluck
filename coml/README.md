@@ -3,6 +3,8 @@
 Open `/coml/` from the CRM Home **Compliance** tile or navigation. The page shares
 the CRM header, five interface languages, casino context, save guards and customer
 segmentation. There is no separate `/crm/coml/` page.
+Legacy `/crm/section.html?s=compliance` links redirect to `/coml/`, preserving
+the `casino_context` parameter.
 
 ## Review queues
 

@@ -156,6 +156,9 @@ class CMSTests(TestCase):
             if path == "games":
                 return [{"id": f"GM-{suffix}", "name": suffix, "enabled": True,
                          "publisher_id": f"PR-{suffix}", "category_ids": [f"CAT-{suffix}"]}]
+            if path == "games/ranking":
+                return {"items": [{"gameId": f"GM-{suffix}"}], "metric": "bet_volume", "country": "WORLD",
+                        "period": {"minutes": 60}, "updatedAt": "2026-10-27T10:00:00Z", "personalized": False}
             return [{"id": f"{'CAT' if path.endswith('categories') else 'PR'}-{suffix}",
                      "name": suffix, "kind": "static"}]
         get.side_effect = catalog
@@ -183,7 +186,7 @@ class CMSTests(TestCase):
             for path in ("games", "games/categories", "games/publishers", "bonuses"):
                 calls = [call for call in get.call_args_list
                          if call.args == (path,) and call.kwargs["casino_id"] == owner]
-                self.assertEqual(len(calls), 1)
+                self.assertEqual(len(calls), 2 if path == "games/publishers" else 1)
         # Returning to the first site must read its own warm cache, not the last site's data.
         response = self.client.get(f"/cms/api/sites/{self.site.id}/widgets/games-3/")
         self.assertEqual(response.data["items"][0]["id"], "GM-A")
@@ -322,22 +325,23 @@ class CMSTests(TestCase):
 
     @patch("core.crm.crm_get")
     def test_crm_widget_whitelist_filters_and_cache(self, get):
-        get.return_value = [
+        games = [
             {"id": "one", "name": "First", "publisher_id": "pragmatic", "category_ids": ["SLOTS"], "enabled": True, "secret": "not public"},
             {"id": "two", "name": "Disabled", "publisher_id": "pragmatic", "category_ids": [], "enabled": False},
             {"id": "three", "name": "Other", "publisher_id": "other", "category_ids": ["SLOTS"], "enabled": True},
         ]
+        get.side_effect = lambda path, **kwargs: games if path == "games" else [{"id": "pragmatic", "name": "Pragmatic Play"}]
         doc = self.document()
-        doc["blocks"][2]["props"].update(provider="pragmatic", category="SLOTS", limit=1)
+        doc["blocks"][2]["props"].update(mode="manual", games=["one", "two"], homeLimit=1, pageLimit=1)
         self.client.patch(self.url, doc, format="json")
         publication = publish_page(self.page.id, 2, self.admin)
         url = f"/cms/api/public/{self.site.slug}/{publication.id}/widgets/games-3/"
         self.client.force_authenticate(None)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["items"], [{"id": "one", "name": "First", "provider": "pragmatic", "categories": ["SLOTS"]}])
+        self.assertEqual(response.data["items"], [{"id": "one", "name": "First", "provider": "Pragmatic Play", "image": "", "badges": []}])
         self.client.get(url)
-        self.assertEqual(get.call_count, 1)
+        self.assertEqual(get.call_count, 2)
 
     @patch("core.crm.crm_get", side_effect=CRMUnavailable("CRM is offline"))
     def test_crm_failure_is_explicit(self, get):
@@ -399,6 +403,8 @@ class CMSTests(TestCase):
         doc = self.document()
         for block in doc["blocks"]:
             block["enabled"] = False
+            if block["kind"] == "games":
+                block["props"].update(mode="manual", games=[])
         response = self.client.patch(self.url, doc, format="json")
         self.assertEqual(response.status_code, 200)
         client = APIClient()

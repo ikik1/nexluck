@@ -100,6 +100,7 @@ CRM_API_BASE = os.environ.get("CRM_API_BASE", "http://127.0.0.1:8086/crm/api/v1"
 CRM_CLIENT_ID = os.environ.get("CRM_CLIENT_ID", "")
 CRM_CLIENT_SECRET = os.environ.get("CRM_CLIENT_SECRET", "")
 CRM_DEMO_UI = LOCAL and os.environ.get("CRM_DEMO_UI", "0") == "1"
+POPULAR_DEMO_INPUTS = os.environ.get("CMS_POPULAR_DEMO_INPUTS", "1" if LOCAL else "0") == "1"
 LOGGING = {"version": 1, "disable_existing_loggers": False,
            "handlers": {"console": {"class": "logging.StreamHandler"}},
            "root": {"handlers": ["console"], "level": "INFO"}}

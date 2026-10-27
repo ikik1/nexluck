@@ -105,8 +105,8 @@ async def browser_check(base, password):
         await page.get_by_label("Website", exact=True).select_option(index=1)
         preview = page.frame_locator('iframe[title="Page preview"]')
         await preview.get_by_role("heading", name="Popular games", exact=True).wait_for()
-        await preview.locator("#games-3 .catalog-card").first.wait_for()
-        assert await preview.locator("#games-3 .catalog-card").count() == 8
+        await preview.locator("#games-3 .popular-tile").first.wait_for()
+        assert await preview.locator("#games-3 .popular-tile").count() == 10
         assert await page.get_by_text("Selected module", exact=True).count() == 0
         assert await preview.get_by_text("Edit section", exact=True).count() == 0
         assert await page.get_by_role("button", name="Connect CRM website", exact=True).count() == 0
@@ -147,11 +147,11 @@ async def browser_check(base, password):
         assert await page.get_by_text("Unsaved changes", exact=True).is_visible()
         assert await page.get_by_role("button", name="Publish", exact=True).is_disabled()
         # Unsaved previews use their own parameters, not the stored draft's.
-        await page.get_by_label("Maximum items", exact=True).fill("3")
-        await preview.locator("#games-3 .catalog-card").nth(2).wait_for()
+        await page.get_by_label("Home limit", exact=True).fill("3")
+        await preview.locator("#games-3 .popular-tile").nth(2).wait_for()
         await page.wait_for_function("""() => {
           const frame=document.querySelector('iframe');
-          return frame?.contentDocument?.querySelectorAll('#games-3 .catalog-card').length===3;
+          return frame?.contentDocument?.querySelectorAll('#games-3 .popular-tile').length===3;
         }""")
         await page.get_by_role("button", name="Done", exact=True).click()
         await page.get_by_role("button", name="Save draft & preview", exact=True).click()
@@ -162,8 +162,8 @@ async def browser_check(base, password):
         public = await browser.new_page()
         await public.goto(base + published_url)
         await public.get_by_role("heading", name="Unsaved game heading", exact=True).wait_for()
-        await public.locator("#games-3 .catalog-card").first.wait_for()
-        assert await public.locator("#games-3 .catalog-card").count() == 3
+        await public.locator("#games-3 .popular-tile").first.wait_for()
+        assert await public.locator("#games-3 .popular-tile").count() == 3
         # Draft changes do not modify published SSR.
         await preview.locator("#games-3").click(button="right", position={"x": 20, "y": 20})
         await page.get_by_role("menuitem", name="Properties ...", exact=True).click()
@@ -195,17 +195,17 @@ async def browser_check(base, password):
         ssr = await nojs.new_page()
         await ssr.goto(base + published_url)
         await ssr.get_by_role("heading", name="Private new heading", exact=True).wait_for()
-        assert await ssr.locator("#games-3 .catalog-card").count() == 0
+        assert await ssr.locator("#games-3 .popular-tile").count() == 0
         await nojs.close()
         # Independent widget failure and retry do not prevent SSR.
         await public.route("**/widgets/games-3/**", lambda route: route.fulfill(
             status=503, content_type="application/json", body='{"detail":"CRM temporarily unavailable"}'))
         await public.reload()
-        await public.get_by_role("alert").filter(has_text="CRM temporarily unavailable").wait_for()
+        await public.get_by_role("alert").filter(has_text="Games didn't load").wait_for()
         await public.get_by_role("heading", name="Private new heading", exact=True).wait_for()
         await public.unroute("**/widgets/games-3/**")
-        await public.get_by_role("button", name="Retry", exact=True).click()
-        await public.locator("#games-3 .catalog-card").first.wait_for()
+        await public.get_by_role("button", name="Try again", exact=True).click()
+        await public.locator("#games-3 .popular-tile").first.wait_for()
         # Actual /h navigation module interactions and external unsaved preview.
         await preview.get_by_role("button", name="Menu", exact=True).click()
         await preview.get_by_role("button", name="Close menu", exact=True).wait_for()
@@ -235,10 +235,10 @@ async def browser_check(base, password):
         await games_row.click(button="right")
         await page.get_by_role("menuitem", name="Hide", exact=True).click()
         await preview.locator('#games-3[data-cms-hidden="true"]').wait_for()
-        await preview.locator("#games-3 .catalog-card").first.wait_for()
+        await preview.locator("#games-3 .popular-tile").first.wait_for()
         assert await preview.locator("#games-3").is_visible()
         assert await preview.locator("#games-3").evaluate("e=>getComputedStyle(e).filter") == "grayscale(1)"
-        assert await preview.get_by_role("searchbox", name="Search games", exact=True).is_disabled()
+        assert await preview.locator("#games-3 .popular-view-all").get_attribute("aria-disabled") == "true"
         assert "hidden" in await games_row.inner_text()
         assert "module-hidden" in await games_row.get_attribute("class")
         await page.get_by_role("button", name="Save draft & preview", exact=True).click()
@@ -250,7 +250,7 @@ async def browser_check(base, password):
         await preview.locator('#games-3[data-cms-hidden="true"]').click(button="right", position={"x": 20, "y": 20})
         await page.get_by_role("menuitem", name="Show", exact=True).click()
         await preview.locator('#games-3:not([data-cms-hidden])').wait_for()
-        assert await preview.get_by_role("searchbox", name="Search games", exact=True).is_enabled()
+        assert await preview.locator("#games-3 .popular-view-all").get_attribute("aria-disabled") is None
         # Native drag-and-drop changes order; Alt+Arrow is the keyboard alternative.
         source = page.locator('[data-module-key="categories-2"]')
         target = page.locator('[data-module-key="games-3"]')
@@ -286,12 +286,12 @@ async def browser_check(base, password):
         docs = await page.context.new_page()
         await docs.goto(base + "/cms/api/")
         await docs.locator(".api-endpoint").first.wait_for()
-        assert await docs.locator(".api-endpoint").count() == 3
+        assert await docs.locator(".api-endpoint").count() == 4
         await docs.locator(".api-endpoint").first.get_by_role("button", name="Try request", exact=True).click()
         await docs.locator(".api-endpoint").first.get_by_role("status").filter(has_text='"items"').wait_for()
         await docs.get_by_role("link", name="Swagger UI", exact=True).click()
         await docs.locator(".swagger-ui .opblock").first.wait_for()
-        assert await docs.locator(".opblock").count() == 3
+        assert await docs.locator(".opblock").count() == 4
         await docs.get_by_role("button", name="Authorize", exact=True).wait_for()
         modules_endpoint = docs.locator(".opblock").filter(has=docs.locator('[data-path="/modules/"]'))
         await modules_endpoint.locator(".opblock-summary").click()
@@ -337,7 +337,7 @@ async def browser_check(base, password):
         await page.get_by_label("Localization", exact=True).select_option("ru")
         assert await page.get_by_label("Module heading", exact=True).input_value() == "Русские игры"
         await preview.get_by_role("heading", name="Русские игры", exact=True).wait_for()
-        await preview.get_by_role("searchbox", name="Поиск игр", exact=True).wait_for()
+        await preview.get_by_role("link", name="Все игры →", exact=True).wait_for()
         await page.get_by_role("button", name="Done", exact=True).click()
         await page.locator('[data-module-key="seo-default"]').click(button="right")
         await page.get_by_role("menuitem", name="Properties ...", exact=True).click()
@@ -353,29 +353,30 @@ async def browser_check(base, password):
         await public.get_by_role("heading", name="Русские игры", exact=True).wait_for()
         await public.get_by_role("heading", name="Русская SEO информация", exact=True).wait_for()
         assert await public.locator(".seo-content [onclick],.seo-content script").count() == 0
-        await public.locator("#games-3 .catalog-card").first.wait_for()
+        await public.locator("#games-3 .popular-tile").first.wait_for()
         assert await public.locator("html").get_attribute("lang") == "ru"
-        await public.locator("#website-language").select_option("pt-PT")
+        assert await public.locator("#website-language").count() == 0
+        await public.goto(base + published_url + "?lang=pt-PT")
         await public.wait_for_url("**lang=pt-PT")
         await public.get_by_role("heading", name="Jogos portugueses", exact=True).wait_for()
         assert await public.locator("html").get_attribute("lang") == "pt-PT"
-        await public.locator("#games-3 .catalog-card").first.wait_for()
+        await public.locator("#games-3 .popular-tile").first.wait_for()
         assert any("lang=pt-PT" in request for request in widget_requests), widget_requests
-        await public.locator("#website-language").select_option("pt-BR")
+        await public.goto(base + published_url + "?lang=pt-BR")
         await public.wait_for_url("**lang=pt-BR")
         await public.get_by_role("heading", name="Private new heading", exact=True).wait_for()
         assert await public.locator("html").get_attribute("lang") == "pt-BR"
-        await public.locator("#games-3 .catalog-card").first.wait_for()
+        await public.locator("#games-3 .popular-tile").first.wait_for()
         assert any("lang=pt-BR" in request for request in widget_requests), widget_requests
-        await public.locator("#website-language").select_option("es")
+        await public.goto(base + published_url + "?lang=es")
         await public.wait_for_url("**lang=es")
         assert await public.locator("html").get_attribute("lang") == "es"
         await public.get_by_role("heading", name="Private new heading", exact=True).wait_for()
-        await public.locator("#games-3 .catalog-card").first.wait_for()
+        await public.locator("#games-3 .popular-tile").first.wait_for()
         assert any("lang=es" in request for request in widget_requests), widget_requests
-        await public.locator("#website-language").select_option("ru")
+        await public.goto(base + published_url + "?lang=ru")
         await public.wait_for_url("**lang=ru")
-        await public.locator("#website-language").select_option("en")
+        await public.goto(base + published_url + "?lang=en")
         await public.wait_for_url("**lang=en")
         await public.get_by_role("heading", name="Private new heading", exact=True).wait_for()
         await public.get_by_role("heading", name="Searchable casino information", exact=True).wait_for()
@@ -385,13 +386,13 @@ async def browser_check(base, password):
         await page.get_by_role("menuitem", name="Свойства ...", exact=True).click()
         await page.get_by_label("Локализация", exact=True).select_option("ru")
         assert await page.get_by_label("Заголовок модуля", exact=True).input_value() == "Русские игры"
-        await page.get_by_label("Максимум элементов", exact=True).fill("0")
+        await page.get_by_label("Количество на главной", exact=True).fill("0")
         await page.get_by_role("button", name="Готово", exact=True).click()
         await page.get_by_role("button", name="Сохранить черновик и предпросмотр", exact=True).click()
         await page.locator(".error-panel").filter(has_text="больше либо равно").first.wait_for()
         await page.locator('[data-module-key="games-3"]').click(button="right")
         await page.get_by_role("menuitem", name="Свойства ...", exact=True).click()
-        await page.get_by_label("Максимум элементов", exact=True).fill("3")
+        await page.get_by_label("Количество на главной", exact=True).fill("3")
         await page.get_by_role("button", name="Готово", exact=True).click()
         await page.get_by_role("button", name="Сохранить черновик и предпросмотр", exact=True).click()
         await page.get_by_role("status").filter(has_text="Черновик сохранён").wait_for()

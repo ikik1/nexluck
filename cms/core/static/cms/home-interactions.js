@@ -24,6 +24,14 @@
     if (action === 'search') {
       const input = document.querySelector('.home-search input');
       input?.scrollIntoView({ block: 'center' }); input?.focus();
+      if (!input) {
+        const link = document.querySelector('.popular-view-all');
+        if (link) {
+          const url = new URL(link.href);
+          url.searchParams.set('browse', '1');
+          location.assign(url.href);
+        }
+      }
     }
     if (action === 'deposit') notify(t('Demo only: deposits are not connected.'));
     if (action === 'mode') {
@@ -39,7 +47,7 @@
   document.addEventListener('input', event => {
     if (!event.target.matches('.home-search input')) return;
     const query = event.target.value.toLowerCase();
-    event.target.closest('[data-block-key]').querySelectorAll('.home-game-tile').forEach(node => { node.hidden = !node.textContent.toLowerCase().includes(query); });
+    event.target.closest('[data-block-key]').querySelectorAll('.home-game-tile,.popular-tile').forEach(node => { node.hidden = !node.textContent.toLowerCase().includes(query); });
   });
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') closeMenu();

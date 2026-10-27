@@ -12,17 +12,14 @@ export function getWidget(key) {
 }
 
 function CatalogCards({ data, kind }) {
-  const classes = { games: 'home-game-grid', promotions: 'home-promo-track', categories: 'category-slider', providers: 'provider-grid' };
+  const classes = { promotions: 'home-promo-track', categories: 'category-slider', providers: 'provider-grid' };
   if (!data.items.length) return <p className="widget-status">{t("No matching catalog items.")}</p>;
   return <div className={classes[kind]}>{data.items.map((item, index) => kind === 'promotions' ?
     <article className="home-feature-card catalog-card" style={{ '--home-art': `url("${globalThis.NexluckHomeArt[index % globalThis.NexluckHomeArt.length]}")` }} key={item.id}>
       <span className="eyebrow">{t("Promotion")}</span><h3>{item.name}</h3><p>{t("See offer terms before participating.")}</p><button data-action="deposit">{t("Deposit")}</button></article> :
-    kind === 'games' ? <article className="home-game-tile catalog-card" key={item.id}>
-      <img src={globalThis.NexluckHomeArt[index % globalThis.NexluckHomeArt.length]} alt="" loading="lazy" />
-      <strong>{item.name}</strong><small>{item.provider}</small></article> :
     kind === 'categories' ? <article className="home-category-card catalog-card" key={item.id}><span aria-hidden="true">{['✦', '♠', '●', '⚽', '▶', '♛'][index % 6]}</span><small>{item.name}</small></article> :
     <article className="provider-card catalog-card" key={item.id}><span aria-hidden="true">{item.name.slice(0, 2).toUpperCase()}</span><strong>{item.name}</strong></article>)}</div>;
 }
-for (const kind of ['games', 'promotions', 'categories', 'providers']) {
+for (const kind of ['promotions', 'categories', 'providers']) {
   registerWidget(kind, props => <CatalogCards {...props} kind={kind} />);
 }

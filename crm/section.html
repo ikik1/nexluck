@@ -7,6 +7,7 @@
 const s=SECTIONS.find(x=>x.k===new URLSearchParams(location.search).get('s'))||SECTIONS[0];
 if (s.k === 'analytics') location.replace('/crm/a/');
 if (s.k === 'casinos') location.replace('/crm/c/l/');
+if (s.k === 'compliance') location.replace(CRMContext.url(s.href, new URLSearchParams(location.search).get('casino_context')).href);
 chrome(`<span class="crumb"><a href="/crm/">${NexLuckI18n.html("Home")}</a> / ${s.n}</span>`);document.title='NexLuck CRM — '+s.n;
 document.getElementById('m').innerHTML=`<h1>${s.i} ${s.n}</h1><p class="lead">${NexLuckI18n.html("Section details (prototype placeholder).")}</p>
 <p class="notice">${NexLuckI18n.html("Casino-specific metrics and activity are unavailable: this section has no connected data source. No global sample totals are shown.")}</p>

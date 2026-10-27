@@ -43,6 +43,49 @@ class SEOProps(Props):
                             attributes={"a": ["href", "title"]}, protocols=["https", "http"], strip=True)
 
 
+class Pin(serializers.Serializer):
+    gameId = serializers.CharField(max_length=120)
+    position = serializers.IntegerField(min_value=1, max_value=200)
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict) or set(data) != {"gameId", "position"}:
+            raise serializers.ValidationError("Supply gameId and position.")
+        return super().to_internal_value(data)
+
+
+class PopularProps(Props):
+    mode = serializers.ChoiceField(choices=["auto", "manual", "hybrid", "ai"], default="auto")
+    games = serializers.ListField(child=serializers.CharField(max_length=120), max_length=200, default=list)
+    pinned = serializers.ListField(child=Pin(), max_length=200, default=list)
+    layout = serializers.ChoiceField(choices=["row", "double"], default="row")
+    homeLimit = serializers.IntegerField(min_value=1, max_value=200, default=10, label="Home limit")
+    pageLimit = serializers.IntegerField(min_value=1, max_value=200, default=100, label="Page limit")
+    rankingMinutes = serializers.IntegerField(min_value=1, max_value=525600, default=60, label="Ranking period (minutes)")
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict) and data.get("layout") == "double" and "homeLimit" not in data:
+            data = {**data, "homeLimit": 20}
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        if attrs["homeLimit"] > attrs["pageLimit"]:
+            raise serializers.ValidationError({"homeLimit": "Home limit must not exceed page limit."})
+        ids = [pin["gameId"] for pin in attrs["pinned"]]
+        positions = [pin["position"] for pin in attrs["pinned"]]
+        if len(set(ids)) != len(ids) or len(set(positions)) != len(positions):
+            raise serializers.ValidationError({"pinned": "Pinned game IDs and positions must be unique."})
+        if any(position > attrs["pageLimit"] for position in positions):
+            raise serializers.ValidationError({"pinned": "Pinned positions must not exceed page limit."})
+        if len(set(attrs["games"])) != len(attrs["games"]):
+            raise serializers.ValidationError({"games": "Game IDs must be unique."})
+        return attrs
+
+
+def popular_data(site, props):
+    from .popular import popular_games, request_context
+    return popular_games(site, props, **request_context.get())
+
+
 def validate_with(schema):
     def validate(props):
         serializer = schema(data=props)
@@ -70,8 +113,8 @@ for key, label, source in [
     ("tournaments", "Tournaments (information)", None), ("winners", "Winners (information)", None),
     ("rewards", "Rewards", None),
 ]:
-    schema = PromotionProps if key == "promotions" else Props
-    data = promotion_data if key == "promotions" else crm_data(source) if source else None
+    schema = PromotionProps if key == "promotions" else PopularProps if key == "games" else Props
+    data = promotion_data if key == "promotions" else popular_data if key == "games" else crm_data(source) if source else None
     registry.register(Module(key, label, validate_with(schema), data, schema))
 for key, label in [("header_profile", "Header profile details"), ("tab_menu", "Tab menu"),
                    ("main_menu", "Main menu"), ("seo", "SEO text")]:

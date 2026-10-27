@@ -85,6 +85,73 @@ Do not place CRM service credentials in frontend code or Git.
 Rebuild frontend assets after changing JSX. No CDN/Babel/browser compilation is
 used by this CMS. Existing `/h/` and `/crm/` assets and APIs are not replaced.
 
+## Popular games
+
+The existing **Popular games** (`games`) module is a single mixed ranking, not
+separate slot/live/table subsections. Add any number of modules; their CMS order
+is their website order. **Localization** selects each module's title, mode,
+ordered game IDs, pins, layout and limits independently. Missing localized
+values inherit the English/default module properties. Language does not imply
+visitor country: there is no country-based module filtering.
+
+- `mode`: `auto` uses the CRM geo ranking; `manual` uses the manager's ordered
+  list; `hybrid` uses geo ranking plus pins; `ai` uses personal ranking plus pins.
+  An anonymous AI request uses a non-personal ranking, not a fabricated identity.
+- `pinned`: `{gameId, position}` records, with unique IDs and one-based positions.
+  Remove pinned IDs from the ranking, insert in position order, and shift other
+  games down. Positions beyond the available list append. Pins are not labelled.
+  Inactive/missing catalogue IDs are excluded. `games` applies only in manual
+  mode; pins apply only in hybrid/AI. Switching modes preserves inactive settings.
+- `layout`: `row` scrolls a single row of large tiles; `double` scrolls two rows
+  of small tiles without providers. Defaults are 10/20 Home tiles respectively.
+- `homeLimit`/`pageLimit`: 1–200, Home no larger than page; default full limit 100.
+  The resolved list is deduplicated and trimmed to `pageLimit`, then Home displays
+  its first `homeLimit` entries. Rankings refresh only on load or explicit retry.
+- `rankingMinutes`: requested CRM period, 1–525600 minutes, default 60.
+
+**View all →** navigates to the same publication/private preview with
+`?popular=<module-key>` (retaining language and preview token). Only that module
+is shown: top three cards and numbered rows for the rest. The subtitle uses CRM
+metric, country/worldwide scope, period, update timestamp and personalization;
+manual lists have no invented ranking subtitle. Empty lists provide **Browse all
+games**, which displays the enabled casino catalogue through `&browse=1`.
+The bottom Search action opens that catalogue; full lists retain name/provider
+search without changing ranking positions.
+Skeletons precede loading; unavailable rankings show **Games didn't load** and
+**Try again**. Last successful rankings and catalogue details are persisted in
+`PopularRanking`, separately scoped by casino and country/personal identity.
+An outage uses that saved copy with a visible notice; a successful empty ranking
+replaces the old copy. Hidden/stale-publication widgets remain inaccessible.
+
+### Explicit demo integration
+
+The repository has no production play-event ranking or player-login service.
+New CRM `/games/ranking` and `/games/demo-favourites` endpoints operate **only**
+in `CRM_UI_MODE=demo`; ranking metadata contains `demo: true`. They use synthetic
+catalogue popularity, not actual bet volume. Generated game artwork is fictional
+catalogue artwork. All real game details are resolved by casino-local `gameId`;
+badges come from catalogue `NEW`/`HOT`/`JACKPOT` tags and jackpot attributes.
+
+`CMS_POPULAR_DEMO_INPUTS=1` enables the preview's **Demo country** dropdown
+(ISO country or `WORLD`) beside the viewport selector in the preview toolbar.
+The editor preview is anonymous; no signed-in-player checkbox or separate demo
+controls strip is displayed.
+The viewport selector uses its selected device as its visible label.
+Demo inputs default on in local mode and off in production.
+Standalone/public demo links accept `demo_country=PL` and
+`demo_player=1`; these are explicitly demo inputs, not trusted geolocation/login.
+Demo player IDs are random, server-session-bound, and never accepted from the
+browser. Hearts are hidden anonymously. Favourite writes require CSRF, a current
+publication/permitted preview, a casino-owned enabled game, and the demo session.
+They persist in the CRM tenant snapshot; personal responses are private-cacheable
+only. Replacing the demo service with authenticated production rankings/identity
+is a separate integration; no real customer personalization is claimed.
+
+Apply migrations before starting the updated backend. Verification:
+`python3 cms/tests/popular_browser_test.py`,
+`python3 crm/api/test/popular_games_test.py`, and
+`CMS_ENV=local cms/.venv/bin/python cms/manage.py test core.test_popular`.
+
 ## Editing workflow
 
 1. Sign in with a staff account. The single **Website** selector fetches websites
@@ -362,8 +429,11 @@ to current English values. Existing documents without `translations` continue
 working. Apply migration `0003_contentblock_translations` before starting.
 
 The private preview follows the Properties language without changing the
-management language. Website visitors use the language switcher or
-`?lang=en|ru|pt-PT|pt-BR|es`; the default is English and unsupported languages
+management language. Home has no visitor-facing language selector.
+Website language can be selected through `?lang=en|ru|pt-PT|pt-BR|es`;
+otherwise the language saved in **My wallet → Profile settings** is used
+(`nexluck_website_language` cookie, separate from management language).
+The default is English and unsupported languages
 return 400. Django's active locale is normalized to `pt`/`pt-br` while CMS
 content, cookie and response headers retain the explicit `pt-PT`/`pt-BR` codes.
 The website language is carried through widget URLs, static labels and async

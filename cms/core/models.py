@@ -99,3 +99,13 @@ class Publication(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["page", "revision"], name="cms_publication_unique")]
         indexes = [models.Index(fields=["page", "-created_at"], name="cms_publication_date_idx")]
+
+
+class PopularRanking(models.Model):
+    site = models.ForeignKey(Site, on_delete=models.CASCADE)
+    fingerprint = models.CharField(max_length=64)
+    payload = models.JSONField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["site", "fingerprint"], name="cms_popular_snapshot_unique")]

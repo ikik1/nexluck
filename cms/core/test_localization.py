@@ -44,6 +44,15 @@ class LocalizationTests(TestCase):
         self.assertIn("pt-BR", LOCALES)
         self.assertIn("es", LOCALES)
 
+    def test_wallet_language_preference_and_explicit_override(self):
+        self.save()
+        url = self.publish()
+        self.client.cookies["nexluck_website_language"] = "ru"
+        self.assertContains(self.client.get(url), 'lang="ru"')
+        self.assertContains(self.client.get(url + "?lang=es"), 'lang="es"')
+        self.client.cookies["nexluck_website_language"] = "invalid"
+        self.assertContains(self.client.get(url), 'lang="en"')
+
     def save(self):
         response = self.client.patch(self.base + "draft/", self.document, format="json")
         self.assertEqual(response.status_code, 200, response.content)
@@ -77,7 +86,7 @@ class LocalizationTests(TestCase):
         self.assertNotContains(en, "<h2>Русский заголовок</h2>")
         self.assertContains(en, "English heading")
         self.assertContains(ru, "Casino unchanged")
-        self.assertContains(ru, "Поиск игр")
+        self.assertContains(ru, catalog()["ru"]["View all →"])
         self.assertContains(ru, "Загрузка каталога...")
         self.page.refresh_from_db()
         widget = f"/cms/api/public/{self.site.slug}/{self.page.published_id}/widgets/{self.block['key']}/"
@@ -170,7 +179,7 @@ class LocalizationTests(TestCase):
                 self.assertEqual(response["Content-Language"], locale)
                 self.assertContains(response, f'<html lang="{locale}">', html=False)
                 self.assertContains(response, title)
-                self.assertContains(response, catalog()[locale]["Search games"])
+                self.assertContains(response, catalog()[locale]["View all →"])
                 saved = self.client.get(self.base + "draft/").json()["document"]
                 saved_block = next(b for b in saved["blocks"] if b["key"] == self.block["key"])
                 self.assertEqual(saved_block["translations"], translations)

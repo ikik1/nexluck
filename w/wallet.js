@@ -21,6 +21,12 @@
   };
   const CRYPTO_NETWORKS = ['USDT (TRC20)', 'USDT (ERC20)', 'Bitcoin (BTC)'];
   const PAGE = 10;
+  const LANGUAGES = [
+    ['en', 'English'], ['ru', 'Русский'], ['pt-PT', 'Português (Portugal)'],
+    ['pt-BR', 'Português (Brasil)'], ['es', 'Español (España)'],
+  ];
+  const languageCookie = 'nexluck_website_language';
+  const savedLanguage = document.cookie.split('; ').find(value => value.startsWith(languageCookie + '='))?.split('=')[1];
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const $ = (sel, el) => (el || document).querySelector(sel);
@@ -60,7 +66,8 @@
     currency: 'EUR',
     balances: { EUR: 100, USD: 100, GBP: 85, INR: 0 },
     rates: { ...RATES },
-    profile: { name: 'Luna Play', email: 'luna.play@example.com', phone: '' },
+    profile: { name: 'Luna Play', email: 'luna.play@example.com', phone: '',
+      language: LANGUAGES.some(([code]) => code === savedLanguage) ? savedLanguage : 'en' },
     kyc: 'Verified',
     points: 12480,
     nextLevel: { name: 'Platinum', at: 20000 },
@@ -141,16 +148,26 @@
       field('name', 'Display name', '<input type="text" id="name" data-f="name" maxlength="40" autocomplete="nickname" value="' + esc(p.name) + '">')
       + field('email', 'Email', '<input type="text" id="email" data-f="email" maxlength="120" autocomplete="email" value="' + esc(p.email) + '">')
       + field('phone', 'Phone', '<input type="tel" id="phone" data-f="phone" maxlength="20" autocomplete="tel" placeholder="+49 151 2345 6789" value="' + esc(p.phone) + '">')
+      + field('language', 'Language', '<select id="language" data-f="language">' + LANGUAGES.map(([code, label]) =>
+        '<option value="' + code + '"' + (code === p.language ? ' selected' : '') + '>' + esc(label) + '</option>').join('') + '</select>')
       + '<button type="button" class="dp-go" id="s-save">Save</button>');
     $('#s-save', el).addEventListener('click', () => {
-      const v = { name: $('#name', el).value.trim(), email: $('#email', el).value.trim(), phone: $('#phone', el).value.trim() };
+      const v = { name: $('#name', el).value.trim(), email: $('#email', el).value.trim(), phone: $('#phone', el).value.trim(),
+        language: $('#language', el).value };
       const bad = {
         name: v.name.length < 2 || v.name.length > 40 ? 'Enter 2-40 characters.' : '',
         email: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email) ? 'Enter a valid email.' : '',
         phone: v.phone && !/^\+?[0-9 ()-]{7,20}$/.test(v.phone) ? 'Enter a valid phone number.' : '',
+        language: !LANGUAGES.some(([code]) => code === v.language) ? 'Choose a supported language.' : '',
       };
       Object.keys(bad).forEach((k) => setErr(el, k, bad[k]));
       if (Object.values(bad).some(Boolean)) return;
+      document.cookie = languageCookie + '=' + v.language + '; Path=/; Max-Age=31536000; SameSite=Lax' +
+        (location.protocol === 'https:' ? '; Secure' : '');
+      if (!document.cookie.split('; ').includes(languageCookie + '=' + v.language)) {
+        setErr(el, 'language', 'Language preference could not be saved. Check browser cookie permissions.');
+        return;
+      }
       state.profile = v;
       closeModal(el);
       renderProfile();
