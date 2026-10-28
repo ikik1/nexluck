@@ -48,7 +48,7 @@ export function PopularGames({ data, fullList, islandKey }) {
   const toggle = async game => {
     setBusy(game.id); setError('');
     try {
-      const csrf = document.cookie.split('; ').find(value => value.startsWith('nexluck_cms_csrf='))?.split('=')[1];
+      const csrf = document.cookie.split('; ').find(value => value.startsWith('nexluck_cms_site_csrf='))?.split('=')[1];
       const response = await fetch(data.favouriteUrl, {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf || '' },

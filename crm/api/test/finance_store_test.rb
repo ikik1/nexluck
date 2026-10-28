@@ -43,6 +43,26 @@ class FinanceStoreTest < Minitest::Test
     assert data['wallets'].all? { |wallet| wallet['customer_id'].match?(/\ACU-\d+\z/) }
   end
 
+  def test_connection_directions_are_independent_booleans_and_legacy_defaults
+    first = @store.finance_data['connections'].first
+    assert first['payin']
+    assert first['payout']
+    [true, false].product([true, false]).each do |payin, payout|
+      saved, errors = @store.save_finance('connections', first['id'].to_s, { 'payin' => payin, 'payout' => payout })
+      assert_empty errors
+      assert_equal payin, saved['payin']
+      assert_equal payout, saved['payout']
+    end
+    [nil, 'true', 1].each do |invalid|
+      _, errors = @store.save_finance('connections', first['id'].to_s, { 'payout' => invalid })
+      assert errors.key?('payout')
+    end
+    @store.state['finance']['connections'].first.delete('payin')
+    @store.state['finance']['connections'].first.delete('payout')
+    assert @store.finance_data['connections'].first['payin']
+    assert @store.finance_data['connections'].first['payout']
+  end
+
   def test_configuration_clone_has_no_history_or_payment_secrets
     data = FinanceStore.seed(include_history: false)
     FinanceStore::HISTORY_KEYS.each { |key| assert_empty data[key] }

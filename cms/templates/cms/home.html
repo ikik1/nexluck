@@ -9,12 +9,12 @@
 {% if preview %}<div class="preview-banner">{% cms_t "DRAFT PREVIEW · Not published" %}{% if editing %} · {% cms_t "Right-click a module for properties · Drag to reorder" %}{% endif %}</div>{% endif %}
 <div class="landing-shell home-shell">
 <header class="landing-header home-header">
-<a class="landing-brand" href="/" aria-label="{% cms_t '{name} home' name=doc.site_name %}"><span class="bird-logo"><i></i><b></b></span><span class="logo-copy">nex<span>luck</span></span><span class="brand-name">{{ doc.site_name }}</span></a>
+<a class="landing-brand" href="/site/{{ site.public_slug }}/" aria-label="{% cms_t '{name} home' name=doc.site_name %}"><span class="bird-logo"><i></i><b></b></span><span class="logo-copy">nex<span>luck</span></span><span class="brand-name">{{ doc.site_name }}</span></a>
 {% for block in profile_blocks %}<div class="home-header-actions{% if not block.enabled %} cms-module-hidden{% endif %}" data-block-key="{{ block.key }}" aria-label="{{ block.props.title }}" {% if not block.enabled %}data-cms-hidden="true" title="{% cms_t "Hidden on published website" %}"{% endif %} {% if editing %}tabindex="0" draggable="true"{% endif %}>
 <label class="balance-select"><span>{% cms_t "Demo balance" %}</span><select aria-label="{% cms_t "Select currency" %}"><option>{% cms_t "100 EUR" %}</option><option>{% cms_t "100 USD" %}</option><option>{% cms_t "85 GBP" %}</option></select></label>
 <button class="header-notice bonus-notice" data-notice="{% cms_t "Demo bonus wallet is up to date." %}" aria-label="{% cms_t "Bonus notifications" %}"><span aria-hidden="true">%</span><i></i></button>
 <button class="header-notice message-notice" data-notice="{% cms_t "Demo profile: no new messages." %}" aria-label="{% cms_t "Messages" %}"><span aria-hidden="true">✉</span><i></i></button>
-<a class="profile-avatar" href="/w/" aria-label="{% cms_t "Demo profile: luna.play, Gold loyalty level" %}"><span>L</span><b class="loyalty-badge">✦</b></a>
+<a class="profile-avatar" href="/w/?casino_context={{ site.crm_id }}" aria-label="{% cms_t "Demo profile: luna.play, Gold loyalty level" %}"><span>L</span><b class="loyalty-badge">✦</b></a>
 </div>{% endfor %}</header>
 <main class="home-main">{% for section in content_sections %}<div class="layout-section columns-{{ section.columns }}" data-slot="{{ section.slot }}">
 {% for block in section.blocks %}{% if not popular_page or block.full_list %}<section class="home-section module-{{ block.kind }}{% if not block.enabled %} cms-module-hidden{% endif %}" id="{{ block.key }}" data-block-key="{{ block.key }}" {% if not block.enabled %}data-cms-hidden="true" title="{% cms_t "Hidden on published website" %}"{% endif %} {% if editing %}tabindex="0" draggable="true"{% endif %}>

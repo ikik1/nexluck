@@ -56,10 +56,10 @@ else:
     CACHES = {"default": {"BACKEND": "django_redis.cache.RedisCache", "LOCATION": os.environ["CMS_REDIS_URL"],
                           "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"}}}
     SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
-SESSION_COOKIE_NAME = "nexluck_cms_session"
-SESSION_COOKIE_PATH = "/cms/"
-CSRF_COOKIE_NAME = "nexluck_cms_csrf"
-CSRF_COOKIE_PATH = "/cms/"
+SESSION_COOKIE_NAME = "nexluck_cms_site_session"
+SESSION_COOKIE_PATH = "/"
+CSRF_COOKIE_NAME = "nexluck_cms_site_csrf"
+CSRF_COOKIE_PATH = "/"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not LOCAL
 CSRF_COOKIE_SECURE = not LOCAL

@@ -12,6 +12,7 @@
 .wl-card { background: #0e1942; border: 1px solid rgba(88, 136, 232, .4); border-radius: 12px; padding: 18px; }
 
 .wl-profile { display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center; }
+.wl-profile-actions { display: grid; gap: 8px; }
 .wl-avatar { position: relative; width: 72px; height: 72px; display: grid; place-items: center; border: 3px solid #6df5ff; border-radius: 50%; color: #111631; background: linear-gradient(145deg, #ffda36, #ff7d8f); font: 800 30px 'Manrope', sans-serif; }
 .wl-avatar b { position: absolute; right: -6px; bottom: -2px; width: 26px; height: 26px; display: grid; place-items: center; border: 3px solid #0e1942; border-radius: 50%; background: #ffda36; color: #141a35; font-size: 12px; }
 .wl-name { margin: 0 0 8px; font: 800 24px/1.1 'Manrope', sans-serif; overflow-wrap: anywhere; }
@@ -97,7 +98,7 @@
 @media (max-width: 640px) {
   .wl-title { font-size: 32px; }
   .wl-profile { grid-template-columns: auto 1fr; }
-  .wl-profile .wl-ghost { grid-column: 1 / -1; }
+  .wl-profile-actions { grid-column: 1 / -1; }
   .wl-balances { grid-template-columns: 1fr; }
   .wl-act { font-size: 16px; flex-direction: column; gap: 2px; padding: 8px 4px; }
   .wl-frow select, .wl-date { min-width: 0; width: 100%; }

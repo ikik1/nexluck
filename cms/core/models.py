@@ -24,6 +24,7 @@ class Layout(models.Model):
 class Site(models.Model):
     crm_id = models.CharField(max_length=80, unique=True)
     slug = models.SlugField(unique=True)
+    public_slug = models.SlugField(unique=True)
     name = models.CharField(max_length=120)
     url = models.URLField(max_length=2048)
     enabled = models.BooleanField(default=True, db_index=True)

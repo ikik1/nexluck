@@ -113,6 +113,8 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
       methods: conn.methods ? [...conn.methods] : (brandGw ? [...brandGw.methods] : ['Visa']),
       status: conn.conn || 'online',
       settings: conn.settings ? { ...conn.settings } : defaultSettingsForBrand(initialBrand),
+      payin: conn.payin !== false,
+      payout: conn.payout !== false,
     };
   });
 
@@ -192,6 +194,8 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
         methods: data.methods,
         conn: data.status,
         settings: data.settings,
+        payin: data.payin,
+        payout: data.payout,
       }); } catch (error) {
         setErrs([error.message || 'Could not save the payment connection.']);
       } finally {
@@ -223,6 +227,8 @@ function ConnectionModal({ conn, isNew, onSave, onClose }) {
         </label>
 
         <div className="cfg">
+          {['payin', 'payout'].map(key => <label key={key} className="fld"><span>{NexLuckI18n.t(key === 'payin' ? 'Payin' : 'Payout')}</span>
+            <input type="checkbox" checked={data[key]} onChange={event => setData(value => ({ ...value, [key]: event.target.checked }))} /></label>)}
           <label className="fld">{NexLuckI18n.t("Currency")}<select value={data.currency} onChange={e => setData(d => ({ ...d, currency: e.target.value }))}>
               {(brandGw ? brandGw.currencies : CURRENCIES).map(c => <option key={c} value={c}>{NexLuckI18n.t(c)}</option>)}
             </select>
@@ -315,6 +321,7 @@ function PaymentList() {
   const [q, setQ] = useState('');
   const [applied, setApplied] = useState('');
   const [zones, setZones] = useState([]);
+  const [direction, setDirection] = useState('');
   const [editConn, setEditConn] = useState(null);
   const [isNew, setIsNew] = useState(false);
 
@@ -323,12 +330,13 @@ function PaymentList() {
   const rows = useMemo(() => {
     const terms = applied.toLowerCase().split(/\s+/).filter(Boolean);
     return connections.filter(c => {
+      if (direction && c[direction] === false) return false;
       if (zones.length && !c.countries.some(code => zones.includes(zoneOf(code)))) return false;
       const countryNames = c.countries.map(code => COUNTRIES[code] ? COUNTRIES[code][0] : code);
       const hay = [c.name, c.brand, c.currency, ...c.methods, ...c.countries, ...countryNames, ...zonesOf(c.countries), ...c.segments, ...c.segments.map(s => NexLuckSegmentTags.describe(s, segmentCatalog).label)].join(' ').toLowerCase();
       return terms.every(t => hay.includes(t));
     });
-  }, [connections, applied, zones]);
+  }, [connections, applied, zones, direction, segmentCatalog]);
 
   const saveConnection = async draft => {
     const saved = await saveFinanceRecord('connections', draft);
@@ -370,6 +378,10 @@ function PaymentList() {
           aria-label={NexLuckI18n.t("Search payment connections")}
         />
         <button type="submit" className="new-btn pri">{NexLuckI18n.t("Search")}</button>
+        <select aria-label={NexLuckI18n.t('Payment direction')} value={direction} onChange={event => setDirection(event.target.value)}>
+          <option value="">{NexLuckI18n.t('All directions')}</option>
+          <option value="payin">{NexLuckI18n.t('Payin')}</option><option value="payout">{NexLuckI18n.t('Payout')}</option>
+        </select>
         <button type="button" className="new-btn pri" onClick={openNew} style={{ marginLeft: 'auto' }}>{NexLuckI18n.t("+ New connection")}</button>
       </form>
 
@@ -389,7 +401,7 @@ function PaymentList() {
       <p className="count">{rows.length}{NexLuckI18n.t(" of ")}{connections.length}{NexLuckI18n.t(" payment connections")}</p>
       <div className="wrap">
         <table className="bt">
-          <thead><tr><th>{NexLuckI18n.t("Payment Connection")}</th><th>{NexLuckI18n.t("Payment method")}</th><th>{NexLuckI18n.t("Currency")}</th><th>{NexLuckI18n.t("Country")}</th><th>{NexLuckI18n.t("Geo zone")}</th><th>{NexLuckI18n.t("Segments")}</th><th>{NexLuckI18n.t("Connectivity")}</th></tr></thead>
+          <thead><tr><th>{NexLuckI18n.t("Payment Connection")}</th><th>{NexLuckI18n.t("Payment method")}</th><th>{NexLuckI18n.t('Payin')}</th><th>{NexLuckI18n.t('Payout')}</th><th>{NexLuckI18n.t("Currency")}</th><th>{NexLuckI18n.t("Country")}</th><th>{NexLuckI18n.t("Geo zone")}</th><th>{NexLuckI18n.t("Segments")}</th><th>{NexLuckI18n.t("Connectivity")}</th></tr></thead>
           <tbody>
             {rows.map(c => (
               <tr key={c.id}>
@@ -398,6 +410,8 @@ function PaymentList() {
                   <div className="desc">{NexLuckI18n.t("Brand: ")}<b>{c.brand}</b></div>
                 </td>
                 <td>{c.methods.map(m => <span key={m} className="tag m">{m}</span>)}</td>
+                <td>{NexLuckI18n.t(c.payin !== false ? 'Enabled' : 'Disabled')}</td>
+                <td>{NexLuckI18n.t(c.payout !== false ? 'Enabled' : 'Disabled')}</td>
                 <td><span className="tag g">{c.currency}</span></td>
                 <td><Countries codes={c.countries} /></td>
                 <td>{zonesOf(c.countries).map(z => <span key={z} className="tag z">{NexLuckI18n.t(z)}</span>)}</td>

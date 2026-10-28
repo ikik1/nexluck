@@ -782,7 +782,7 @@ WEBrick::HTTPServlet::ProcHandler.class_eval { alias_method :do_DELETE, :do_GET 
 srv.mount_proc('/crm/api/v1') { |req, res| handler.call(req, res, req.path.sub(%r{\A/crm/api/v1/?}, ''), true) }
 srv.mount_proc('/crm/ui-api/v1') { |req, res| handler.call(req, res, req.path.sub(%r{\A/crm/ui-api/v1/?}, ''), false) }
 
-srv.mount_proc('/cms') do |req, res|
+cms_proxy = proc do |req, res|
   if req.path == '/cms'
     res.status = 302
     res['Location'] = '/cms/'
@@ -816,6 +816,9 @@ srv.mount_proc('/cms') do |req, res|
     res.body = 'CMS is unavailable. Start the Django CMS service on port 8090.'
   end
 end
+
+srv.mount_proc('/cms', &cms_proxy)
+srv.mount_proc('/site', &cms_proxy)
 
 trap('INT') { srv.shutdown }
 trap('TERM') { srv.shutdown }

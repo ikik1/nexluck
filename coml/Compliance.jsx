@@ -8,6 +8,14 @@ const COMPLIANCE_TABS = [
 const complianceDate = value => value ? new Date(value).toLocaleString(NexLuckI18n.formatLocale, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 const scoreTone = score => NexLuckSegmentTags.riskLevel(score);
 const segmentLabel = segment => segment.tag_name || segment.name;
+const payoutMethod = row => [row.payment_brand || row.connection_name, row.payment_method].filter((value, index, values) => value && values.indexOf(value) === index).join(' · ');
+const payoutDestination = row => {
+  const type = row.destination_type || (['Visa', 'MasterCard'].includes(row.payment_method) ? 'card' : '');
+  const label = { card: 'Card', iban: 'IBAN', bank_account: 'Bank account', uk_account: 'Bank account',
+    phone: 'Phone number', upi: 'UPI ID', pix: 'Pix key', email: 'Email' }[type] || 'Payment details';
+  return row.masked_destination ? NexLuckI18n.t(label) + ': ' + row.masked_destination : NexLuckI18n.t('Not provided');
+};
+const payoutDetails = row => payoutMethod(row) + ' · ' + payoutDestination(row);
 const ComplianceSegmentSelection = createSegmentSelection(React);
 
 async function complianceRequest(path = '', options = {}) {
@@ -100,19 +108,22 @@ function KYCRequestForm({ customers, customerId = '', onClose, onSaved }) {
 function ReviewRequest({ row, kind, onClose, onSaved }) {
   const [status, setStatus] = useState(row.status === 'New' ? 'Pending' : row.status);
   const resource = kind === 'kyc_requests' ? 'kyc-requests' : kind;
-  return <ComplianceForm title="Process request" onClose={onClose} onSubmit={async () => {
-    await complianceRequest('/' + resource + '/' + encodeURIComponent(row.id), { method: 'PATCH', body: JSON.stringify({ status }) });
+  const payout = kind === 'payouts';
+  return <ComplianceForm title="Process request" onClose={onClose} submitLabel={payout ? 'Approve' : 'Save'} onSubmit={async () => {
+    await complianceRequest('/' + resource + '/' + encodeURIComponent(row.id), { method: 'PATCH', body: JSON.stringify(payout ? { action: 'approve' } : { status }) });
     await onSaved();
   }}>
     <p><b>{row.external_id}</b> · {row.customer.name}</p>
     <p className="notice">{NexLuckI18n.t('Review status only. Approving a payout does not execute a payment.')}</p>
-    <label className="field">{NexLuckI18n.t('Status')}<select aria-label={NexLuckI18n.t('Status')} value={status} onChange={event => setStatus(event.target.value)}>
+    {payout ? <><p><b>{payoutDetails(row)}</b></p>
+      {row.connection_name && <p>{row.connection_name}</p>}<p>{row.amount} {row.currency}</p>
+      <p className="hint">{NexLuckI18n.t('The player-selected payout method cannot be changed. Approval moves the request to Pending.')}</p></> : <label className="field">{NexLuckI18n.t('Status')}<select aria-label={NexLuckI18n.t('Status')} value={status} onChange={event => setStatus(event.target.value)}>
       {REVIEW_STATUSES.map(value => <option key={value} value={value}>{NexLuckI18n.t(value)}</option>)}
-    </select></label>
+    </select></label>}
   </ComplianceForm>;
 }
 
-function ComplianceChat({ customer, onClose }) {
+function ComplianceChat({ customer, requestId, onClose, onRead }) {
   const [items, setItems] = useState([]);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -120,7 +131,15 @@ function ComplianceChat({ customer, onClose }) {
   const path = '/customers/' + encodeURIComponent(customer.id) + '/chat';
   const load = async () => {
     setLoading(true); setError('');
-    try { setItems((await complianceRequest(path)).items); }
+    try {
+      const received = (await complianceRequest(path)).items;
+      setItems(received);
+      const ids = received.filter(item => item.sender === 'player' && !item.read_at && (!item.request_id || item.request_id === requestId)).map(item => item.id);
+      if (ids.length) {
+        await complianceRequest(path + '/read', { method: 'POST', body: JSON.stringify({ ids }) });
+        await onRead();
+      }
+    }
     catch (failure) { setError(failure.message); }
     finally { setLoading(false); }
   };
@@ -133,21 +152,39 @@ function ComplianceChat({ customer, onClose }) {
     <p className="notice">{NexLuckI18n.t('Internal staff conversation. Messages are stored in CRM and are not delivered to the customer.')}</p>
     {loading && <p role="status">{NexLuckI18n.t('Loading…')}</p>}
     {error && <p role="alert" className="error">{error} <button type="button" className="btn" onClick={load}>{NexLuckI18n.t('Retry')}</button></p>}
-    <ul className="compliance-chat">{items.map(item => <li key={item.id}><time>{complianceDate(item.created_at)}</time><p>{item.message}</p></li>)}</ul>
+    <ul className="compliance-chat">{items.filter(item => !item.request_id || item.request_id === requestId).map(item => <li key={item.id} className={item.sender === 'player' && !item.read_at ? 'chat-message-new' : ''}><b>{NexLuckI18n.t(item.sender === 'player' ? 'Player' : 'Internal note')}</b>{item.sender === 'player' && !item.read_at && <strong className="chat-new-label">{NexLuckI18n.t('New')}</strong>} · <time>{complianceDate(item.created_at)}</time><p>{item.message}</p></li>)}</ul>
     <label className="field">{NexLuckI18n.t('Message')}<textarea required maxLength="4000" value={message} onChange={event => setMessage(event.target.value)} /></label>
   </ComplianceForm>;
+}
+
+function DocumentHistory({ documents, onPreview }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef(null);
+  useEffect(() => {
+    const dismiss = event => { if (!root.current?.contains(event.target)) setOpen(false); };
+    document.addEventListener('pointerdown', dismiss);
+    return () => document.removeEventListener('pointerdown', dismiss);
+  }, []);
+  return <div className="compliance-document-history" ref={root} onKeyDown={event => {
+    if (event.key === 'Escape') { setOpen(false); root.current.querySelector('button').focus(); }
+  }}>
+    <button className="btn" type="button" aria-label={NexLuckI18n.t('Document history')} aria-expanded={open} onClick={() => setOpen(value => !value)}>▾</button>
+    {open && <ul>{[...documents].reverse().map(document => <li key={document.id}><button type="button" className="btn" onClick={() => {
+      setOpen(false); onPreview(document);
+    }}>{document.name}<small>{complianceDate(document.uploaded_at)}</small></button></li>)}</ul>}
+  </div>;
 }
 
 function ComplianceMenu({ menu, onClose, onAction }) {
   const ref = useRef(null);
   useEffect(() => {
-    ref.current.querySelector('button')?.focus();
+    ref.current.querySelector('button:not(:disabled)')?.focus();
     const dismiss = event => { if (!ref.current?.contains(event.target)) onClose(); };
     const keyboard = event => {
       if (event.key === 'Escape') { event.preventDefault(); onClose(); }
       if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
         event.preventDefault();
-        const buttons = [...ref.current.querySelectorAll('button')];
+        const buttons = [...ref.current.querySelectorAll('button:not(:disabled)')];
         const index = buttons.indexOf(document.activeElement);
         buttons[(index + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length].focus();
       }
@@ -166,11 +203,11 @@ function ComplianceMenu({ menu, onClose, onAction }) {
       menu.trigger?.focus();
     };
   }, []);
-  const actions = menu.kind === 'kyc_requests' ? [['request', 'New request'], ['chat', 'Chat'], ['review', 'Process ...'], ['decline', 'Decline']]
+  const actions = menu.kind === 'kyc_requests' ? [['request', 'New request'], ['chat', 'Chat'], ['review', 'Process ...'], ['approve_kyc', 'Approve KYC'], ['decline', 'Decline']]
     : menu.kind === 'payouts' ? [['review', 'Process ...'], ['request', 'KYC Request'], ['decline', 'Decline']]
     : [['block', 'Block']];
   return <div ref={ref} role="menu" className="compliance-menu" aria-label={NexLuckI18n.t('Actions')} style={{ left: Math.max(12, Math.min(menu.x, innerWidth - 200)), top: Math.max(12, Math.min(menu.y, innerHeight - 210)) }}>
-    {actions.map(([action, label]) => <button type="button" role="menuitem" key={action} disabled={action === 'block' && menu.row.customer.compliance_blocked === true} onClick={() => onAction(action, menu)}>{NexLuckI18n.t(action === 'block' && menu.row.customer.compliance_blocked ? 'Blocked' : label)}</button>)}
+    {actions.map(([action, label]) => <button type="button" role="menuitem" key={action} disabled={(action === 'block' && menu.row.customer.compliance_blocked === true) || (action === 'approve_kyc' && (!menu.row.kyc_approvable || menu.row.customer.kyc_status === 'VERIFIED')) || (action === 'review' && menu.kind === 'payouts' && menu.row.status !== 'New') || (action === 'decline' && !['New', 'Pending'].includes(menu.row.status))} onClick={() => onAction(action, menu)}>{NexLuckI18n.t(action === 'block' && menu.row.customer.compliance_blocked ? 'Blocked' : label)}</button>)}
   </div>;
 }
 
@@ -200,6 +237,13 @@ function Compliance() {
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (dialog || loading) return;
+    const timer = setInterval(() => {
+      complianceRequest().then(setData).catch(failure => setError(failure.message));
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [dialog, loading]);
   const membership = useMemo(() => Object.fromEntries(customers.map(customer => [
     customer.id, customerSegmentIds(customer, segments, parameters)
   ])), [customers, segments, parameters]);
@@ -220,7 +264,7 @@ function Compliance() {
       : tab === 'kyc_requests' ? [['document_name', 'Document name', row => row.document_name], ['preview_url', 'Uploaded file', row => row.preview_url ? NexLuckI18n.t('Preview') : NexLuckI18n.t('No file uploaded')]]
       : [['segments', 'Segments', row => groupsFor(row.customer).map(segment => segment.name + ' ' + segmentLabel(segment)).join(' ')]]),
     ['username', 'Username', row => row.customer.name + ' ' + row.customer.id],
-    ...(tab === 'payouts' ? [['payment_method', 'Payment method', row => row.payment_method]]
+    ...(tab === 'payouts' ? [['payment_method', 'Payment method', row => payoutDetails(row)]]
       : tab === 'alerts' ? [['last_session', 'Last session', row => row.last_session ? row.last_session.ip + ' (' + row.last_session.country + ') ' + row.last_session.at + ' ' + row.last_session.device : '']] : []),
     ['risk', 'Risk score', row => riskFor(row.customer) + '/100'],
     ...(tab === 'kyc_requests' ? [] : [['kyc', 'KYC status', row => row.customer.kyc_status]]),
@@ -271,7 +315,10 @@ function Compliance() {
     if (key === 'segments') return <SegmentTags segments={groupsFor(customer)} />;
     if (key === 'risk') return <span className={'compliance-score ' + scoreTone(riskFor(customer))}>{value}</span>;
     if (key === 'ggr') return <button className="compliance-stat" type="button" aria-label={NexLuckI18n.t('Customer segment parameters') + ' ' + customer.name} onClick={() => setDialog({ type: 'statistics', row })}>{value} …</button>;
-    if (key === 'preview_url') return row.preview_url ? <button className="btn" type="button" onClick={() => setDialog({ type: 'preview', row })}>{NexLuckI18n.t('Preview')}</button> : <span className="hint">{NexLuckI18n.t('No file uploaded')}</span>;
+    if (key === 'external_id' && tab === 'kyc_requests') return <>{value}{row.unread_messages > 0 && <button type="button" className="compliance-chat-link" onClick={() => setDialog({ type: 'chat', row })}>{NexLuckI18n.t('new chat message {count}', { count: row.unread_messages })}</button>}</>;
+    if (key === 'payment_method') return <><span>{payoutMethod(row)}</span><small className="payout-payment-details">{payoutDestination(row)}</small>{row.connection_name && <small>{row.connection_name}</small>}</>;
+    if (key === 'preview_url') return <div className="compliance-documents">{row.preview_url ? <button className="btn" type="button" onClick={() => setDialog({ type: 'preview', row, document: row.documents?.[row.documents.length - 1] })}>{NexLuckI18n.t('Preview')}</button> : <span className="hint">{NexLuckI18n.t('No file uploaded')}</span>}
+      {!!row.documents?.length && <DocumentHistory documents={row.documents} onPreview={document => setDialog({ type: 'preview', row, document })} />}</div>;
     if (key === 'last_session') return row.last_session ? <>{row.last_session.ip} ({row.last_session.country})<small>{complianceDate(row.last_session.at)} · {row.last_session.device}</small></> : '—';
     if (key === 'status' || key === 'kyc' || key === 'aml') return <span className="status">{NexLuckI18n.t(value.replace(/_/g, ' '))}</span>;
     if (key === 'amount') return Number(value).toLocaleString(NexLuckI18n.formatLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -335,10 +382,13 @@ function Compliance() {
     {dialog?.type === 'review' && <ReviewRequest row={dialog.row} kind={dialog.kind} onClose={closeDialog} onSaved={load} />}
     {dialog?.type === 'decline' && <ComplianceForm title="Decline request" onClose={closeDialog} submitLabel="Decline" onSubmit={async () => {
       const resource = dialog.kind === 'kyc_requests' ? 'kyc-requests' : dialog.kind;
-      await complianceRequest('/' + resource + '/' + encodeURIComponent(dialog.row.id), { method: 'PATCH', body: JSON.stringify({ status: 'Declined' }) });
+      await complianceRequest('/' + resource + '/' + encodeURIComponent(dialog.row.id), { method: 'PATCH', body: JSON.stringify(dialog.kind === 'payouts' ? { action: 'decline' } : { status: 'Declined' }) });
       await load();
     }}><p>{NexLuckI18n.t('Decline this request?')} <b>{dialog.row.external_id}</b> · {dialog.row.customer.name}</p></ComplianceForm>}
-    {dialog?.type === 'chat' && <ComplianceChat customer={dialog.row.customer} onClose={closeDialog} />}
+    {dialog?.type === 'chat' && <ComplianceChat customer={dialog.row.customer} requestId={dialog.row.id} onClose={closeDialog} onRead={load} />}
+    {dialog?.type === 'approve_kyc' && <ComplianceForm title="Approve KYC" submitLabel="Approve KYC" onClose={closeDialog} onSubmit={async () => {
+      await complianceRequest('/customers/' + encodeURIComponent(dialog.row.customer_id) + '/approve-kyc', { method: 'POST', body: '{}' }); await load();
+    }}><p>{dialog.row.customer.name}</p><p>{NexLuckI18n.t('All KYC requests must be approved first.')}</p></ComplianceForm>}
     {dialog?.type === 'block' && <ComplianceForm title="Block customer" onClose={closeDialog} submitLabel="Block" onSubmit={async () => {
       await complianceRequest('/customers/' + encodeURIComponent(dialog.row.customer_id) + '/block', { method: 'POST', body: JSON.stringify({}) });
       await load();
@@ -346,6 +396,7 @@ function Compliance() {
     {dialog?.type === 'statistics' && <SegmentParameters customer={dialog.row.customer} parameters={parameters} onClose={closeDialog} />}
     {dialog?.type === 'preview' && <SegmentDialog title={NexLuckI18n.t('Document preview')} wide onClose={closeDialog}>
       <p className="notice">{NexLuckI18n.t('Fictional demo document. Not valid identification.')}</p>
+      {dialog.document && <p>{dialog.document.name} · {complianceDate(dialog.document.uploaded_at)}</p>}
       <img className="compliance-preview" src="/coml/demo-document.svg" alt={NexLuckI18n.t('Fictional demo document. Not valid identification.')} />
     </SegmentDialog>}
   </>;

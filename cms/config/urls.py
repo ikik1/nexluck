@@ -30,4 +30,10 @@ cms_urls = [
     path("sites/<slug:slug>/<slug:page_slug>/", views.public_page),
     *registry.plugin_urls,
 ]
-urlpatterns = [path("cms/", include(cms_urls))]
+urlpatterns = [
+    path("cms/", include(cms_urls)),
+    path("site/<slug:site_slug>/preview/<int:revision>/", views.site_preview),
+    path("site/<slug:site_slug>/preview/<int:revision>/<slug:page_slug>/", views.site_preview),
+    path("site/<slug:site_slug>/", views.site_page),
+    path("site/<slug:site_slug>/<slug:page_slug>/", views.site_page),
+]

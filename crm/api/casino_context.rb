@@ -1,6 +1,7 @@
 require 'digest'
 require_relative 'home_dashboard'
 require_relative 'compliance'
+require_relative 'demo_wallet'
 require_relative 'popular_games'
 
 # One atomic snapshot contains the registry, tenants, migration and operation keys.
@@ -16,6 +17,7 @@ class CasinoContext
 
   class Tenant < CustomerStore
     include ComplianceStore
+    include DemoWallet
     include PopularGames
     attr_reader :state, :casino_id
 
@@ -526,12 +528,16 @@ class CasinoContext
         customer_store.handle_popular_games(req, res, rest)
       elsif rest == 'compliance' || rest.start_with?('compliance/')
         return if secured && !authorize(req, res, req.request_method == 'GET' ? 'compliance:read' : 'compliance:write')
-        if rest == 'compliance' && req.request_method == 'GET' && ComplianceStore.prepare(state, casino_id)
+        if (rest == 'compliance' || rest.start_with?('compliance/demo-wallet')) && ComplianceStore.prepare(state, casino_id)
           state['revision'] += 1
           document['audit'] << audit(req, 'compliance_demo_seeded', casino_id, { 'source' => 'synthetic_demo' })
           persist(document)
         end
-        customer_store.handle_compliance(req, res, rest)
+        if rest == 'compliance/demo-wallet' || rest.start_with?('compliance/demo-wallet/')
+          customer_store.handle_demo_wallet(req, res, rest)
+        else
+          customer_store.handle_compliance(req, res, rest)
+        end
       elsif rest == 'finance' || rest.start_with?('finance/')
         return if secured && !authorize(req, res, req.request_method == 'GET' ? 'finance:read' : 'finance:write')
         match = rest.match(%r{\Afinance(?:/(connections|cascades)(?:/([\w-]+))?)?\z})

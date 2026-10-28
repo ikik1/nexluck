@@ -90,6 +90,81 @@ class ComplianceStoreTest < Minitest::Test
     assert_empty @state['profiles']
     assert_empty @tenant.compliance['payouts']
     refute @tenant.compliance['demo']
+    req = Request.new('GET', {}, nil, {})
+    res = WEBrick::HTTPResponse.new(WEBrick::Config::HTTP)
+    @tenant.handle_demo_wallet(req, res, 'compliance/demo-wallet')
+    assert_equal 404, res.status
+  end
+
+  def test_document_history_examples_are_dated_idempotent_and_preserve_existing_history
+    seed
+    requests = @tenant.compliance['kyc_requests']
+    requests.each do |row|
+      assert_equal 3, row['documents'].length
+      assert_equal 3, row['documents'].map { |document| document['id'] }.uniq.length
+      dates = row['documents'].map { |document| document['uploaded_at'] }
+      assert_equal dates.sort, dates
+      assert_equal row['created_at'], dates.last
+      assert row['documents'].all? { |document| document['url'] == ComplianceStore::PREVIEW_URL && document['demo'] }
+    end
+    row = requests.first
+    row.delete('documents')
+    protected_row = requests.last
+    protected_row['documents'] = [{ 'id' => 'player-version', 'name' => 'Existing submission' }]
+    before = row.slice('status', 'audit', 'created_at', 'updated_at')
+    assert seed
+    assert_equal before, row.slice(*before.keys)
+    assert_equal [{ 'id' => 'player-version', 'name' => 'Existing submission' }], protected_row['documents']
+    snapshot = JSON.generate(@state)
+    refute seed
+    assert_equal snapshot, JSON.generate(@state)
+  end
+
+  def test_payment_examples_are_currency_specific_masked_and_idempotent
+    rows = ComplianceStore::DEMO_PAYMENT_METHODS.flat_map do |currency, methods|
+      methods.map.with_index do |_, index|
+        { 'source' => 'synthetic_demo', 'payment_method' => 'Demo bank transfer',
+          'currency' => currency, 'status' => 'Pending', 'amount' => 25 + index, 'audit' => [{ 'to' => 'Pending' }] }
+      end
+    end
+    wallet = { 'source' => 'demo_wallet', 'payment_method' => 'Visa', 'masked_destination' => '4102 xxxxxx 9876', 'currency' => 'EUR' }
+    custom = { 'source' => 'synthetic_demo', 'payment_method' => 'Custom method', 'currency' => 'INR' }
+    supplied = { 'source' => 'synthetic_demo', 'payment_method' => 'Demo bank transfer', 'currency' => 'EUR', 'masked_destination' => '**** 4321' }
+    data = { 'payouts' => rows + [wallet, custom, supplied] }
+    protected_rows = JSON.generate([wallet, custom, supplied])
+    assert ComplianceStore.add_payment_examples(data)
+    ComplianceStore::DEMO_PAYMENT_METHODS.each do |currency, methods|
+      examples = rows.select { |row| row['currency'] == currency }
+      assert_equal methods.map(&:first), examples.map { |row| row['payment_method'] }
+      examples.each do |row|
+        assert_equal 'Pending', row['status']
+        assert_equal [{ 'to' => 'Pending' }], row['audit']
+        assert row['masked_destination'].include?('*') || row['masked_destination'].include?('xxxxxx')
+        refute_match(/\d{5,}/, row['masked_destination'])
+      end
+    end
+    assert_equal protected_rows, JSON.generate([wallet, custom, supplied])
+    snapshot = JSON.generate(data)
+    refute ComplianceStore.add_payment_examples(data)
+    assert_equal snapshot, JSON.generate(data)
+  end
+
+  def test_existing_demo_payout_upgrade_preserves_decisions_and_money
+    seed
+    payout = @tenant.compliance['payouts'].first
+    payout['payment_method'] = 'Demo bank transfer'
+    %w[payment_brand destination_type masked_destination].each { |key| payout.delete(key) }
+    payout['status'] = 'Declined'
+    original = payout.slice('id', 'amount', 'currency', 'status', 'audit', 'created_at', 'updated_at')
+    assert seed
+    assert_equal original, payout.slice(*original.keys)
+    assert payout['masked_destination']
+    refute seed
+    payout['payment_method'] = 'Demo bank transfer'
+    payout.delete('masked_destination')
+    before = JSON.generate(@state)
+    refute ComplianceStore.prepare(@state, @a, demo: false)
+    assert_equal before, JSON.generate(@state)
   end
 
   def test_review_examples_upgrade_preserves_existing_decisions
@@ -163,11 +238,12 @@ class ComplianceStoreTest < Minitest::Test
     path = "compliance/payouts/#{payout['id']}"
     assert_equal 422, call(path, 'PATCH', { 'status' => 'Executed' })[0]
     assert_equal 422, call(path, 'PATCH', { 'status' => 'Pending', 'amount' => 999 })[0]
-    assert_equal 200, call(path, 'PATCH', { 'status' => 'Pending' })[0]
-    assert_equal 200, call(path, 'PATCH', { 'status' => 'Approved' })[0]
-    assert_equal 200, call(path, 'PATCH', { 'status' => 'Approved' })[0]
-    assert_equal 409, call(path, 'PATCH', { 'status' => 'Declined' })[0]
-    assert_equal %w[Pending Approved], payout['audit'].map { |event| event['to'] }
+    assert_equal 422, call(path, 'PATCH', { 'status' => 'Approved' })[0]
+    assert_equal 200, call(path, 'PATCH', { 'action' => 'approve' })[0]
+    assert_equal 'Pending', payout['status']
+    assert_equal 409, call(path, 'PATCH', { 'action' => 'approve' })[0]
+    assert_equal 200, call(path, 'PATCH', { 'action' => 'decline' })[0]
+    assert_equal %w[Pending Declined], payout['audit'].map { |event| event['to'] }
     assert_equal ['test-staff'], payout['audit'].map { |event| event['by'] }.uniq
     assert_equal finance, JSON.generate(@state['finance'])
   end
@@ -188,7 +264,7 @@ class ComplianceStoreTest < Minitest::Test
     end
   end
 
-  def test_kyc_creation_and_latest_request_controls_profile
+  def test_kyc_creation_and_any_unapproved_request_prevents_verification
     seed
     customer = @tenant.list.first
     original = customer['kyc_status']
@@ -200,9 +276,10 @@ class ComplianceStoreTest < Minitest::Test
     assert_equal 'New', newer['status']
     assert_equal 'PENDING', customer['kyc_status']
     assert_equal 200, call("compliance/kyc-requests/#{older['id']}", 'PATCH', { 'status' => 'Declined' })[0]
-    assert_equal 'PENDING', customer['kyc_status']
+    assert_equal 'REJECTED', customer['kyc_status']
     assert_equal 200, call("compliance/kyc-requests/#{newer['id']}", 'PATCH', { 'status' => 'Approved' })[0]
-    assert_equal 'VERIFIED', customer['kyc_status']
+    assert_equal 'REJECTED', customer['kyc_status']
+    assert_equal 409, call("compliance/customers/#{customer['id']}/approve-kyc", 'POST', {})[0]
     status, latest = call('compliance/kyc-requests', 'POST', { 'customer_id' => customer['id'], 'document_name' => 'Identity check' })
     assert_equal 201, status
     assert_equal 200, call("compliance/kyc-requests/#{latest['id']}", 'PATCH', { 'status' => 'Declined' })[0]
@@ -211,13 +288,40 @@ class ComplianceStoreTest < Minitest::Test
     assert_equal 422, call('compliance/kyc-requests', 'POST', { 'customer_id' => customer['id'], 'document_name' => 'x' * 201 })[0]
   end
 
+  def test_explicit_kyc_approval_requires_all_requests_and_blocks_profile_bypass
+    seed
+    customer = @tenant.list.first
+    customer['kyc_status'] = 'PENDING'
+    requests = @tenant.compliance['kyc_requests'].select { |row| row['customer_id'] == customer['id'] }
+    path = "compliance/customers/#{customer['id']}/approve-kyc"
+    %w[New Pending Declined].each do |status|
+      requests.each { |row| row['status'] = 'Approved' }
+      requests.first['status'] = status
+      assert_equal 409, call(path, 'POST', {})[0]
+      assert_equal false, call[1]['kyc_requests'].find { |row| row['customer_id'] == customer['id'] }['kyc_approvable']
+      _, errors = @tenant.update(customer['id'], { 'kyc_status' => 'VERIFIED' })
+      assert errors.key?('kyc_status')
+      assert_equal 'PENDING', customer['kyc_status']
+    end
+    requests.each { |row| row['status'] = 'Approved' }
+    assert_equal true, call[1]['kyc_requests'].find { |row| row['customer_id'] == customer['id'] }['kyc_approvable']
+    assert_equal 200, call(path, 'POST', {})[0]
+    assert_equal 'VERIFIED', customer['kyc_status']
+    assert_equal 'test-staff', customer['kyc_approved_by']
+    assert_equal 404, call('compliance/customers/CU-999/approve-kyc', 'POST', {})[0]
+    @tenant.compliance['kyc_requests'].reject! { |row| row['customer_id'] == customer['id'] }
+    assert_equal 409, call(path, 'POST', {})[0]
+  end
+
   def test_internal_notes_and_foreign_references
     seed
     path = "compliance/customers/#{@tenant.list.first['id']}/chat"
-    assert_equal [], call(path)[1]['items']
+    existing = call(path)[1]['items']
+    assert_equal 12, existing.length
+    assert_equal 10, existing.count { |item| !item['read_at'] }
     status, notes = call(path, 'POST', { 'message' => 'Staff review only' })
     assert_equal 201, status
-    note = notes['items'].first
+    note = notes['items'].last
     assert_equal 'Staff review only', note['message']
     assert note['internal']
     assert_equal @a, note['casino_id']
@@ -227,6 +331,21 @@ class ComplianceStoreTest < Minitest::Test
     assert_equal 422, call(path, 'POST', { 'message' => 'Note', 'recipient' => 'external' })[0]
     assert_equal 404, call('compliance/customers/CU-999/chat')[0]
     assert_equal 404, call('compliance/payouts/foreign', 'PATCH', { 'status' => 'Approved' })[0]
+  end
+
+  def test_chat_examples_are_request_scoped_and_acknowledgements_persist
+    seed
+    customer = @tenant.list.first
+    rows = call[1]['kyc_requests'].select { |row| row['customer_id'] == customer['id'] }
+    assert_equal 10, rows.sum { |row| row['unread_messages'] }
+    assert_equal 1, rows.count { |row| row['unread_messages'] > 0 }
+    items = call("compliance/customers/#{customer['id']}/chat")[1]['items']
+    assert_equal 2, items.count { |item| item['read_at'] }
+    assert_equal 200, call("compliance/customers/#{customer['id']}/chat/read", 'POST', { 'ids' => items.map { |item| item['id'] } })[0]
+    assert_equal 0, call[1]['kyc_requests'].select { |row| row['customer_id'] == customer['id'] }.sum { |row| row['unread_messages'] }
+    before = JSON.generate(@state)
+    refute seed
+    assert_equal before, JSON.generate(@state)
   end
 
   def test_context_enforces_ownership_and_persists_lazy_seed_and_mutations
@@ -263,7 +382,7 @@ class ComplianceStoreTest < Minitest::Test
     assert_empty request.call(@b, 'customers')[1]['items']
     payout = payload['payouts'].first
     assert_equal 404, request.call(@b, "compliance/payouts/#{payout['id']}", 'PATCH', { status: 'Approved' })[0]
-    assert_equal 200, request.call(@a, "compliance/payouts/#{payout['id']}", 'PATCH', { status: 'Pending' })[0]
+    assert_equal 200, request.call(@a, "compliance/payouts/#{payout['id']}", 'PATCH', { action: 'approve' })[0]
     persisted = JSON.parse(File.read(@context.path))
     assert_equal 'Pending', persisted['tenants'][@a]['compliance']['payouts'].first['status']
     assert_empty persisted['tenants'][@b]['profiles']

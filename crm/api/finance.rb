@@ -7,7 +7,7 @@ module FinanceStore
   SEED_JSON = File.read(File.join(__dir__, 'finance_seed.json')).freeze
   HISTORY_KEYS = %w[wallets wallet_transactions transactions players].freeze
   COLLECTION_KEYS = %w[connections gateways cascades wallets wallet_transactions transactions players game_catalog].freeze
-  CONNECTION_FIELDS = %w[name brand currency methods countries segments conn settings enabled configuration_required].freeze
+  CONNECTION_FIELDS = %w[name brand currency methods countries segments conn settings enabled configuration_required payin payout].freeze
   CASCADE_FIELDS = %w[name type country zone segments method currency steps enabled configuration_required].freeze
   DECLINE_REASONS = ['Insufficient funds', 'Do not honor', '3-D Secure failed', 'Suspected fraud', 'Issuer unavailable', 'Expired card', 'Any decline'].freeze
   ZONES = ['SEA', 'APAC', 'MENA', 'LATM', 'CIS', 'Europe', 'Africa', 'Canada', 'United States'].freeze
@@ -18,6 +18,7 @@ module FinanceStore
 
   def self.seed(include_history: true)
     data = JSON.parse(SEED_JSON)
+    data['connections'].each { |connection| connection.merge!('payin' => true, 'payout' => true) }
     unless include_history
       HISTORY_KEYS.each { |key| data[key] = [] }
       data['game_catalog'] = []
@@ -32,6 +33,7 @@ module FinanceStore
 
   def finance_data
     data = JSON.parse(JSON.generate(@state.fetch('finance')))
+    data['connections'].each { |connection| connection['payin'] = true unless connection.key?('payin'); connection['payout'] = true unless connection.key?('payout') }
     games = @state.fetch('games', {})
     providers = @state.fetch('catalogs', {}).fetch('providers', []).select { |provider| finance_owned?(provider) }
     categories = games.fetch('categories', []).select { |category| finance_owned?(category) }
@@ -68,10 +70,11 @@ module FinanceStore
       errors['name'] = 'Name is already in use' if records.any? { |row| row != current && row['name'].casecmp?(clean['name']) }
     end
     finance_validate_segments(clean['segments'], errors)
-    %w[enabled configuration_required].each do |key|
+    %w[enabled configuration_required payin payout].each do |key|
       errors[key] = 'Must be a boolean' if clean.key?(key) && ![true, false].include?(clean[key])
     end
     if resource == 'connections'
+      %w[payin payout].each { |key| clean[key] = true unless clean.key?(key) }
       finance_validate_connection(clean, errors)
     else
       finance_validate_cascade(clean, errors)

@@ -40,3 +40,12 @@ main{max-width:1800px}
 .compliance-chat li{padding:12px;margin:8px 0;background:#f2f6fb;border-radius:7px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}
 .compliance-chat time{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
 @media(max-width:600px){.compliance-tabs{gap:7px}.compliance-tabs button{min-width:100%;padding:12px}.matrix-row{grid-template-columns:minmax(0,1fr) 70px}.matrix-row>.btn{grid-column:1/-1;justify-self:end}.compliance-heading{align-items:flex-start}.compliance-filter-grid{grid-template-columns:minmax(0,1fr)}.compliance-amount-range{grid-column:auto}}
+.compliance-chat-link{display:block;border:0;background:none;color:#747b85;padding:3px 4px;margin:2px -4px 0;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer}
+.compliance-chat-link:hover,.compliance-chat-link:focus-visible{background:#e8ecf1;color:#424a55}
+.compliance-chat li.chat-message-new{background:#fff4cf;border-left:3px solid #d5a12b}
+.chat-new-label{display:inline-block;margin-left:8px;font-size:10px;color:#805900}
+.compliance-documents{display:flex;align-items:flex-start;gap:4px}
+.compliance-document-history{position:relative}
+.compliance-documents ul{position:absolute;z-index:5;right:0;min-width:220px;max-height:240px;overflow:auto;list-style:none;padding:8px;margin:4px 0;background:var(--panel,#fff);border:1px solid var(--line);box-shadow:0 8px 24px #0002}
+.compliance-documents li button{width:100%;text-align:left;margin-bottom:4px}
+.compliance-menu button:disabled{color:#999;cursor:not-allowed}

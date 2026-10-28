@@ -41,7 +41,7 @@ def selected_page(request, site_id):
 
 
 def page_url(page):
-    return f"/cms/sites/{page.site.slug}/" + ("" if page.slug == "home" else f"{page.slug}/")
+    return f"/site/{page.site.public_slug}/" + ("" if page.slug == "home" else f"{page.slug}/")
 
 
 def page_record(page):
@@ -167,7 +167,7 @@ def publish(request, site_id):
     return Response({"revision": publication.revision, "url": page_url(page)})
 
 
-def render_document(request, doc, site, preview=False, publication=None, token=""):
+def render_document(request, doc, site, preview=False, publication=None, token="", preview_page_id=None):
     locale = website_locale(request)
     doc = localized_document(doc, locale)
     template = registry.layouts.get(doc["renderer"])
@@ -181,7 +181,7 @@ def render_document(request, doc, site, preview=False, publication=None, token="
     popular_key = request.GET.get("popular")
     if popular_key and not any(b["key"] == popular_key and b["kind"] == "games" and b["enabled"] for b in blocks):
         raise Http404("Popular module not found.")
-    preview_page = selected_page(request, site.pk).pk if preview and request.GET.get("page") else None
+    preview_page = preview_page_id or (selected_page(request, site.pk).pk if preview and request.GET.get("page") else None)
     for b in blocks:
         if b["kind"] == "seo":
             from .modules import SEOProps
@@ -260,7 +260,40 @@ def create_preview(request, site_id):
     doc.update(site_name=site.name, renderer=layout.renderer, tokens=theme.tokens, sections=layout_tree(layout, doc["blocks"]))
     token = secrets.token_urlsafe(32)
     cache.set("cms:preview:" + token, {"user_id": request.user.id, "site_id": site.id, "page_id": page.pk, "document": doc}, 300)
-    return Response({"url": f"/cms/preview/{site.id}/?token={token}&lang={locale}&page={page.pk}"})
+    path = f"/site/{site.public_slug}/preview/{doc['revision']}/"
+    if page.slug != "home":
+        path += f"{doc.get('slug', page.slug)}/"
+    return Response({"url": f"{path}?token={token}&lang={locale}&page={page.pk}"})
+
+
+@never_cache
+@login_required
+@xframe_options_sameorigin
+@ensure_csrf_cookie
+def site_preview(request, site_slug, revision, page_slug="home"):
+    site = get_object_or_404(sites_for(request.user), public_slug=site_slug)
+    if not request.user.is_staff:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied()
+    token = request.GET.get("token", "")
+    page_id = None
+    if token:
+        doc = preview_document(request, site, token)
+    else:
+        page = get_object_or_404(page_query(), site=site, slug=page_slug)
+        page_id = page.pk
+        if request.GET.get("page") and selected_page(request, site.pk).pk != page.pk:
+            raise Http404("Preview does not belong to this page.")
+        doc, layout, theme = validate_document(document_for(page))
+        doc.update(site_name=site.name, renderer=layout.renderer, tokens=theme.tokens, sections=layout_tree(layout, doc["blocks"]))
+    if doc["revision"] != revision or doc.get("slug", "home") != page_slug:
+        raise Http404("Preview does not match this URL.")
+    return render_document(request, doc, site, preview=True, token=token, preview_page_id=page_id)
+
+
+def site_page(request, site_slug, page_slug="home"):
+    site = get_object_or_404(Site, public_slug=site_slug, enabled=True)
+    return public_page(request, site.slug, page_slug)
 
 
 @ensure_csrf_cookie

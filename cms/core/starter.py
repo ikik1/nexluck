@@ -31,7 +31,14 @@ def import_site(record):
     slug = slugify(record["name"])[:50 - len(suffix)] or "casino"
     # Stable CRM suffix avoids name collisions without exposing customer data.
     slug += suffix
-    site = Site.objects.create(crm_id=record["id"], slug=slug, name=record["name"],
+    base = slugify(record["name"])[:50] or "casino"
+    public_slug = base
+    number = 2
+    while Site.objects.filter(public_slug=public_slug).exists():
+        suffix = f"-{number}"
+        public_slug = base[:50 - len(suffix)] + suffix
+        number += 1
+    site = Site.objects.create(crm_id=record["id"], slug=slug, public_slug=public_slug, name=record["name"],
         url=record["url"], enabled=record["enabled"], theme=theme)
     page = Page.objects.create(site=site, title=site.name + " | Home", layout=Layout.objects.get(key="home"))
     starter = [

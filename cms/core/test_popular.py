@@ -1,6 +1,7 @@
 from copy import deepcopy
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase
@@ -144,7 +145,7 @@ class PopularTests(TestCase):
         anonymous = APIClient(enforce_csrf_checks=True)
         self.assertEqual(anonymous.post(url + "?demo_player=1", {"gameId": "g1", "favourite": True}, format="json").status_code, 403)
         anonymous.get(f"/cms/sites/{self.site.slug}/?demo_player=1")
-        csrf = anonymous.cookies["nexluck_cms_csrf"].value
+        csrf = anonymous.cookies[settings.CSRF_COOKIE_NAME].value
         self.assertEqual(anonymous.post(url, {"gameId": "g1", "favourite": True}, format="json", HTTP_X_CSRFTOKEN=csrf).status_code, 403)
         with patch("core.views.crm_get", return_value={"items": [{"gameId": "g1"}], "total": 1}) as write:
             response = anonymous.post(url + "?demo_player=1", {"gameId": "g1", "favourite": True}, format="json", HTTP_X_CSRFTOKEN=csrf)

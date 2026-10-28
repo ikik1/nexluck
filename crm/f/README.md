@@ -61,9 +61,18 @@ tenant state in the private tenant document, not this fixture.
 Connection tests do not contact live providers; the UI explicitly states that
 saving configuration does not verify gateway credentials.
 
+Payment connections have independent boolean `payin` and `payout` attributes;
+both may be enabled (or disabled). The editor exposes both checkboxes, the list
+shows both columns, and **Payment direction** filters by the enabled attribute.
+Existing connections without these attributes retain both directions enabled
+for backward compatibility. New connections default to both enabled.
+The demo wallet offers only enabled, non-offline connections with Payout enabled;
+its API returns safe display fields, never gateway credentials.
+
 ## Focused checks
 
 ```sh
 ruby crm/api/test/finance_store_test.rb
 node crm/api/test/finance_data_test.js
+python3 crm/api/test/compliance_workflow_test.py
 ```

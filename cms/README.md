@@ -164,8 +164,8 @@ switching or creating a page. Copying uses the saved source, not unsaved edits.
 
 Edit the selected page's title, URL slug, layout, theme, navigation and modules.
 Each page has its own draft revision, ephemeral preview and publication.
-Home keeps its reserved `home` slug and public `/cms/sites/<site>/` URL.
-Additional pages publish to `/cms/sites/<site>/<page-slug>/`; duplicate slugs
+Home keeps its reserved `home` slug and public `/site/<casino-name>/` URL.
+Additional pages publish to `/site/<casino-name>/<page-slug>/`; duplicate slugs
 within a website are rejected. Saving a page URL changes its public routing;
 content still comes from its last publication until publishing again.
 There is no delete/unpublish action.
@@ -175,6 +175,21 @@ Staff APIs: `GET/POST /cms/api/sites/<id>/pages/` lists/creates pages
 publish and draft-widget endpoints accept `?page=<page-id>`; omitted page
 continues selecting Home. Page permissions inherit website membership and
 publication permission. Apply `0005_page_configuration` before starting.
+
+Casino URL names use stable hyphenated names: **Aurora Casino** becomes
+`aurora-casino`. `0006_site_public_slug` assigns names to existing sites;
+collisions receive numeric suffixes (`aurora-casino-2`). Internal CRM-linked
+slugs and existing `/cms/sites/...` URLs remain supported.
+Previews use `/site/<casino-name>/preview/<draft-revision>/<page-slug>/`
+(Home omits the page slug). Generated unsaved previews retain their expiring,
+user/site/page-bound token; the path's revision and page must match the preview.
+Without a token, only the matching current saved draft can be previewed by
+authorized staff, not historical revisions. Preview content is never public.
+Session and CSRF cookies now cover `/` so CMS authentication also reaches
+`/site/`. New cookie names avoid collisions with previous `/cms/` cookies;
+existing users must sign in again after upgrading.
+Proxy **both** `/cms/` and `/site/` to Django using the supplied Nginx snippet;
+the local Ruby proxy supports both paths.
 
 1. Sign in with a staff account. The single **Website** selector fetches websites
    from the CRM casino API. Superusers see all CRM websites; other staff see
@@ -215,7 +230,7 @@ publication permission. Apply `0005_page_configuration` before starting.
 7. **Publish** requires `can_publish` membership (or superuser) and no unsaved
    changes. It freezes title, layout sections, menu, validated theme colors and
    block configuration in a publication. Public URL:
-   `/cms/sites/<site-slug>/`. Draft edits never change that snapshot.
+   `/site/<casino-name>/`. Draft edits never change that snapshot.
 8. **Website settings** on My Casinos retains the CRM name/URL/skin form.
 
 CRM site import is a snapshot of identity/enabled/theme, not continuous
@@ -313,8 +328,10 @@ shared cache in production. Public endpoints never expose drafts.
 | `/cms/api/sites/<id>/previews/` | POST | Site editor; private expiring unsaved preview |
 | `/cms/api/sites/<id>/publish/` | POST | Site publisher; `{revision}` |
 | `/cms/preview/<id>/` | GET | Staff + site permission; optional user-bound preview token |
+| `/site/<casino-name>/preview/<revision>/<page-slug>/` | GET | Staff + site permission; revision/page-checked draft preview; Home omits page slug |
 | `/cms/api/sites/<id>/widgets/<key>/` | GET | Site editor; draft/preview widget |
 | `/cms/sites/<slug>/` | GET | Public; enabled site and published document only |
+| `/site/<casino-name>/<page-slug>/` | GET | Public canonical URL; Home omits page slug; legacy `/cms/sites/` paths remain supported |
 | `/cms/api/public/<slug>/<publication>/widgets/<key>/` | GET | Public; current publication widget only |
 | `/cms/api/plugins/announcements/<id>/` | GET, POST | Site editor read / publisher create |
 | `/cms/health/` | GET | Database + cache readiness (503/500 on failure) |

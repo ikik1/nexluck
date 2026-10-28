@@ -118,8 +118,8 @@ async def check():
         await page.get_by_role("button", name="Clear filters", exact=True).click()
         await row.click(button="right")
         await page.get_by_role("menuitem", name="Process ...", exact=True).click()
-        await page.get_by_role("dialog").get_by_role("combobox", name="Status", exact=True).select_option("Pending")
-        await page.get_by_role("dialog").get_by_role("button", name="Save", exact=True).click()
+        assert await page.get_by_role("dialog").get_by_role("combobox", name="Status", exact=True).count() == 0
+        await page.get_by_role("dialog").get_by_role("button", name="Approve", exact=True).click()
         await page.get_by_role("tab", name="Payout requests New 14", exact=True).wait_for()
         assert await page.locator(f'tr[data-id="{first["id"]}"]').get_attribute("data-status") == "Pending"
         await page.reload()
@@ -158,8 +158,9 @@ async def check():
         await page.get_by_text("Filter all fields", exact=True).click()
         await page.get_by_role("searchbox", name="Filter Document name", exact=True).fill("Browser compliance proof")
         await page.locator("tbody tr").first.wait_for()
-        assert "review-approved" in await page.locator("tbody tr").first.get_attribute("class")
-        assert await page.locator('tbody tr [data-column="kyc"]').first.inner_text() == "VERIFIED"
+        assert "review-pending" in await page.locator("tbody tr").first.get_attribute("class")
+        assert await page.locator('tbody tr [data-column="kyc"]').first.inner_text() == "PENDING"
+        assert await page.locator("tbody tr").first.get_by_role("button", name="Approve KYC", exact=True).count() == 0
         await page.get_by_role("button", name="Clear filters", exact=True).click()
         await page.get_by_role("button", name="Next", exact=True).click()
         assert set(await page.locator('tbody tr').evaluate_all("(rows) => rows.map(row => row.dataset.status)")) == {"New", "Pending", "Approved", "Declined"}

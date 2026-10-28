@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.views.decorators.cache import never_cache
@@ -150,7 +151,7 @@ def openapi(request):
                 "responses": {"200": response, "400": {"description": "Invalid parameters or segment IDs"},
                               "403": {"description": "Staff session required"}, "404": {"description": "Site not found or not permitted"},
                               "503": {"description": "CRM unavailable or site not linked"}}}}},
-        "components": {"securitySchemes": {"session": {"type": "apiKey", "in": "cookie", "name": "nexluck_cms_session"}}},
+        "components": {"securitySchemes": {"session": {"type": "apiKey", "in": "cookie", "name": settings.SESSION_COOKIE_NAME}}},
         "security": [{"session": []}]})
 
 

@@ -14,12 +14,35 @@
     loss: { label: 'Losses', one: 'Loss', icon: '✕' },
     exchange: { label: 'Exchange', one: 'Exchange', icon: '⇄' },
   };
-  const W_METHODS = {
-    bank: { label: 'Bank transfer', currencies: null },
-    crypto: { label: 'Crypto', currencies: null },
-    paytm: { label: 'Paytm', currencies: ['INR'] },
+  const walletContext = new URLSearchParams(location.search);
+  let demoCustomer = walletContext.get('customer') || '';
+  let demoCasino = walletContext.get('casino_context') || '';
+  const demoRequest = async (path = '', body) => {
+    if (!demoCasino) {
+      const response = await fetch('/crm/ui-api/v1/casinos');
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Unable to load demo casinos.');
+      demoCasino = (Array.isArray(payload) ? payload : payload.items)?.[0]?.id;
+      if (!demoCasino) throw new Error('No demo casino is available.');
+    }
+    const response = await fetch('/crm/ui-api/v1/compliance/demo-wallet' + path + '?customer=' + encodeURIComponent(demoCustomer), {
+      method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'X-Casino-Id': demoCasino },
+      ...(body ? { body: JSON.stringify(body) } : {})
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error([payload.error, ...Object.values(payload.fields || {})].filter(Boolean).join(': ') || 'Demo wallet request failed.');
+    if (payload.customer) {
+      demoCustomer = payload.customer.id;
+      state.kyc = payload.customer.kyc_status;
+      state.demoName = payload.customer.name;
+      const url = new URL(location.href);
+      url.searchParams.set('casino_context', demoCasino);
+      url.searchParams.set('customer', demoCustomer);
+      history.replaceState(null, '', url);
+      renderProfile();
+    }
+    return payload;
   };
-  const CRYPTO_NETWORKS = ['USDT (TRC20)', 'USDT (ERC20)', 'Bitcoin (BTC)'];
   const PAGE = 10;
   const LANGUAGES = [
     ['en', 'English'], ['ru', 'Русский'], ['pt-PT', 'Português (Portugal)'],
@@ -135,11 +158,13 @@
     $('#wl-profile').innerHTML =
       '<div class="wl-avatar" aria-hidden="true">' + esc(p.name.trim().charAt(0).toUpperCase() || '?') + '<b>✦</b></div>'
       + '<div><h2 class="wl-name">' + esc(p.name) + '</h2>'
+      + (state.demoName ? '<p class="wl-avail">Demo CRM customer: ' + esc(state.demoName) + '</p>' : '')
       + '<div class="wl-pills"><span class="wl-pill ok">✓ KYC: ' + esc(state.kyc) + '</span>'
       + '<span class="wl-pill gold">✦ Gold</span>'
       + '<span class="wl-pill">' + state.points.toLocaleString('en-US') + ' loyalty points</span></div>'
       + '<div class="wl-loyal">' + left.toLocaleString('en-US') + ' points to ' + esc(state.nextLevel.name) + '<div class="wl-bar"><i style="width:' + pct + '%"></i></div></div></div>'
-      + '<button type="button" class="wl-ghost" id="wl-settings">Profile settings</button>';
+      + '<div class="wl-profile-actions"><button type="button" class="wl-ghost" id="wl-kyc">KYC & chat (demo)</button>'
+      + '<button type="button" class="wl-ghost" id="wl-settings">Profile settings</button></div>';
   };
 
   const openSettings = () => {
@@ -281,40 +306,38 @@
   };
 
   // ---------- withdrawal ----------
-  const openWithdrawal = () => {
-    const w = { cur: state.currency, method: 'bank' };
+  const openWithdrawal = async () => {
+    let payload;
+    try { payload = await demoRequest(); } catch (error) { toast(error.message); return; }
+    const w = { connection: payload.connections.find(connection => connection.currency === state.currency) || payload.connections[0], method: '', key: crypto.randomUUID() };
     const el = openModal('Withdrawal',
-      '<div class="dp-sec"><label class="dp-lbl" for="w-cur">Currency</label><select id="w-cur">' + curOptions(w.cur) + '</select></div>'
+      '<p class="wl-avail">Demo customer: ' + esc(payload.customer.name) + '. No payment is executed.</p>'
+      + '<div class="dp-sec"><label class="dp-lbl" for="w-connection">Payment connection</label><select id="w-connection">' + payload.connections.map(connection => '<option value="' + esc(connection.id) + '"' + (connection.id === w.connection?.id ? ' selected' : '') + '>' + esc(connection.brand + ' · ' + connection.name + ' · ' + connection.currency) + '</option>').join('') + '</select></div>'
       + '<div class="dp-sec"><span class="dp-lbl">Withdrawal method</span><div class="dp-methods" id="w-methods"></div></div>'
       + '<div class="dp-widget" id="w-widget"></div>'
       + '<button type="button" class="dp-go" id="w-go" style="margin-top:16px">Withdraw</button>'
-      + '<p class="wl-avail" style="margin-top:12px">Demo only: nothing is sent to a payment provider.</p>');
+      + '<p role="alert" id="w-error" class="dp-err"></p>');
 
-    const methodsFor = (cur) => Object.keys(W_METHODS).filter((m) => !W_METHODS[m].currencies || W_METHODS[m].currencies.includes(cur));
     const renderWidget = () => {
-      const avail = state.balances[w.cur];
-      const amount = field('w-amount', 'Amount (' + w.cur + ')', '<div class="dp-amt"><input type="text" id="w-amount" data-f="w-amount" inputmode="decimal" autocomplete="off" placeholder="0.00"><div class="dp-chips"><button type="button" class="dp-chip" id="w-max">Max</button></div></div>');
-      let details = '';
-      if (w.method === 'bank') {
-        details = field('w-holder', 'Account holder', '<input type="text" id="w-holder" data-f="w-holder" maxlength="60" autocomplete="name">')
-          + field('w-iban', 'IBAN / account number', '<input type="text" id="w-iban" data-f="w-iban" maxlength="42" autocomplete="off" placeholder="DE89 3704 0044 0532 0130 00">');
-      } else if (w.method === 'crypto') {
-        details = field('w-net', 'Network', '<select id="w-net" data-f="w-net">' + CRYPTO_NETWORKS.map((n) => '<option>' + n + '</option>').join('') + '</select>')
-          + field('w-addr', 'Wallet address', '<input type="text" id="w-addr" data-f="w-addr" maxlength="70" autocomplete="off" spellcheck="false">');
-      } else {
-        details = field('w-phone', 'Paytm phone number', '<input type="tel" id="w-phone" data-f="w-phone" maxlength="14" autocomplete="tel" placeholder="9876543210">');
-      }
-      $('#w-widget', el).innerHTML = '<h3>' + W_METHODS[w.method].label + '</h3><p class="wl-avail">Available: <b>' + money(avail, w.cur) + '</b></p>' + amount + details;
+      if (!w.connection) { $('#w-widget', el).textContent = 'No enabled payout connections. Configure Finance first.'; $('#w-go', el).disabled = true; return; }
+      const cur = w.connection.currency;
+      const avail = state.balances[cur] || 0;
+      const amount = field('w-amount', 'Amount (' + esc(cur) + ')', '<div class="dp-amt"><input type="text" id="w-amount" data-f="w-amount" inputmode="decimal" autocomplete="off" placeholder="0.00"><div class="dp-chips"><button type="button" class="dp-chip" id="w-max">Max</button></div></div>');
+      const card = ['Visa', 'MasterCard'].includes(w.method);
+      const details = card
+        ? field('w-first', 'Card first 4 digits (demo)', '<input id="w-first" inputmode="numeric" maxlength="4" autocomplete="off">') + field('w-last', 'Card last 4 digits (demo)', '<input id="w-last" inputmode="numeric" maxlength="4" autocomplete="off">')
+        : field('w-destination', 'Masked destination only (e.g. xxxx 1234)', '<input id="w-destination" maxlength="100" autocomplete="off">');
+      $('#w-widget', el).innerHTML = '<h3>' + esc(w.method) + '</h3><p class="wl-avail">Available: <b>' + money(avail, cur) + '</b></p>' + amount + details;
     };
     const renderMethods = () => {
-      const list = methodsFor(w.cur);
+      const list = w.connection?.methods || [];
       if (!list.includes(w.method)) w.method = list[0];
-      $('#w-methods', el).innerHTML = list.map((m) => '<button type="button" class="dp-method" data-method="' + m + '" aria-pressed="' + (m === w.method) + '">' + W_METHODS[m].label + '</button>').join('');
+      $('#w-methods', el).innerHTML = list.map(m => '<button type="button" class="dp-method" data-method="' + esc(m) + '" aria-pressed="' + (m === w.method) + '">' + esc(m) + '</button>').join('');
     };
     renderMethods();
     renderWidget();
 
-    $('#w-cur', el).addEventListener('change', (e) => { w.cur = e.target.value; renderMethods(); renderWidget(); });
+    $('#w-connection', el).addEventListener('change', event => { w.connection = payload.connections.find(connection => String(connection.id) === event.target.value); renderMethods(); renderWidget(); });
     $('#w-methods', el).addEventListener('click', (e) => {
       const b = e.target.closest('[data-method]');
       if (!b) return;
@@ -322,41 +345,55 @@
       renderMethods();
       renderWidget();
     });
-    $('#w-widget', el).addEventListener('click', (e) => {
-      if (e.target.closest('#w-max')) $('#w-amount', el).value = String(state.balances[w.cur]);
+    $('#w-widget', el).addEventListener('click', event => {
+      if (event.target.closest('#w-max')) $('#w-amount', el).value = String(state.balances[w.connection.currency] || 0);
     });
-    $('#w-go', el).addEventListener('click', () => {
-      const avail = state.balances[w.cur];
+    $('#w-go', el).addEventListener('click', async () => {
+      const cur = w.connection.currency;
+      const avail = state.balances[cur] || 0;
       const raw = $('#w-amount', el).value.trim().replace(',', '.');
       const amount = /^\d+(\.\d{1,2})?$/.test(raw) ? Number(raw) : NaN;
-      const bad = {};
-      if (!(amount >= 10)) bad['w-amount'] = 'Enter an amount of at least 10 ' + w.cur + '.';
-      else if (amount > avail) bad['w-amount'] = 'Amount exceeds your balance of ' + money(avail, w.cur) + '.';
-      let note = W_METHODS[w.method].label;
-      if (w.method === 'bank') {
-        const holder = $('#w-holder', el).value.trim();
-        const iban = $('#w-iban', el).value.replace(/\s/g, '').toUpperCase();
-        if (holder.length < 2) bad['w-holder'] = 'Enter the account holder name.';
-        if (!/^[A-Z0-9]{8,34}$/.test(iban)) bad['w-iban'] = 'Enter a valid IBAN or account number.';
-        note += ' · ' + '••••' + iban.slice(-4);
-      } else if (w.method === 'crypto') {
-        const addr = $('#w-addr', el).value.trim();
-        if (!/^[A-Za-z0-9]{26,64}$/.test(addr)) bad['w-addr'] = 'Enter a valid wallet address.';
-        note = $('#w-net', el).value + ' · ' + addr.slice(0, 4) + '…' + addr.slice(-4);
-      } else {
-        const phone = $('#w-phone', el).value.replace(/[\s-]/g, '').replace(/^\+91/, '');
-        if (!/^\d{10}$/.test(phone)) bad['w-phone'] = 'Enter a 10-digit phone number.';
-        note += ' · ••••' + phone.slice(-4);
-      }
-      el.querySelectorAll('[data-err]').forEach((n) => setErr(el, n.dataset.err, bad[n.dataset.err] || ''));
-      if (Object.keys(bad).length) return;
-      state.balances[w.cur] = round2(avail - amount);
-      addTx('withdrawal', w.cur, -amount, note, 'Pending');
-      state.currency = w.cur;
-      closeModal(el);
-      render();
-      toast('Withdrawal of ' + money(amount, w.cur) + ' requested.');
+      let destination = $('#w-destination', el)?.value.trim();
+      const card = ['Visa', 'MasterCard'].includes(w.method);
+      if (card) destination = $('#w-first', el).value + ' xxxxxx ' + $('#w-last', el).value;
+      const button = $('#w-go', el);
+      button.disabled = true;
+      try {
+        if (!(amount >= 10) || amount > avail) throw new Error('Enter an amount of at least 10 within your demo balance.');
+        if (card && !/^\d{4} x{6} \d{4}$/.test(destination)) throw new Error('Enter only the first four and last four digits.');
+        await demoRequest('/payouts', { connection_id: w.connection.id, method: w.method, destination, amount, currency: cur, request_key: w.key });
+        state.balances[cur] = round2(avail - amount);
+        addTx('withdrawal', cur, -amount, w.connection.brand + ' · ' + destination, 'New');
+        state.currency = cur;
+        closeModal(el); render(); toast('Demo payout request saved in Compliance.');
+      } catch (error) { $('#w-error', el).textContent = error.message; }
+      finally { button.disabled = false; }
     });
+  };
+
+  const openKYC = async () => {
+    let payload;
+    try { payload = await demoRequest(); } catch (error) { toast(error.message); return; }
+    const el = openModal('KYC & chat (demo)',
+      '<p>Simulated player portal. Document submissions use a fictional demo image, not real uploads.</p>'
+      + field('kyc-player', 'Demo customer', '<select id="kyc-player">' + payload.customers.map(customer => '<option value="' + esc(customer.id) + '"' + (customer.id === demoCustomer ? ' selected' : '') + '>' + esc(customer.name) + '</option>').join('') + '</select>')
+      + '<p>KYC: ' + esc(payload.customer.kyc_status) + '</p>'
+      + '<ul>' + payload.messages.map(message => '<li>' + esc(message.message) + '</li>').join('') + '</ul>'
+      + field('player-message', 'Message to Compliance', '<textarea id="player-message" maxlength="4000"></textarea>')
+      + '<button type="button" class="dp-go" id="player-send">Send demo message</button>'
+      + field('kyc-request', 'KYC request', '<select id="kyc-request">' + payload.requests.map(request => '<option value="' + esc(request.id) + '">' + esc(request.document_name + ' · ' + request.status) + '</option>').join('') + '</select>')
+      + field('kyc-name', 'Demo document version name', '<input id="kyc-name" maxlength="200">')
+      + '<button type="button" class="dp-go" id="player-document"' + (payload.requests.length ? '' : ' disabled') + '>Submit demo document</button>'
+      + '<p role="status" id="player-feedback"></p>');
+    $('#kyc-player', el).addEventListener('change', event => { demoCustomer = event.target.value; closeModal(el); openKYC(); });
+    const submit = (selector, path, body) => $(selector, el).addEventListener('click', async event => {
+      event.target.disabled = true;
+      try { await demoRequest(path, body()); $('#player-feedback', el).textContent = 'Saved in Compliance.'; }
+      catch (error) { $('#player-feedback', el).textContent = error.message; }
+      finally { event.target.disabled = false; }
+    });
+    submit('#player-send', '/chat', () => ({ message: $('#player-message', el).value, request_id: $('#kyc-request', el).value }));
+    submit('#player-document', '/documents', () => ({ request_id: $('#kyc-request', el).value, name: $('#kyc-name', el).value }));
   };
 
   // ---------- exchange ----------
@@ -442,7 +479,7 @@
   const init = () => {
     render();
     bindFilters();
-    $('#wl-profile').addEventListener('click', (e) => { if (e.target.closest('#wl-settings')) openSettings(); });
+    $('#wl-profile').addEventListener('click', (e) => { if (e.target.closest('#wl-settings')) openSettings(); if (e.target.closest('#wl-kyc')) openKYC(); });
     $('#wl-balances').addEventListener('change', (e) => {
       if (e.target.id !== 'wl-cur') return;
       state.currency = e.target.value;

@@ -1,4 +1,6 @@
 from copy import deepcopy
+from urllib.parse import urlsplit
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -55,7 +57,7 @@ class PageManagementTests(TestCase):
         self.assertContains(html, "Only this page")
         self.assertContains(html, f"page={page_id}")
         self.assertEqual(self.client.get(preview.data["url"].replace(f"page={page_id}", f"page={self.home.pk}")).status_code, 404)
-        url = f"/cms/sites/{self.site.slug}/about-us/"
+        url = f"/site/{self.site.public_slug}/about-us/"
         self.assertEqual(self.client.get(url).status_code, 404)
         publication = self.client.post(self.base + f"publish/?page={page_id}", {"revision": 2}, format="json")
         self.assertEqual(publication.status_code, 200)
@@ -72,6 +74,49 @@ class PageManagementTests(TestCase):
         editor = get_user_model().objects.create_user("pages-editor", is_staff=True)
         SiteMember.objects.create(site=self.site, user=editor)
         self.client.force_authenticate(editor)
+        self.client.force_login(editor)
         self.assertEqual(self.client.get(f"/cms/api/sites/{self.other.pk}/pages/").status_code, 404)
+        self.assertEqual(self.client.get(f"/site/{self.other.public_slug}/preview/1/").status_code, 404)
         self.assertEqual(self.client.post(self.base + "publish/", {"revision": 1}, format="json").status_code, 403)
         self.assertEqual(self.client.get(self.base + "draft/?page=bad").status_code, 400)
+
+    def test_canonical_urls_and_preview_boundaries(self):
+        self.assertEqual(self.site.public_slug, "pages")
+        page_id = self.create(source_id=self.home.pk)
+        doc = self.client.get(self.base + f"draft/?page={page_id}").data["document"]
+        doc["slug"] = "unsaved-about"
+        result = self.client.post(self.base + f"previews/?page={page_id}", doc, format="json")
+        url = result.data["url"]
+        self.assertEqual(urlsplit(url).path, "/site/pages/preview/1/unsaved-about/")
+        self.assertEqual(self.client.get(url).status_code, 200)
+        self.assertEqual(self.client.get(url.replace("/preview/1/", "/preview/2/")).status_code, 404)
+        self.assertEqual(self.client.get(url.replace("/unsaved-about/", "/wrong/")).status_code, 404)
+        self.assertEqual(self.client.get(url.replace("/site/pages/", "/site/other/")).status_code, 404)
+        current = f"/site/pages/preview/1/about/"
+        self.assertContains(self.client.get(current), f"page={page_id}")
+        self.assertEqual(self.client.get(current.replace("/1/", "/2/")).status_code, 404)
+        self.assertEqual(self.client.get(current + f"?page={self.home.pk}").status_code, 404)
+        home_doc = self.client.get(self.base + "draft/").data["document"]
+        preview = self.client.post(self.base + "previews/", home_doc, format="json")
+        self.assertEqual(urlsplit(preview.data["url"]).path, "/site/pages/preview/1/")
+        published = self.client.post(self.base + "publish/", {"revision": 1}, format="json")
+        self.assertEqual(published.data["url"], "/site/pages/")
+        self.assertEqual(self.client.get("/site/pages/").status_code, 200)
+        self.assertContains(self.client.get("/site/pages/"), 'class="landing-brand" href="/site/pages/"')
+        self.assertEqual(self.client.get(f"/cms/sites/{self.site.slug}/").status_code, 200)
+        self.assertEqual(self.client.get("/site/pages/about/").status_code, 404)
+        self.client.force_authenticate(None)
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)
+        self.assertEqual(self.client.get(current).status_code, 302)
+
+    def test_readable_slugs_and_root_scoped_authentication(self):
+        first = import_site({"id": "CS-readable", "name": "Aurora Casino", "url": "https://readable.example", "enabled": True})
+        second = import_site({"id": "CS-readable-copy", "name": "Aurora Casino", "url": "https://copy.example", "enabled": True})
+        self.assertEqual(first.public_slug, "aurora-casino")
+        self.assertEqual(second.public_slug, "aurora-casino-2")
+        self.assertEqual(import_site({"id": first.crm_id}).public_slug, first.public_slug)
+        self.assertEqual(self.client.cookies[settings.SESSION_COOKIE_NAME]["path"], "/")
+        response = self.client.get(f"/site/{self.site.public_slug}/preview/1/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.cookies[settings.CSRF_COOKIE_NAME]["path"], "/")
