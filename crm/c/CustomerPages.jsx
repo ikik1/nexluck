@@ -169,6 +169,56 @@ function Stats({ items }) {
   return <div className="stat-list">{items.map(([label, value]) => <div key={label}><span>{NexLuckI18n.t(label)}</span><b>{NexLuckI18n.t(value)}</b></div>)}</div>;
 }
 
+function CustomerLoyalty({ customer, segmentState, onSave }) {
+  const [settings, setSettings] = useState(null);
+  const [points, setPoints] = useState(customer.loyalty_points);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const load = async () => {
+    setError('');
+    try { setSettings(await apiRequest('/crm/ui-api/v1/loyalty')); }
+    catch (err) { setError(err.message); }
+  };
+  useEffect(() => { load(); }, []);
+  useEffect(() => { setPoints(customer.loyalty_points); }, [customer.loyalty_points]);
+  useEffect(() => {
+    CRMContext.setDirty('loyalty-points', points !== customer.loyalty_points);
+    return () => CRMContext.setDirty('loyalty-points', false);
+  }, [points, customer.loyalty_points]);
+  const save = async event => {
+    event.preventDefault(); setBusy(true); setError(''); setMessage('');
+    try {
+      onSave(await customerRequest('/' + customer.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loyalty_points: points }) }));
+      setMessage(NexLuckI18n.t('Loyalty points saved.'));
+    } catch (err) { setError(err.fields?.loyalty_points || err.message); }
+    finally { setBusy(false); }
+  };
+  const ready = settings && !segmentState.loading && !segmentState.error;
+  const status = ready ? NexLuckLoyalty.status(customer, settings.tiers, segmentState.segments, segmentState.parameters) : null;
+  return <>
+    <div className="loyalty-grid"><div><strong>{customer.loyalty_points.toLocaleString(NexLuckI18n.formatLocale)}</strong><small>LP</small></div>
+      {status && <div><strong>{status.current?.name || NexLuckI18n.t('Unranked')}</strong><small>{NexLuckI18n.t('Current tier')}</small></div>}
+      <a className="btn" href="/crm/loyalty/">{NexLuckI18n.t('Tier settings')}</a>
+    </div>
+    {!ready && !error && !segmentState.error && <p role="status">{NexLuckI18n.t('Loading loyalty…')}</p>}
+    {segmentState.error && <p className="error" role="alert">{segmentState.error} <button className="btn" onClick={segmentState.load}>{NexLuckI18n.t('Retry segments')}</button></p>}
+    {status?.next && <>
+      <progress className="loyalty-progress" max="100" value={status.progress} aria-label={NexLuckI18n.t('Progress to next tier')} />
+      <p>{NexLuckI18n.t('Next tier: {tier} — {points} LP remaining.', { tier: status.next.name, points: status.remaining.toLocaleString(NexLuckI18n.formatLocale) })}</p>
+      {status.missingSegments.length > 0 && <p className="hint">{NexLuckI18n.t('Required segments still to match')}: {status.missingSegments.map(id => segmentState.segments.find(segment => segment.id === id)?.name || id).join(', ')}</p>}
+    </>}
+    {status && !status.next && <p className="hint">{NexLuckI18n.t(status.current ? 'Highest tier reached.' : 'No tiers configured. Add a tier to start.')}</p>}
+    <form className="loyalty-points-form" onSubmit={save}>
+      <label className="field">{NexLuckI18n.t('Loyalty points (LP)')}<input type="number" step="1" min="0" max={Number.MAX_SAFE_INTEGER} required value={points} disabled={busy} onChange={event => setPoints(event.target.value === '' ? '' : Number(event.target.value))} /></label>
+      <button className="btn" disabled={busy || points === customer.loyalty_points}>{NexLuckI18n.t(busy ? 'Saving…' : 'Save points')}</button>
+    </form>
+    {error && <p className="error" role="alert">{error} {!settings && <button className="btn" onClick={load}>{NexLuckI18n.t('Retry')}</button>}</p>}
+    {message && <p role="status" className="notice ok">{message}</p>}
+    <p className="hint">{NexLuckI18n.t('Points are a saved integer customer attribute. Formulas and rewards are configuration only.')}</p>
+  </>;
+}
+
 function CustomerInfo() {
   const segmentState = useCustomerSegments();
   const [segmentWidget, setSegmentWidget] = useState(false);
@@ -202,6 +252,7 @@ function CustomerInfo() {
     {message && <p className="notice ok" role="status">{message}</p>}
     <p className="notice">{NexLuckI18n.t("Demo activity from Finance wallets; rolling turnover periods end now (1 month = 30 days, 1 year = 365 days). Monetary values remain in each wallet's currency. Profile edits are saved on the server.")}</p>
     <div className="customer-sat">
+      <div className="customer-center-column">
       <section className="customer-card customer-center">
         <div className="customer-identity">
           <dl className="customer-timestamps"><dt>{NexLuckI18n.t("created_at")}</dt><dd>{dateText(customer.created_at)}</dd><dt>{NexLuckI18n.t("updated_at")}</dt><dd>{dateText(customer.updated_at)}</dd></dl>
@@ -221,16 +272,15 @@ function CustomerInfo() {
           {segmentCustomerError && <p role="alert" className="error">{segmentCustomerError}</p>}
         </div>
         <dl className="detail-list">{profileFields.map(([key, label]) => <React.Fragment key={key}><dt>{NexLuckI18n.t(label)}</dt><dd>{key === 'country' ? COUNTRIES[customer.country][0] : key === 'risk_score' ? segmentState.loading || segmentState.error ? '—' : <CustomerRiskScore score={customerSegmentRisk(customer, segmentState.segments, segmentState.parameters)} stored={customer[key]} /> : ['kyc_status', 'aml_status'].includes(key) ? <CustomerStatus value={customer[key]} /> : customer[key] === '' ? '—' : customer[key]}</dd></React.Fragment>)}</dl>
-        <h3 className="activity-title">{NexLuckI18n.t("Activity info")}</h3>
-        <Stats items={[
+        <p className="hint">{NexLuckI18n.t("Password: separate secured credential entity (never returned).")}</p>
+      </section>
+      <CustomerActivityLogs customer={customer} activityItems={[
           ['Last login', lastLoginDays === null ? 'No recorded login' : lastLoginDays === 0 ? 'Today' : `${lastLoginDays} day${lastLoginDays === 1 ? '' : 's'} ago`],
           ['Last session', `${customer.activity.last_session_hours} hours`],
           ['Overall game hours', new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(customer.activity.overall_game_hours).toUpperCase() + ' h'],
           ['Devices (demo)', customer.devices.join(', ')], ['Sessions per week (demo)', customer.sessions_per_week]
         ]} />
-        <p className="hint">{NexLuckI18n.t("Activity is seeded demo data. Last session shows duration.")}</p>
-        <p className="hint">{NexLuckI18n.t("Password: separate secured credential entity (never returned).")}</p>
-      </section>
+      </div>
       <section className="customer-card" style={{ gridArea: 'risk', '--c': '#ba0517' }}>
         <h2>{NexLuckI18n.t("Risk indicators")}</h2>
         <p className="hint">{NexLuckI18n.t("Demo review signals, not verified findings.")}</p>
@@ -276,12 +326,8 @@ function CustomerInfo() {
         <p className="hint">{NexLuckI18n.t("Wagering requirements and completion are not available in the demo ledger.")}</p>
       </section>
       <section className="customer-card" style={{ gridArea: 'loyalty', '--c': '#b8860b' }}>
-        <h2>{NexLuckI18n.t("Loyalty points")}</h2><div className="loyalty-grid">
-          <div><strong>{activity.points.toLocaleString(NexLuckI18n.formatLocale)}</strong><small>{NexLuckI18n.t("Available demo points")}</small></div>
-          <div><strong>{activity.tier}</strong><small>{NexLuckI18n.t("Loyalty status")}</small></div>
-          <span className="status warn">{activity.tier}{NexLuckI18n.t(" badge")}</span>
-          {customer.kyc_status === 'VERIFIED' && <span className="status good">{NexLuckI18n.t("Verified customer badge")}</span>}
-        </div><p className="hint">{NexLuckI18n.t("Demo rule: 100 points per recorded real-wallet bet; Silver at 200 points, Gold at 500 points.")}</p>
+        <h2>{NexLuckI18n.t("Loyalty points")}</h2>
+        <CustomerLoyalty customer={customer} segmentState={segmentState} onSave={setCustomer} />
       </section>
     </div>
     {editing && <CustomerEdit customer={customer} onClose={() => setEditing(false)} onSave={saved => { setCustomer(saved); setEditing(false); setMessage('Customer updated successfully.'); }} />}

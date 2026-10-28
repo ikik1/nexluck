@@ -1,0 +1,22 @@
+.loyalty-tools{display:flex;align-items:end;gap:14px;flex-wrap:wrap;margin:18px 0}
+.loyalty-tools h2{margin:0 auto 0 0}
+.loyalty-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin:18px 0 28px}
+.loyalty-stat,.loyalty-tier{background:#fff;border:1px solid #d8dde6;border-radius:8px;padding:20px}
+.loyalty-stat h3{margin:0 0 10px;font-size:15px}.loyalty-stat strong{font-size:30px;color:#946909}
+.loyalty-stat small{display:block;color:#656b75;margin-top:8px}
+.loyalty-tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px}
+.loyalty-tier h3{margin:0 0 16px}.loyalty-tier dl{display:grid;grid-template-columns:1fr 1.4fr;gap:12px;margin:18px 0}
+.loyalty-tier dd{margin:0;overflow-wrap:anywhere}.loyalty-tier dt{color:#656b75}
+.loyalty-form fieldset{margin:18px 0;border:1px solid #d8dde6;border-radius:6px;padding:14px}
+dialog.customer-modal{margin:auto;border:1px solid #d8dde6;max-width:calc(100vw - 32px)}
+dialog.customer-modal::backdrop{background:#0006}
+.loyalty-options{display:grid;gap:8px;max-height:180px;overflow:auto}
+.loyalty-options label{display:flex;gap:8px;align-items:start;overflow-wrap:anywhere}
+.loyalty-options input{flex-shrink:0}
+.loyalty-progress{width:100%;height:16px;accent-color:#b8860b;margin:14px 0 4px}
+.loyalty-grid{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,max-content) max-content;align-items:start;gap:12px}
+.loyalty-grid strong{overflow-wrap:anywhere}
+.loyalty-points-form{display:flex;gap:8px;align-items:end;margin-top:14px}
+.loyalty-points-form .field{flex:0 1 180px;min-width:0;margin:0}
+.loyalty-points-form .btn{flex-shrink:0}
+@media(max-width:600px){.loyalty-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.loyalty-tier dl{grid-template-columns:1fr}.loyalty-tools .field{width:100%}}

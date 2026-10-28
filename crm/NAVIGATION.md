@@ -26,6 +26,11 @@ Compliance opens `/coml/` from Home or a "compliance" navigation request.
 It retains casino context like the other operational pages. See the
 [Compliance guide](../coml/README.md) for payout/KYC queues, alerts and risk scores.
 
+Loyalty opens `/crm/loyalty/` from Home or a "loyalty" navigation request.
+The legacy Loyalty section redirects to the same casino-scoped page. See the
+[Loyalty guide](loyalty/README.md) for point attributes, tier configuration,
+bet-period statistics and profile progress.
+
 Type to see destinations, use Up/Down to highlight, Tab to fill the highlighted
 suggestion, Enter/Go to navigate, and Escape to dismiss suggestions. Clicking a
 suggestion navigates directly. Unmatched phrases show an explicit message.

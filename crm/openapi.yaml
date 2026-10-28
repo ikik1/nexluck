@@ -47,7 +47,145 @@ tags:
   - name: Reporting
   - name: Dashboard
   - name: Compliance
+  - name: Loyalty
 paths:
+  /customers/{customerId}/activity:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+      - name: customerId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^CU-[0-9]+$' }
+    get:
+      tags: [Customers]
+      operationId: getCustomerActivity
+      summary: Read customer activity newest first, filtered by UTC dates and event tag
+      description: |
+        Requires customers:read and the owning casino context. Demo mode creates one saved
+        fictional timeline per customer without overwriting existing histories.
+        No automatic operational-event ingestion is connected; authenticated mode never seeds
+        demo histories. Dates include both UTC boundary days. Stable ordering uses created_at
+        descending then ID descending. Filters apply before pagination.
+      security: [{ oauth2: ["customers:read"] }]
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: tag
+          in: query
+          schema: { type: string, enum: [customer, game, finance, loyalty, bonus, compliance, segment] }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, maximum: 99999999, default: 0 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: Customer activity page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/CustomerActivityEvent' } }
+                  total: { type: integer }
+                  offset: { type: integer }
+                  limit: { type: integer }
+                  tags: { type: array, items: { type: string } }
+                  demo: { type: boolean }
+        '404': { description: Customer does not belong to this casino }
+        '422': { description: Invalid filter, reversed dates or invalid pagination }
+  /loyalty:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+    get:
+      tags: [Loyalty]
+      operationId: getLoyalty
+      summary: Read casino-owned tiers and available reward bonus names
+      security: [{ oauth2: ["loyalty:read"] }]
+      responses:
+        '200':
+          description: Tiers sorted by ascending LP threshold; bonus options exclude deleted bonuses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tiers: { type: array, items: { $ref: '#/components/schemas/LoyaltyTier' } }
+                  bonus_options:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+  /loyalty/tiers:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+    post:
+      tags: [Loyalty]
+      operationId: createLoyaltyTier
+      summary: Add a tier (configuration only; no automatic accrual or reward issuance)
+      security: [{ oauth2: ["loyalty:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/LoyaltyTierInput'
+                - required: [name, minimum_points, game_weight, eur_per_point, segment_ids, bonus_ids, cashback, rakeback]
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyTier' }
+        '422': { description: Invalid fields, duplicate tier name/threshold or foreign selections }
+  /loyalty/tiers/{tierId}:
+    parameters:
+      - $ref: '#/components/parameters/CasinoContext'
+      - name: tierId
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Loyalty]
+      operationId: updateLoyaltyTier
+      summary: Edit tier settings without changing saved customer LP
+      security: [{ oauth2: ["loyalty:write"] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoyaltyTierInput' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoyaltyTier' }
+        '404': { description: Tier does not belong to this casino }
+        '422': { description: Validation failed }
+    delete:
+      tags: [Loyalty]
+      operationId: deleteLoyaltyTier
+      summary: Remove a tier while retaining customer points
+      security: [{ oauth2: ["loyalty:write"] }]
+      responses:
+        '200':
+          description: Removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: string }
+        '404': { description: Tier does not belong to this casino }
   /games/ranking:
     parameters:
       - $ref: '#/components/parameters/CasinoContext'
@@ -1655,11 +1793,61 @@ components:
             dashboard:read: Read casino-specific CRM Home sample summaries
             compliance:read: Read casino-owned compliance reviews and internal notes
             compliance:write: Review compliance records, configure risk scores and write internal notes
+            loyalty:read: Read casino loyalty tier settings and bonus selection options
+            loyalty:write: Add, edit and remove casino loyalty tiers
     basicAuth:
       type: http
       scheme: basic
       description: client_id and client_secret, used only at the token endpoint.
   schemas:
+    CustomerActivityEvent:
+      type: object
+      required: [id, casino_id, customer_id, created_at, user_name, event_type, event_tag, session_id, details, demo]
+      properties:
+        id: { type: string, readOnly: true }
+        casino_id: { type: string, readOnly: true }
+        customer_id: { type: string, readOnly: true }
+        created_at: { type: string, format: date-time }
+        user_name: { type: string }
+        event_type:
+          type: string
+          enum: [Sign in, Registration, Email confirmation, Round start, Round end, Deposit, Loyalty points, Tier assigned, Bonus wager, Transfer, Cash out requested, Cashout approved, KYC doc requested, KYC doc approved, Assign segment, Removed from segment]
+        event_tag: { type: string, enum: [customer, game, finance, loyalty, bonus, compliance, segment] }
+        session_id: { type: string }
+        details:
+          type: object
+          description: Event-specific display fields (game/bonus external IDs, totals, payment method, wallets, documents, LP, tier or segment names).
+          additionalProperties:
+            oneOf:
+              - { type: string }
+              - { type: number }
+        demo: { type: boolean }
+    LoyaltyTierInput:
+      type: object
+      additionalProperties: false
+      description: |
+        LP formula is fixed to total bet amount (EUR) x game_weight x (1 / eur_per_point).
+        Defaults are game_weight 1, eur_per_point 10, cashback 15 and rakeback 10.
+        Qualification requires the threshold and ALL selected segments; empty segments allow everyone.
+        UI tier/progress/statistics use current segment membership, not historical tier membership.
+        These settings never automatically credit LP or issue rewards.
+      properties: &LoyaltyProperties
+        name: { type: string, minLength: 1, maxLength: 100 }
+        minimum_points: { type: integer, minimum: 0, maximum: 9007199254740991, description: Unique within this casino }
+        game_weight: { type: number, exclusiveMinimum: true, minimum: 0, maximum: 1000000, default: 1 }
+        eur_per_point: { type: number, exclusiveMinimum: true, minimum: 0, maximum: 1000000, default: 10 }
+        segment_ids: { type: array, maxItems: 1000, uniqueItems: true, items: { type: string } }
+        bonus_ids: { type: array, maxItems: 1000, uniqueItems: true, items: { type: string }, description: Nondeleted casino-owned bonuses }
+        cashback: { type: number, minimum: 0, maximum: 100, default: 15 }
+        rakeback: { type: number, minimum: 0, maximum: 100, default: 10 }
+    LoyaltyTier:
+      type: object
+      properties:
+        <<: *LoyaltyProperties
+        id: { type: string, readOnly: true }
+        casino_id: { type: string, readOnly: true }
+        created_at: { type: string, format: date-time, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
     ComplianceStatus:
       type: string
       enum: [New, Pending, Approved, Declined]
@@ -1924,6 +2112,7 @@ components:
         addr12: { type: string, maxLength: 200 }
         mfa_type: { type: string, enum: [NONE, TOTP, SMS, EMAIL] }
         risk_score: { type: integer, minimum: 0, maximum: 100 }
+        loyalty_points: { type: integer, minimum: 0, maximum: 9007199254740991, default: 0, description: Manually editable saved LP; never derived from bet counts }
         kyc_status: { type: string, enum: [NOT_STARTED, PENDING, VERIFIED, REJECTED] }
         birthday: { type: string, format: date }
         aml_status: { type: string, enum: [CLEAR, REVIEW, BLOCKED] }

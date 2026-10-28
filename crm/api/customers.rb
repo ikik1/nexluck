@@ -17,7 +17,7 @@ CUSTOMER_OBJECTS = %w[luna.play max_rider k.novak sofia88 jhon_d anita.s tigerki
     'aml_status' => %w[CLEAR REVIEW BLOCKED][i % 3], 'info' => 'Demo customer profile.',
     'gender' => %w[Female Male Non-binary Undisclosed][i % 4],
     'devices' => [i.even? ? 'Desktop' : 'Mobile'].freeze,
-    'sessions_per_week' => 2 + i % 6, 'bonus_wr_rate' => 40 + i * 5,
+    'sessions_per_week' => 2 + i % 6, 'bonus_wr_rate' => 40 + i * 5, 'loyalty_points' => 0,
     'funnel_status' => CUSTOMER_FUNNEL_STATUSES[i % 6],
     'activity' => {
       'last_login_at' => (Time.now.utc - (i + 1) * 86400).iso8601.freeze,
@@ -28,7 +28,7 @@ CUSTOMER_OBJECTS = %w[luna.play max_rider k.novak sofia88 jhon_d anita.s tigerki
 end.freeze
 
 class CustomerStore
-  FIELDS = %w[external_id name DocumentINo country currency lang addr1 addr12 mfa_type risk_score kyc_status birthday aml_status info funnel_status gender].freeze
+  FIELDS = %w[external_id name DocumentINo country currency lang addr1 addr12 mfa_type risk_score kyc_status birthday aml_status info funnel_status gender loyalty_points].freeze
   OPTIONS = {
     'mfa_type' => %w[NONE TOTP SMS EMAIL],
     'kyc_status' => %w[NOT_STARTED PENDING VERIFIED REJECTED],
@@ -53,7 +53,7 @@ class CustomerStore
     # Upgrade existing profiles without overwriting saved fields or timestamps.
     defaults = seed
     @profiles = @profiles.map do |id, profile|
-      additions = defaults.fetch(id, {}).select { |key, _| %w[funnel_status activity risk_indicators gender devices sessions_per_week bonus_wr_rate].include?(key) }
+      additions = { 'loyalty_points' => 0 }.merge(defaults.fetch(id, {}).select { |key, _| %w[funnel_status activity risk_indicators gender devices sessions_per_week bonus_wr_rate].include?(key) })
       [id, additions.merge(profile)]
     end.to_h
     @credentials = load_file('credentials.json') || {}
@@ -101,7 +101,7 @@ class CustomerStore
     (body.keys - FIELDS).each { |key| errors[key] = 'Unknown or read-only field' }
     clean = @profiles.fetch(id).merge(body)
     FIELDS.each do |key|
-      next if key == 'risk_score'
+      next if %w[risk_score loyalty_points].include?(key)
       value = clean[key]
       max = key == 'info' ? 4000 : 200
       errors[key] = "Must be text of at most #{max} characters" unless value.is_a?(String) && value.length <= max
@@ -117,6 +117,8 @@ class CustomerStore
     end
     score = clean['risk_score']
     errors['risk_score'] = 'Must be an integer between 0 and 100' unless score.is_a?(Integer) && score.between?(0, 100)
+    points = clean['loyalty_points']
+    errors['loyalty_points'] = 'Must be a nonnegative safe integer' unless points.is_a?(Integer) && points.between?(0, 9_007_199_254_740_991)
     begin
       date = Date.iso8601(clean['birthday'].to_s)
       errors['birthday'] = 'Must be a past date in YYYY-MM-DD format' unless date < Date.today && date.iso8601 == clean['birthday']

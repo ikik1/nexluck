@@ -43,8 +43,7 @@ function customerActivity(id, now = Date.now()) {
     categories: rank(games.map(game => game ? game.category : 'Unmapped category')),
     providers: rank(games.map(game => game ? game.provider : 'Unmapped provider'))
   };
-  const points = bets.length * 100;
-  return { wallets, transactions, stats, favourites, points, tier: points >= 500 ? 'Gold' : points >= 200 ? 'Silver' : 'Bronze' };
+  return { wallets, transactions, stats, favourites };
 }
 
 function segmentFacts(customer, now = Date.now()) {
@@ -71,7 +70,7 @@ function segmentFacts(customer, now = Date.now()) {
     favourite_category: activity.favourites.categories.map(([name]) => name),
     favourite_provider: activity.favourites.providers.map(([name]) => name),
     favourite_type: activity.favourites.categories.map(([name]) => name),
-    bonus_wr_rate: customer.bonus_wr_rate, loyalty_points: activity.points,
+    bonus_wr_rate: customer.bonus_wr_rate, loyalty_points: customer.loyalty_points,
     rdw_rate: withdrawals.length ? deposits.length / withdrawals.length : null
   };
   const riskFields = {

@@ -105,7 +105,7 @@ async def check(base):
             ("home", "home", "/crm/"),
             ("analytics", "show me analytics", "/crm/a/"),
             ("casinos", "my casinos", "/crm/c/l/"),
-            ("loyalty", "loyalty", "/crm/section.html?s=loyalty"),
+            ("loyalty", "loyalty", "/crm/loyalty/"),
             ("compliance", "compliance", "/coml/"),
             ("audit", "audit", "/crm/section.html?s=audit"),
             ("wallets", "list of wallets", "/crm/f/wallets/"),

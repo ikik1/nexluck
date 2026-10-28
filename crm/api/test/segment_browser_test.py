@@ -99,7 +99,7 @@ async def check_browser(base):
           const c = {...(await customerRequest('/CU-1001')), birthday:'1985-10-14',
             created_at:'2026-08-01T00:00:00Z', devices:['Desktop','Mobile'],
             activity:{last_login_at:'2026-10-12T00:00:00Z',overall_game_hours:5000,last_session_hours:3},
-            gender:'Female',sessions_per_week:4,bonus_wr_rate:65,risk_indicators:['rdw','multiple_payment_methods']};
+            gender:'Female',sessions_per_week:4,bonus_wr_rate:65,loyalty_points:375,risk_indicators:['rdw','multiple_payment_methods']};
           const now=Date.parse('2026-10-13T00:00:00Z'), day=86400000;
           const ws=WALLETS.slice(), ts=WALLET_TX.slice();
           try {
@@ -121,7 +121,7 @@ async def check_browser(base):
               lifetime_ggr:250,net_cash_flow:1000,number_of_deposits:3,deposit_frequency:21/73,
               real_balance:750,bonus_balance:20,win_over_loss:-250,favourite_game:['Gates of Olympus','Aviator'],
               favourite_category:['Slots','Crash'],favourite_provider:['Pragmatic Play','Spribe'],favourite_type:['Slots','Crash'],
-              average_bet:150,bonus_wr_rate:65,loyalty_points:300,rdw_rate:3,
+              average_bet:150,bonus_wr_rate:65,loyalty_points:375,rdw_rate:3,
               risk_rdw:true,risk_bonus_abuse:false,risk_multiple_payment_methods:true,
               risk_abnormal_activity:false,risk_failed_kyc_attempts:false,risk_multiple_ips:false};
             if(params.length!==Object.keys(expected).length) throw Error('Incomplete parameter coverage');
@@ -228,7 +228,12 @@ async def check_browser(base):
               if(cards.length !== 6) throw Error('Missing customer tiles');
               if(document.documentElement.scrollWidth > innerWidth) throw Error('Profile overflow');
               if(getComputedStyle(grid).gap !== '16px') throw Error('Unequal tile gaps');
-              for(const card of cards) {
+              const profile = grid.querySelector('.customer-center').getBoundingClientRect();
+              const activity = grid.querySelector('.customer-activity').getBoundingClientRect();
+              gap(activity.top,profile.bottom);
+              near(activity.left,profile.left);
+              near(activity.right,profile.right);
+              for(const card of grid.querySelectorAll('.customer-card')) {
                 const style = getComputedStyle(card);
                 if(style.borderRadius !== '10px' ||
                    getComputedStyle(card.querySelector('h2')).textTransform !== 'uppercase')

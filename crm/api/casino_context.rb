@@ -3,6 +3,8 @@ require_relative 'home_dashboard'
 require_relative 'compliance'
 require_relative 'demo_wallet'
 require_relative 'popular_games'
+require_relative 'loyalty'
+require_relative 'customer_activity'
 
 # One atomic snapshot contains the registry, tenants, migration and operation keys.
 # The file lock also serializes independent Ruby processes sharing the store.
@@ -19,6 +21,8 @@ class CasinoContext
     include ComplianceStore
     include DemoWallet
     include PopularGames
+    include LoyaltyStore
+    include CustomerActivity
     attr_reader :state, :casino_id
 
     def initialize(state, casino_id, casinos)
@@ -138,7 +142,9 @@ class CasinoContext
     transaction do |document|
       changed = false
       document.fetch('tenants').each do |id, state|
+        changed = LoyaltyStore.prepare(state, id) || changed
         changed = ComplianceStore.prepare(state, id, demo: false) || changed
+        changed = Tenant.new(state, id, document['casinos']).prepare_customer_activity || changed
         unless state.key?('home_dashboard')
           state['home_dashboard'] = HomeDashboard.seed(id)
           changed = true
@@ -238,6 +244,7 @@ class CasinoContext
   end
 
   def stamp(state, casino_id)
+    LoyaltyStore.prepare(state, casino_id)
     visit = lambda do |value|
       case value
       when Hash
@@ -523,7 +530,20 @@ class CasinoContext
         return if secured && !authorize(req, res, %w[games:read bonuses:read customers:read segments:read])
         return json(res, 200, state['catalogs'].merge('categories' => customer_store.game_categories))
       end
-      if %w[games/ranking games/demo-favourites].include?(rest)
+      if (activity_match = rest.match(%r{\Acustomers/(CU-\d+)/activity\z}))
+        return if secured && !authorize(req, res, 'customers:read')
+        return json(res, 405, { error: 'GET required' }) unless req.request_method == 'GET'
+        return json(res, 404, { error: 'Customer not found' }) unless customer_store.find(activity_match[1])
+        if customer_store.prepare_customer_activity
+          state['revision'] += 1
+          document['audit'] << audit(req, 'customer_activity_demo_seeded', casino_id, { 'source' => 'synthetic_demo' })
+          persist(document)
+        end
+        customer_store.handle_customer_activity(req, res, activity_match[1])
+      elsif rest == 'loyalty' || rest.start_with?('loyalty/')
+        return if secured && !authorize(req, res, req.request_method == 'GET' ? 'loyalty:read' : 'loyalty:write')
+        customer_store.handle_loyalty(req, res, rest)
+      elsif %w[games/ranking games/demo-favourites].include?(rest)
         return if secured && !authorize(req, res, req.request_method == 'GET' ? 'games:read' : 'games:write')
         customer_store.handle_popular_games(req, res, rest)
       elsif rest == 'compliance' || rest.start_with?('compliance/')

@@ -4,7 +4,7 @@ const SECTIONS=[
 {k:'customers',href:'/crm/c/list/',n:NexLuckI18n.t("Customers"),i:'👥',c:'#2e844a'},
 {k:'games',href:'/crm/g/',n:NexLuckI18n.t("Games"),i:'🎰',c:'#e8590c'},
 {k:'bonuses',href:'/crm/b/',n:NexLuckI18n.t("Bonuses / Promotion"),i:'🎁',c:'#c23934'},
-{k:'loyalty',n:NexLuckI18n.t("Loyalty"),i:'⭐',c:'#b8860b'},
+{k:'loyalty',href:'/crm/loyalty/',n:NexLuckI18n.t("Loyalty"),i:'⭐',c:'#b8860b'},
 {k:'finance',href:'/crm/f/',n:NexLuckI18n.t("Finance"),i:'💶',c:'#0a7d8c'},
 {k:'compliance',href:'/coml/',n:NexLuckI18n.t("Compliance"),i:'🛡️',c:'#5a4fcf'},
 {k:'audit',n:NexLuckI18n.t("Audit"),i:'📋',c:'#444'}

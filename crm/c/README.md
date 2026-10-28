@@ -10,6 +10,9 @@
 - The center profile contains all distinct customer fields and the Edit button;
   there is no duplicate Customer info satellite. Creation/update timestamps sit
   to the upper left of the customer avatar.
+- The center column stacks two separate cards: the naturally sized profile and
+  Activity info underneath, with summary statistics and a filterable Activity
+  logs list. The profile no longer stretches to fill the center column.
 - Funnel status is editable and persisted: Lead, Registered, FTD, Trusted, VIP,
   Dormant. The main profile highlights the current stage; the list includes a
   funnel column and filter.
@@ -97,12 +100,51 @@ separately for balances and turnover. The same wallets are used by Finance.
   No bets displays an empty state; missing catalog metadata is explicitly
   shown as "Unmapped category" / "Unmapped provider".
 - Bonus activity: granted, wagered, cancelled amounts and event count.
-- Loyalty demo: 100 points per real-wallet bet; Silver at 200, Gold at 500.
+- Loyalty: persisted integer customer LP and configured casino tiers, with
+  editable LP and next-tier progress. See [Loyalty](../loyalty/README.md).
 
 Statistics are labelled as demo activity, grouped by wallet currency, and do
 not imply live analytics or completed bonus wagering requirements.
 
 Validation: `ruby crm/api/test/customer_store_test.rb`.
+
+## Activity logs
+
+The Activity info card below the central profile retains last login, session
+duration, game hours, devices and session frequency. Activity logs below those
+statistics show the newest event first, with 10 entries per page. Filter by
+event tag and inclusive UTC start/end dates; clearing filters returns to the
+latest page. Empty, loading and retryable error states are explicit.
+
+Every event includes `created_at`, `user_name`, `event_type`, `event_tag`,
+`session_id`, customer/casino ownership, an ID and structured detail fields.
+Tags: `customer`, `game`, `finance`, `loyalty`, `bonus`, `compliance`, `segment`.
+
+Demo mode saves 17 events per customer (16 types, including two sign-ins),
+covering registration/email confirmation, sign-in, segment assignment/removal,
+deposit, KYC request/approval, game round start/end with bets/wins/losses,
+LP/tier, completed bonus wagering, bonus-to-real transfer, and requested/approved
+cashout. Histories use fictional email addresses, varied amounts and timestamps,
+and two identifiable demo sessions. Histories are illustrative, not proofs of
+KYC approval, financial transactions or actual segment/tier assignment.
+They do not change balances, compliance states, segments, LP or rewards.
+
+Existing histories are never overwritten, including explicitly empty histories.
+Startup populates missing histories for existing demo customers; later reads
+also populate newly created demo profiles. Seeding and reads are serialized by
+the casino snapshot lock. Restarting preserves timestamps and event IDs.
+Authenticated mode does not generate demo events.
+
+`GET /crm/ui-api/v1/customers/{id}/activity` accepts `from`, `to`, `tag`,
+`offset` (default 0) and `limit` (default 10, maximum 100). Filtering occurs
+before pagination. Unknown/invalid filters return 422, foreign customers 404.
+The secured `/crm/api/v1/` equivalent requires `customers:read`.
+This is a read-only history viewer; live operational event ingestion is not
+connected. Deploy the new `crm/api/customer_activity.rb` module with the API.
+
+Validation: `python3 crm/api/test/customer_activity_test.py` (isolated API
+fixtures, all event types, filters, ownership, restart, non-demo seeding guard,
+Chrome profile layout, pagination, mobile and Russian UI).
 
 ## Rule-based segments
 
